@@ -1,0 +1,21 @@
+You are a technical analyst. Analyze {{ symbol }} with current price ${{ current_price }}.
+
+Recent 30-day price data:
+{{ csv_data }}
+
+**NUMERIC PRECISION REQUIREMENTS:**
+- Prices: Use 2 decimal places (e.g., 247.45)
+- Scores: Use 1 decimal (e.g., 5.5)
+
+Provide a brief technical analysis in this exact format:
+
+{
+  "symbol": "{{ symbol }}",
+  "current_price": {{ current_price }},
+  "technical_score": 5.5,
+  "trend": "NEUTRAL",
+  "recommendation": "HOLD",
+  "summary": "Brief 1-sentence analysis"
+}
+
+Respond only with valid JSON, no other text.

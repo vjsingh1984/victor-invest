@@ -1,0 +1,286 @@
+// InvestiGator - AI Investment Research Assistant
+// Copyright (c) 2025 Vijaykumar Singh
+// Licensed under the Apache License, Version 2.0
+// See LICENSE file for details
+
+= 🐊 InvestiGator - AI Investment Research Assistant
+:doctype: book
+:toc: left
+:toclevels: 3
+:sectanchors:
+:sectlinks:
+:sectnums:
+:source-highlighter: highlight.js
+:icons: font
+:imagesdir: images
+:reproducible:
+
+[source,text]
+----
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║ ████████╗███╗  ██╗██╗   ██╗███████╗███████╗████████╗██╗ ██████╗  █████╗████████╗║
+║ ╚══██╔══╝████╗ ██║██║   ██║██╔════╝██╔════╝╚══██╔══╝██║██╔════╝ ██╔══██╚══██╔══╝║
+║    ██║   ██╔██╗██║██║   ██║█████╗  ███████╗   ██║   ██║██║  ███╗███████║  ██║   ║
+║    ██║   ██║╚████║╚██╗ ██╔╝██╔══╝  ╚════██║   ██║   ██║██║   ██║██╔══██║  ██║   ║
+║    ██║   ██║ ╚███║ ╚████╔╝ ███████╗███████║   ██║   ██║╚██████╔╝██║  ██║  ██║   ║
+║    ╚═╝   ╚═╝  ╚══╝  ╚═══╝  ╚══════╝╚══════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═╝  ╚═╝   ║
+║                                                                              ║
+║            🐊  Institutional-grade investment research on your Mac.         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+----
+
+[.lead]
+InvestiGator unifies SEC fundamentals, technical indicators, and LLM synthesis to deliver privacy-first equity research with explainable outputs and repeatable workflows.
+
+== 📌 Quick Facts
+
+* *Primary entry point:* `./investigator_v2.sh` → `cli_orchestrator.py`
+* *Core runtime:* Python 3.11+, async agent framework, Ollama-hosted LLMs
+* *Target platform:* macOS 12+ on Apple Silicon (Metal acceleration enabled)
+* *Data sources:* SEC EDGAR APIs, local market data snapshot (PostgreSQL/Parquet)
+* *Caching:* Multi-layer (File/Parquet/RDBMS) with deterministic prompts
+* *Packaged namespace:* `src/investigator/` provides domain/application/infrastructure/interfaces layers while legacy modules in `agents/`, `core/`, and `utils/` remain during migration
+
+== 🧭 Architectural Overview
+
+[source,text]
+----
+                                 ┌────────────────────┐
+                                 │   CLI Orchestrator │
+                                 │(cli_orchestrator.py│
+                                 └─────────┬──────────┘
+                                           │
+     ┌───────────────────────────┬─────────┼──────────┬───────────────────────────┐
+     │                           │         │          │                           │
+┌────▼────┐                 ┌────▼────┐┌───▼───┐┌─────▼────┐                 ┌────▼────┐
+│ SEC     │                 │ Technical││Fundamental││ Market/ETF│           │Synthesis│
+│ Agent   │                 │ Agent    ││ Agent     ││ Context   │           │ Agent   │
+│ (sec)   │                 │ (tech)   ││ (fund)    ││ Agents    │           │ (synth) │
+└────┬────┘                 └────┬────┘└───┬───┘└─────┬────┘                 └────┬────┘
+     │                           │         │          │                           │
+     │         ┌─────────────────▼─────────▼──────────▼─────────────────┐         │
+     │         │          Agent Orchestrator (`core/`)                   │         │
+     │         │  • Task scheduling & dependency graph                   │         │
+     │         │  • Resource-aware LLM pool + semaphore                  │         │
+     │         │  • Metrics, retries, progress signalling                │         │
+     │         └────────────────────────────┬────────────────────────────┘         │
+     │                                      │                                      │
+     │                 ┌────────────────────▼─────────────────────┐                │
+     └────────────────▶│  Cache + Persistence Layer (`utils/`)    │◀───────────────┘
+                       │  • File/Parquet caches                   │
+                       │  • RDBMS (Postgres/SQLite)               │
+                       │  • Prompt/response registries            │
+                       └──────────────────────────────────────────┘
+----
+
+=== Component Responsibilities
+
+[cols="2,5",options="header"]
+|===
+| Component | Notes
+
+| `src/investigator/`
+| Installable package namespace (domain models, application orchestration, infrastructure adapters, shared utilities, interfaces). Source of truth for new modules (`application/orchestrator.py`, `cli.py`).
+
+| `core/`
+| Legacy orchestration primitives (LLM semaphore, resource-aware pool, metrics, job lifecycle) kept for backward compatibility while migration to `src/investigator/` completes.
+
+| `agents/`
+| Specialized async agents (SEC fundamentals, technical indicators, fundamentals, synthesis, ETF context) based on `InvestmentAgent`.
+
+| `api/` & `cli_orchestrator.py`
+| External interfaces exposing orchestration services to shell scripts, APIs, and tests.
+
+| `utils/`
+| Shared infrastructure: cache manager, database access, market data fetchers, ticker mapping, prompt optimization, logging helpers.
+
+| `patterns/`
+| Reusable prompt templates, formatting helpers, pattern matchers for LLM outputs.
+
+| `tests/`
+| Mirrored module structure, fixtures in `tests/fixtures/`, integration harnesses via CLI orchestrator.
+|===
+
+== 🗂️ Repository Map
+
+[source,text]
+----
+investigator/
+├─ src/investigator/   # Installable package (domain/, application/, infrastructure/, interfaces/, shared/)
+├─ agents/              # Agent implementations (sec, tech, fund, synth, market context)
+├─ api/                 # HTTP interface stubs & adapters
+├─ core/                # Orchestrator, scheduling, resource pool, metrics
+├─ utils/               # Cache, DB helpers, data fetchers, prompt optimizers
+├─ patterns/            # Prompt fragments, synthesis helpers, formatting utilities
+├─ tests/               # Unit + integration suites mirror runtime layout
+├─ data/                # On-disk caches (SEC, LLM, technical parquet)
+├─ archive/             # Git-ignored cold storage (historic logs, metrics, reports)
+├─ artifacts/           # Optional workspace for generated outputs during dev
+├─ diagrams/            # Architecture visuals consumed by README
+├─ investigator_v2.sh   # Preferred entrypoint; bootstraps Python orchestrator
+└─ cli_orchestrator.py  # Command routing for agentic pipeline
+----
+
+== 🔄 Data & Control Flow
+
+[source,text]
+----
+┌─────────────┐  tasks   ┌─────────────────┐  async jobs  ┌──────────────┐
+│ CLI / API   │─────────▶│ Agent Orchestrator│───────────▶│ Agent Workers │
+└─────┬───────┘          └────────┬────────┘             └────┬─────────┘
+      │                           │                          results
+      │                  cache lookups / writes               │
+      │                           ▼                          │
+      │                 ┌───────────────────┐                 │
+      │                 │ CacheManager      │◀────────────────┘
+      │                 │ • File (LLM JSON) │
+      │                 │ • Parquet (OHLCV) │
+      │                 │ • RDBMS snapshots │
+      │                 └────────┬──────────┘
+      │                          │
+      ▼                          │
+┌───────────────┐                │
+│ Result Synth  │◀───────────────┘
+└───────────────┘
+----
+
+*Markets & fundamentals* arrive through `utils.market_data_fetcher` and `utils.sec_companyfacts_extractor`.
+*LLM* requests are funneled via `core.resource_aware_pool` with GPU-aware scheduling.
+*Outputs* are persisted under `results/` with task metadata for downstream automation.
+
+== 🚀 Getting Started
+
+.Create an isolated environment
+[source,bash]
+----
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements-dev.txt
+----
+
+.Configure runtime
+* Copy `config.json.sample` → `config.json`, set a valid SEC user agent, and adjust Ollama endpoints (`config.yaml`).
+* Confirm local market-data database credentials (`utils/db.py`) or place CSV fallback data under `data/`.
+
+.Smoke test
+[source,bash]
+----
+./investigator_v2.sh --test-system
+----
+
+== 📈 Running Analyses
+
+[cols="2,4",options="header"]
+|===
+| Goal | Command
+| Single symbol comprehensive | `./investigator_v2.sh --symbol AAPL`
+| Standard-depth run | `./investigator_v2.sh --symbol MSFT --mode standard`
+| Batch from CLI | `python cli_orchestrator.py batch AAPL MSFT NVDA --mode comprehensive`
+| Peer comparison | `python cli_orchestrator.py compare AAPL MSFT GOOGL --output comparison.json`
+| Regenerate using cached artifacts | `python cli_orchestrator.py rerun-task <TASK_ID>`
+|=== 
+
+Generated artifacts land in `results/<SYMBOL_TIMESTAMP>.json` alongside cached prompts and charts under `data/`.
+
+== 🔧 Development Guidelines
+
+* *Code style:* PEP 8, 4-space indent, Google-style docstrings, functions <120 LOC.
+* *Tooling:* `black .`, `isort .`, `mypy patterns/ utils/`, `ruff .` (optional) before commits.
+* *Imports:* stdlib → third-party → local; pytest files named `test_<target>.py`.
+* *Configuration:* Extend existing abstractions (`config.py`, `config.yaml`) instead of new ad-hoc knobs.
+* *Caching:* Prefer `CacheManager` APIs; specify cache type enums for parity across handlers.
+* *Observability:* Use `structlog`-style context (symbol/task ids) for new log lines.
+
+== 🧪 Testing & Quality
+
+[source,bash]
+----
+pytest tests/ -v                               # core unit + integration
+pytest tests/ --cov=patterns --cov=utils \
+       --cov-report=html                       # coverage + HTML report in htmlcov/
+./investigator_v2.sh --test-system             # orchestrated smoke test
+./investigator_v2.sh --symbol TSLA --mode standard --dry-run  # CLI dry-run validation
+----
+
+*Fixtures* live in `tests/fixtures/` and mirror market/SEC data structures.
+Tag integration-heavy suites with `@pytest.mark.integration`.
+Mock SEC and Ollama dependencies in unit tests (see `tests/utils/test_cache.py` for patterns).
+
+== 🗄️ Cache & Persistence Layer
+
+* `utils/cache/cache_manager.py` — routing, TTL validation, promotion across handlers.
+* `utils/cache/file_cache_handler.py` — gzipped JSON for prompts & LLM outputs (stores `response` + `thinking` payloads).
+* `utils/cache/parquet_cache_handler.py` — parquet or pickle fallback for OHLCV data (handles DataFrame metadata).
+* `utils/cache/rdbms_cache_handler.py` — durable Postgres/SQLite table for LLM responses and synthesis artifacts.
+
+When writing new artifacts, supply:
+
+[source,python]
+----
+cache_manager.set(
+    CacheType.LLM_RESPONSE,
+    {'symbol': symbol, 'llm_type': 'fundamental_growth_analysis'},
+    llm_response_payload,
+)
+----
+
+The manager automatically skips lower-priority handlers when a higher layer already owns the key.
+
+== 🧠 Agent Reference
+
+[cols="2,3,5",options="header"]
+|===
+| Agent | Location | Responsibilities
+
+| SEC Agent | `agents/sec_agent.py` | Retrieves SEC facts, performs enrichment, caches summarized filings, primes fundamental agent context.
+| Technical Agent | `agents/technical_agent.py` | Loads OHLCV data, computes 80+ indicators, pattern recognition via Qwen-based reasoning.
+| Fundamental Agent | `agents/fundamental_agent.py` | Calculates ratios, market cap, data quality scores, valuation, forecasts.
+| Market Context Agent | `agents/etf_market_context_agent.py` | ETF-anchored macro overlays, sector breadth, liquidity regimes.
+| Synthesis Agent | `agents/synthesis_agent.py` | Merges upstream analyses, applies weighting heuristics, produces investment thesis & recommendations.
+|===
+
+Each agent inherits shared health checks, capability registration, and caching hooks from `agents/base.py`.
+
+== 🛠️ Operational Playbook
+
+* *Resource awareness:* `core.resource_aware_pool` dynamically loads models (Llama/Qwen/DeepSeek) respecting GPU VRAM checks in `core.llm_semaphore`.
+* *Retry semantics:* Failed agent tasks bubble up with detailed error codes; orchestrator retries idempotent operations before marking degraded.
+* *Metrics:* `metrics/` captures execution spans and cache hit ratios; integrate with Prometheus/OpenTelemetry if available.
+* *Logging:* Structured INFO-level logs track cache state (`Cache HIT/MISS`), market-data sufficiency, and LLM allocations.
+
+== 📁 Data & Assets
+
+* `data/sec_cache/` — SEC facts, parsed filings, LLM prompt cache.
+* `data/llm_cache/` — zipped JSON per symbol & `llm_type`.
+* `data/technical_cache/` — parquet/pickle OHLCV snapshots grouped by timeframe.
+* `results/` — active task outputs; move long-lived artifacts to `archive/results/` to keep diffs clean.
+* `metrics/` — JSON snapshots emitted by `utils.monitoring.MetricsCollector`, prune with `make clean` or `clean-all`.
+* `archive/` — git-ignored cold storage for historical logs, metrics, and reports.
+* `artifacts/` — optional workspace for temporary charts or comparisons during development.
+* `diagrams/` & `images/` — architecture/flow diagrams referenced by this README.
+
+== 🧹 Repository Hygiene
+
+* `make clean` removes bytecode, coverage artifacts, and other transient build outputs.
+* `make clean-all` additionally purges cached data (`data/*_cache/`) and staging folders under `artifacts/`.
+* Move long-running experiment logs or result snapshots into `archive/` once reviewed to keep the workspace and PR diffs lean.
+
+== 🧩 Contribution Workflow
+
+1. Fork or branch from `main`.
+2. Ensure CI green locally (`pytest`, `black`, `isort`, `mypy`).
+3. Use Conventional Commit prefixes (`feat:`, `fix:`, `docs:`, …).
+4. Reference related issues and maintain release notes in your fork (the upstream repository tracks history via git).
+5. Provide result snapshots (`results/*.json`) or logs demonstrating changes where relevant.
+
+== 📚 Glossary
+
+* *Analysis Mode* — `standard`, `comprehensive`, `quarterly` (affects workload & prompt set).
+* *Cache Type* — Enum in `utils/cache/cache_types.py` representing storage strategy.
+* *Thinking Trace* — Reasoning token stream returned by reasoning LLMs; persisted for transparency.
+* *Task ID* — `<SYMBOL>_<epoch>` identifier tracked throughout orchestrator logs and result payloads.
+
+== 🤝 License
+
+Apache 2.0 — see `LICENSE` and `NOTICE` for details.

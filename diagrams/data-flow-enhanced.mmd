@@ -1,0 +1,87 @@
+sequenceDiagram
+    participant CLI as investigator.sh
+    participant CONFIG as config.py
+    participant SEC as sec_fundamental.py
+    participant TECH as yahoo_technical.py
+    participant SYNTH as synthesizer.py
+    
+    participant SEC_API as SEC EDGAR API
+    participant YAHOO_API as Yahoo Finance API
+    participant OLLAMA as Ollama LLM
+    
+    participant CACHE as Cache Manager
+    participant FILE_CACHE as File Cache<br/>(Priority 20)
+    participant PARQUET_CACHE as Parquet Cache<br/>(Priority 15)
+    participant DB_CACHE as DB Cache<br/>(Priority 10)
+    
+    participant DATABASE as PostgreSQL
+    participant REPORTS as PDF Reports
+    participant EMAIL as Email Service
+
+    CLI->>CONFIG: Load configuration
+    CONFIG-->>CLI: Return config objects
+    
+    CLI->>SEC: Start SEC analysis
+    SEC->>CACHE: Check for cached company facts
+    
+    alt Cache Miss - Company Facts
+        CACHE->>SEC_API: Fetch company data
+        SEC_API-->>CACHE: Return company facts
+        CACHE->>FILE_CACHE: Store compressed JSON
+        CACHE->>DB_CACHE: Store in PostgreSQL
+    else Cache Hit
+        CACHE-->>SEC: Return cached data
+    end
+    
+    SEC->>CACHE: Check for cached SEC filings
+    
+    alt Cache Miss - SEC Filings  
+        CACHE->>SEC_API: Fetch 10-K/10-Q filings
+        SEC_API-->>CACHE: Return filing data
+        SEC->>OLLAMA: Generate LLM analysis
+        OLLAMA-->>SEC: Return fundamental analysis
+        CACHE->>FILE_CACHE: Store LLM response<br/>(gzip compressed)
+        Note over FILE_CACHE: Structure:<br/>data/llm_cache/{symbol}/<br/>llmresponse_sec_*.json.gz<br/>prompt_sec_*.txt.gz
+    else Cache Hit
+        CACHE-->>SEC: Return cached analysis
+    end
+    
+    CLI->>TECH: Start technical analysis
+    TECH->>CACHE: Check for cached price data
+    
+    alt Cache Miss - Technical Data
+        CACHE->>YAHOO_API: Fetch price/volume data
+        YAHOO_API-->>CACHE: Return market data
+        TECH->>TECH: Calculate 20+ indicators<br/>(RSI, MACD, Bollinger)
+        CACHE->>PARQUET_CACHE: Store time-series data
+        TECH->>OLLAMA: Generate technical analysis
+        OLLAMA-->>TECH: Return technical insights
+        CACHE->>FILE_CACHE: Store LLM response
+    else Cache Hit
+        CACHE-->>TECH: Return cached data
+    end
+    
+    CLI->>SYNTH: Start synthesis
+    SYNTH->>CACHE: Retrieve SEC analysis
+    SYNTH->>CACHE: Retrieve technical analysis
+    SYNTH->>OLLAMA: Generate investment synthesis<br/>(60% fundamental + 40% technical)
+    OLLAMA-->>SYNTH: Return final recommendation
+    
+    SYNTH->>CACHE: Store synthesis results
+    CACHE->>FILE_CACHE: Store comprehensive analysis
+    Note over FILE_CACHE: Structure:<br/>llmresponse_investment_synthesis_comprehensive.json.gz<br/>prompt_synthesis_comprehensive.txt
+    
+    SYNTH->>DATABASE: Store structured results
+    DATABASE-->>SYNTH: Confirm storage
+    
+    SYNTH->>REPORTS: Generate PDF report
+    REPORTS-->>SYNTH: Return PDF path
+    
+    opt Email Enabled
+        SYNTH->>EMAIL: Send report
+        EMAIL-->>SYNTH: Confirm delivery
+    end
+    
+    CLI-->>CLI: Analysis complete
+    
+    Note over CLI, EMAIL: Cache TTL Configuration:<br/>SEC Response: 90 days<br/>LLM Response: 30 days<br/>Technical Data: 1 day<br/>Company Facts: 90 days

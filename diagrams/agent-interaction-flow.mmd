@@ -1,0 +1,88 @@
+sequenceDiagram
+    participant CLIENT as Client Application
+    participant API as REST API Gateway
+    participant MANAGER as Agent Manager
+    participant QUEUE as Task Queue
+    participant EVENT_BUS as Event Bus
+    
+    participant SEC_AGENT as SEC Agent
+    participant TECH_AGENT as Technical Agent
+    participant FUND_AGENT as Fundamental Agent
+    participant SYNTH_AGENT as Synthesis Agent
+    
+    participant OLLAMA as Ollama Gateway
+    participant CACHE as Cache Layer
+    participant DB as Database
+    participant REPORTS as Report Service
+
+    CLIENT->>API: POST /analyze/symbol/AAPL
+    API->>MANAGER: Create analysis workflow
+    MANAGER->>EVENT_BUS: Publish AnalysisStarted event
+    
+    MANAGER->>QUEUE: Enqueue SEC analysis task
+    MANAGER->>QUEUE: Enqueue Technical analysis task
+    MANAGER->>QUEUE: Enqueue Fundamental analysis task
+    
+    Note over QUEUE: Parallel Agent Processing
+    
+    QUEUE->>SEC_AGENT: Process SEC filing analysis
+    QUEUE->>TECH_AGENT: Process technical indicators
+    QUEUE->>FUND_AGENT: Process fundamental metrics
+    
+    SEC_AGENT->>CACHE: Check for cached filings
+    alt Cache Miss
+        SEC_AGENT->>SEC_AGENT: Fetch SEC data via adapter
+        SEC_AGENT->>OLLAMA: POST /api/generate (Financial LLM)
+        OLLAMA-->>SEC_AGENT: Return structured analysis
+        SEC_AGENT->>CACHE: Store analysis results
+    else Cache Hit
+        CACHE-->>SEC_AGENT: Return cached analysis
+    end
+    
+    TECH_AGENT->>CACHE: Check for cached indicators
+    alt Cache Miss
+        TECH_AGENT->>TECH_AGENT: Fetch market data
+        TECH_AGENT->>TECH_AGENT: Calculate technical indicators
+        TECH_AGENT->>OLLAMA: POST /api/generate (Technical LLM)
+        OLLAMA-->>TECH_AGENT: Return technical analysis
+        TECH_AGENT->>CACHE: Store results
+    else Cache Hit
+        CACHE-->>TECH_AGENT: Return cached analysis
+    end
+    
+    FUND_AGENT->>CACHE: Check for fundamental data
+    alt Cache Miss
+        FUND_AGENT->>FUND_AGENT: Process financial metrics
+        FUND_AGENT->>OLLAMA: POST /api/generate (Fundamental LLM)
+        OLLAMA-->>FUND_AGENT: Return valuation analysis
+        FUND_AGENT->>CACHE: Store results
+    else Cache Hit
+        CACHE-->>FUND_AGENT: Return cached analysis
+    end
+    
+    SEC_AGENT->>EVENT_BUS: Publish SECAnalysisComplete
+    TECH_AGENT->>EVENT_BUS: Publish TechnicalAnalysisComplete
+    FUND_AGENT->>EVENT_BUS: Publish FundamentalAnalysisComplete
+    
+    EVENT_BUS->>MANAGER: All analysis agents completed
+    MANAGER->>QUEUE: Enqueue synthesis task
+    
+    QUEUE->>SYNTH_AGENT: Process investment synthesis
+    SYNTH_AGENT->>CACHE: Retrieve all analysis results
+    SYNTH_AGENT->>OLLAMA: POST /api/generate (Synthesis LLM)
+    Note over OLLAMA: Multi-modal synthesis<br/>60% Fundamental + 40% Technical<br/>Risk assessment<br/>Position sizing
+    OLLAMA-->>SYNTH_AGENT: Return investment recommendation
+    
+    SYNTH_AGENT->>DB: Store structured recommendation
+    SYNTH_AGENT->>EVENT_BUS: Publish SynthesisComplete
+    
+    EVENT_BUS->>REPORTS: Trigger report generation
+    REPORTS->>CACHE: Retrieve all analysis data
+    REPORTS->>REPORTS: Generate PDF report
+    REPORTS->>EVENT_BUS: Publish ReportGenerated
+    
+    EVENT_BUS->>MANAGER: Workflow completed
+    MANAGER->>API: Return analysis results
+    API-->>CLIENT: HTTP 200 + Analysis Summary
+    
+    Note over CLIENT,REPORTS: Asynchronous Processing:<br/>WebSocket/SSE updates<br/>Real-time progress tracking<br/>Error handling & retry logic

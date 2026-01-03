@@ -1,0 +1,700 @@
+// InvestiGator - Developer Guide
+// Copyright (c) 2025 Vijaykumar Singh
+// Licensed under the Apache License, Version 2.0
+
+= InvestiGator Developer Guide
+:doctype: book
+:toc: left
+:toclevels: 3
+:sectanchors:
+:sectlinks:
+:sectnums:
+:source-highlighter: highlight.js
+:icons: font
+:reproducible:
+
+[.lead]
+Comprehensive developer guide for contributing to and extending InvestiGator, an AI-powered investment research platform.
+
+== Quick Start
+
+=== Prerequisites
+
+* Python 3.11+ installed
+* macOS 12+ on Apple Silicon (Metal acceleration)
+* PostgreSQL database (for market data storage)
+* Ollama installed and running (`brew install ollama`)
+
+=== Initial Setup
+
+[source,bash]
+----
+# Clone and setup environment
+git clone <repository-url>
+cd InvestiGator
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements-dev.txt
+
+# Configure runtime
+cp config.json.sample config.json
+# Edit config.json with your SEC user agent and database credentials
+
+# Initialize database schema
+python3 cli_orchestrator.py setup-database
+
+# Run system health check
+python3 cli_orchestrator.py status
+----
+
+=== First Analysis
+
+[source,bash]
+----
+# Run comprehensive analysis for a symbol
+python3 cli_orchestrator.py analyze AAPL -m standard -o results/AAPL_analysis.json
+
+# Or use the convenience wrapper
+./investigator_v2.sh --symbol AAPL --mode standard
+----
+
+== Core Commands Reference
+
+=== Analysis Commands
+
+[source,bash]
+----
+# Single symbol analysis (modes: quick, standard, comprehensive)
+python3 cli_orchestrator.py analyze AAPL -m comprehensive -o results/AAPL.json
+
+# Batch analysis
+python3 cli_orchestrator.py batch AAPL MSFT GOOGL --mode standard --output-dir results/
+
+# Peer group comparison
+python3 cli_orchestrator.py compare AAPL MSFT GOOGL --output comparison.json
+
+# Force cache refresh (bypass all caches)
+python3 cli_orchestrator.py analyze TSLA --force-refresh
+----
+
+=== Cache Management Commands
+
+[source,bash]
+----
+# Clean all caches
+python3 cli_orchestrator.py clean-cache --all
+
+# Clean cache for specific symbol
+python3 cli_orchestrator.py clean-cache --symbol AAPL
+
+# Clean database cache only
+python3 cli_orchestrator.py clean-cache --db
+
+# Clean disk cache only
+python3 cli_orchestrator.py clean-cache --disk
+
+# Inspect cache contents
+python3 cli_orchestrator.py inspect-cache --symbol AAPL --verbose
+
+# Show cache sizes by type
+python3 cli_orchestrator.py cache-sizes
+----
+
+=== Testing Commands
+
+[source,bash]
+----
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ --cov=patterns --cov=utils --cov-report=html
+
+# Run specific test module
+pytest tests/cache/test_cache_manager.py -v
+
+# Run integration tests
+pytest tests/integration/ -v
+
+# System smoke test
+./investigator_v2.sh --test-system
+----
+
+=== Development Commands
+
+[source,bash]
+----
+# Format code
+black .
+
+# Sort imports
+isort .
+
+# Type checking
+mypy patterns/ utils/
+
+# Lint (optional)
+ruff .
+
+# System status check
+python3 cli_orchestrator.py status
+
+# View metrics
+python3 cli_orchestrator.py metrics --days 7
+
+# System statistics
+python3 cli_orchestrator.py system-stats
+----
+
+== Development Guidelines
+
+=== Code Style Standards
+
+==== PEP 8 Compliance
+
+* 4-space indentation (no tabs)
+* Maximum line length: 120 characters
+* Google-style docstrings for all public functions/classes
+* Type hints for function signatures
+* Function size: Keep under 120 lines of code (LOC)
+
+==== Naming Conventions
+
+[IMPORTANT]
+====
+*CRITICAL RULE:* All dictionary keys MUST use `snake_case` throughout the entire pipeline (agents, cache, synthesis, PDF).
+
+This ensures agents wire together on same keys without mapping confusion.
+====
+
+* *Variables, functions, methods:* `snake_case`
+* *Classes:* `PascalCase`
+* *Constants:* `UPPER_SNAKE_CASE`
+* *Private methods:* `_leading_underscore`
+* *Dictionary keys:* `snake_case` (ALWAYS)
+
+==== Import Organization
+
+[source,python]
+----
+# Standard library imports
+import os
+import json
+from typing import Dict, Optional
+
+# Third-party imports
+import pandas as pd
+from sqlalchemy import create_engine
+
+# Local application imports
+from config import get_config
+from utils.cache import get_cache_manager
+----
+
+=== Data Normalization Standards
+
+==== Field Naming Convention
+
+*ALL dictionary keys must use `snake_case`* for consistency across the pipeline.
+
+Required conversions from SEC API or LLM responses:
+
+[source,python]
+----
+# Convert camelCase to snake_case
+'marketCap' → 'market_cap'
+'priceTarget' → 'price_target'
+'currentPrice' → 'current_price'
+'fiscalPeriod' → 'fiscal_period'
+'revenueGrowth' → 'revenue_growth'
+----
+
+Implementation using `DataNormalizer`:
+
+[source,python]
+----
+from utils.data_normalizer import DataNormalizer
+
+# ALWAYS convert to snake_case before caching or passing to other agents
+data = DataNormalizer.normalize_field_names(data, to_camel_case=False)
+----
+
+==== Numeric Precision Standards
+
+[cols="3,2,2,3",options="header"]
+|===
+| Data Type | Internal Storage | Display Format | Example
+
+| Prices, Market Cap, Cash Flow | `float` with 2 decimals | `$XXX.XX` | `123.45` not `123.456789`
+| Ratios (P/E, P/B, etc.) | `float` with 4 decimals | `XX.XXXX` | `15.2500` not `15.250000123`
+| Percentages | `float` with 2 decimals | `XX.XX%` | `12.34` not `12.3456789`
+| Scores (0-10 or 0-100) | `float` with 2 decimals | `X.XX` | `7.50` not `7.5000001`
+| Confidence Levels | `float` 0-100 scale | `XX.XX%` | `85.00` not `0.85`
+|===
+
+Implementation:
+
+[source,python]
+----
+from utils.data_normalizer import DataNormalizer
+
+# Normalize and round in one step (recommended)
+normalized = DataNormalizer.normalize_and_round(
+    data,
+    to_camel_case=False  # Use snake_case for internal Python code
+)
+----
+
+==== Integration Points in Pipeline
+
+*Agent Output (Before Caching):*
+
+[source,python]
+----
+# agents/fundamental_agent.py (example)
+async def post_process(self, result: AgentResult) -> AgentResult:
+    """Normalize data before caching"""
+    from utils.data_normalizer import DataNormalizer
+
+    # Convert to snake_case and round for consistency
+    result.data = DataNormalizer.normalize_and_round(
+        result.data,
+        to_camel_case=False
+    )
+    return result
+----
+
+*SEC Data Extraction (At Source):*
+
+[source,python]
+----
+# utils/sec_companyfacts_extractor.py
+from utils.data_normalizer import DataNormalizer
+
+def extract_company_facts(cik: str) -> Dict[str, Any]:
+    """Extract company facts from SEC API"""
+    # Fetch from SEC API (returns camelCase)
+    raw_data = fetch_sec_api(cik)
+
+    # CRITICAL: Convert to snake_case IMMEDIATELY
+    normalized_data = DataNormalizer.normalize_field_names(
+        raw_data,
+        to_camel_case=False
+    )
+
+    # Now safe to save to database/cache with snake_case keys
+    save_to_database(normalized_data)
+    return normalized_data
+----
+
+*Synthesis Aggregation:*
+
+[source,python]
+----
+# agents/synthesis_agent.py
+def aggregate_analysis_scores(self, fundamental_data, technical_data):
+    """Aggregate scores from normalized inputs"""
+    from utils.data_normalizer import DataNormalizer
+
+    # Ensure inputs are normalized to snake_case with proper rounding
+    fundamental_data = DataNormalizer.normalize_and_round(
+        fundamental_data,
+        to_camel_case=False
+    )
+    technical_data = DataNormalizer.normalize_and_round(
+        technical_data,
+        to_camel_case=False
+    )
+
+    # Now safe to access with consistent keys (all snake_case)
+    return {
+        'market_cap': fundamental_data.get('market_cap'),
+        'current_price': technical_data.get('current_price'),
+        # ... rest of aggregation
+    }
+----
+
+=== Configuration Management
+
+==== Single Source of Truth
+
+All configuration should use `config.py`, `config.yaml`, and `config.json`:
+
+* *config.py*: Python dataclasses for type-safe configuration
+* *config.yaml*: Ollama endpoints, cache settings, runtime parameters
+* *config.json*: SEC user agent, database credentials, model specifications
+
+==== Adding New Configuration
+
+[source,python]
+----
+# config.py - Extend existing dataclasses
+@dataclass
+class NewFeatureConfig:
+    """Configuration for new feature"""
+    enabled: bool
+    parameter: str
+    timeout: int
+
+# Add to main Config class
+@dataclass
+class Config:
+    # ... existing configs ...
+    new_feature: NewFeatureConfig
+----
+
+=== Caching Best Practices
+
+==== Use CacheManager APIs
+
+[source,python]
+----
+from utils.cache import get_cache_manager
+from utils.cache.cache_types import CacheType
+
+cache_manager = get_cache_manager()
+
+# Store data
+cache_manager.set(
+    CacheType.LLM_RESPONSE,
+    {'symbol': 'AAPL', 'llm_type': 'fundamental_analysis'},
+    analysis_result
+)
+
+# Retrieve data
+cached_data = cache_manager.get(
+    CacheType.LLM_RESPONSE,
+    {'symbol': 'AAPL', 'llm_type': 'fundamental_analysis'}
+)
+----
+
+==== Include Fiscal Periods
+
+For fundamental data, *ALWAYS include `fiscal_period` in cache keys*:
+
+[source,python]
+----
+cache_key = {
+    'symbol': 'AAPL',
+    'llm_type': 'fundamental_growth_analysis',
+    'fiscal_period': self.get_current_fiscal_period()  # e.g., '2025-Q4'
+}
+----
+
+==== Cache Naming Convention
+
+Cache files should include symbol and fiscal period:
+
+----
+fundamental_AAPL_2025-Q4.json.gz  ✓ CORRECT
+fundamental_AAPL.json.gz          ✗ WRONG (missing period)
+----
+
+=== Observability and Logging
+
+==== Structured Logging
+
+Use `structlog`-style context with symbol and task IDs:
+
+[source,python]
+----
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Good - includes context
+logger.info(
+    f"Cache HIT for {symbol} fundamental analysis "
+    f"(fiscal_period={fiscal_period})"
+)
+
+# Good - includes context and agent name
+logger.warning(
+    f"Agent {agent_name} timeout for {symbol}, retrying..."
+)
+----
+
+==== Log Levels
+
+* *INFO*: Normal operation, cache hits/misses, task completion
+* *DEBUG*: Detailed diagnostics, data transformations
+* *WARNING*: Recoverable errors, missing data, retries
+* *ERROR*: Unrecoverable errors, failed tasks
+
+=== Testing Strategy
+
+==== Test Organization
+
+* *Mirror structure:* Test files mirror runtime module structure
+* *Naming:* Test files named `test_<target>.py`
+* *Fixtures:* Shared fixtures in `tests/fixtures/`
+* *Integration tags:* Use `@pytest.mark.integration` for integration tests
+
+==== Mock Dependencies
+
+[source,python]
+----
+# tests/agents/test_fundamental_agent.py
+import pytest
+from unittest.mock import Mock, patch
+
+@pytest.fixture
+def mock_ollama_client():
+    """Mock Ollama client for testing"""
+    client = Mock()
+    client.generate.return_value = {
+        'response': 'Test analysis',
+        'thinking': 'Test reasoning'
+    }
+    return client
+
+def test_fundamental_agent_analysis(mock_ollama_client):
+    """Test fundamental analysis with mocked LLM"""
+    # Test implementation
+    pass
+----
+
+==== Coverage Goals
+
+* *Core modules:* Aim for >80% coverage for `patterns/`, `utils/`, `agents/`
+* *Integration tests:* Full end-to-end workflows for critical paths
+* *HTML reports:* Generate with `pytest --cov --cov-report=html`
+
+== Common Debugging Scenarios
+
+=== NumPy Segfault on macOS (Exit Code 139)
+
+*Cause:* NumPy's Accelerate/LAPACK self-test fails during import
+
+*Symptoms:*
+
+* CLI crashes immediately with exit code 139
+* Importing `synthesizer` or `numpy` kills Python process
+* Backtrace: `numpy.lib.polynomial.polyfit → numpy.linalg.inv → numpy._mac_os_check`
+
+*Solution 1 - Quick Fix (Disable Accelerate Check):*
+
+[source,bash]
+----
+# Add to shell profile
+export NUMPY_DISABLE_MAC_OS_ACCELERATE=1
+
+# Test if it works
+python3 -c "import numpy; print('NumPy OK')"
+
+# If successful, add to ~/.zshrc or ~/.bashrc
+echo 'export NUMPY_DISABLE_MAC_OS_ACCELERATE=1' >> ~/.zshrc
+source ~/.zshrc
+----
+
+*Solution 2 - Reinstall NumPy with OpenBLAS:*
+
+[source,bash]
+----
+# Reinstall with stable BLAS backend (recommended)
+pip install --upgrade --force-reinstall "numpy==1.26.4" \
+    --only-binary=:all: --no-cache-dir
+
+# Or upgrade to NumPy 2.x (uses OpenBLAS by default on macOS)
+pip install --upgrade "numpy>=2.0.0"
+
+# Verify installation
+python3 -c "import numpy; print(f'NumPy {numpy.__version__} OK')"
+----
+
+=== Blank/Null Data in Analysis Results
+
+*Cause:* Stale cached data from previous broken code iterations
+
+*Solution:*
+
+[source,bash]
+----
+SYMBOL="AAPL"
+
+# Clear file caches (local)
+rm -rf data/llm_cache/${SYMBOL} data/sec_cache/facts/processed/${SYMBOL}
+
+# Clear database cache (requires network access)
+# Option 1: Direct database access
+PGPASSWORD=investigator psql -h ${DB_HOST:-localhost} -U investigator -d sec_database \
+  -c "DELETE FROM llm_responses WHERE symbol = '${SYMBOL}';"
+
+# Option 2: Use CLI command
+python3 cli_orchestrator.py clean-cache --symbol ${SYMBOL}
+
+# Run fresh analysis
+python3 cli_orchestrator.py analyze ${SYMBOL} -m standard
+----
+
+[NOTE]
+====
+The CLI and API pick up sector-multiple and model-selection rules from
+`config/sector_multiples.json` and `config/model_selection.yaml`. Update those
+files (see `docs/VALUATION_CONFIGURATION.md`) when adjusting valuation behavior.
+====
+
+=== Adjusting Valuation Configuration
+
+To tweak valuation behavior for CLI/API runs:
+
+. **Sector multiples** – edit `config/sector_multiples.json` and bump the
+  `last_updated` timestamp. Example (add Technology sector override):
+
+[source,json]
+----
+{
+  "Technology": {
+    "pe": 28.0,
+    "ev_ebitda": 20.0,
+    "ps": 7.0,
+    "pb": 5.5,
+    "sample_size": 60,
+    "last_updated": "2025-03-19T12:00:00Z"
+  }
+}
+----
+
+. **Model selection rules** – adjust `config/model_selection.yaml` to include or
+  exclude models for a given archetype. Example (down-weight P/S for financials):
+
+[source,yaml]
+----
+archetypes:
+  financial:
+    exclude:
+      - ps
+----
+
+. **Run analysis** – re-run CLI/API commands. No restart required; the config is
+  read on demand:
+
+[source,bash]
+----
+python3 cli_orchestrator.py analyze AAPL --mode comprehensive --force-refresh
+curl -X POST http://localhost:8080/api/analyze -d '{"symbol":"MSFT"}'
+----
+
+Best practice: commit the config changes alongside analysis results so peers can
+reproduce runs.
+
+=== Agent Timeout
+
+*Cause:* LLM taking too long, VRAM exhaustion, or network issues
+
+*Solution:*
+
+. Check Ollama status: `python3 cli_orchestrator.py status`
+. Check VRAM usage: Review LLM semaphore logs
+. Reduce concurrency: Lower `max_concurrent_agents` in config.yaml
+. Use smaller model: Switch from 70B to 7B model
+
+=== Cache Not Being Used
+
+*Cause:* Cache key mismatch, TTL expired, or cache disabled
+
+*Solution:*
+
+. Inspect cache: `python3 cli_orchestrator.py inspect-cache --symbol AAPL --verbose`
+. Check cache key structure (must include symbol, llm_type, fiscal_period)
+. Verify TTL hasn't expired
+. Check config: `force_refresh` should be `false`
+
+=== Missing Fiscal Period in Cache Files
+
+*Cause:* Cache key missing `fiscal_period` field
+
+*Solution:*
+
+[source,python]
+----
+# agents/fundamental_agent.py
+cache_key = {
+    'symbol': symbol,
+    'llm_type': 'fundamental_growth_analysis',
+    'fiscal_period': self.get_current_fiscal_period()  # e.g., '2025-Q4'
+}
+----
+
+== Commit Conventions
+
+Use *Conventional Commits* format with scope:
+
+* `feat(agent):` New agent feature
+* `fix(cache):` Cache bug fix
+* `fix(fundamental):` Fundamental analysis bug fix
+* `test(integration):` Integration test changes
+* `docs:` Documentation updates
+* `refactor(llm):` LLM integration refactoring
+* `perf(cache):` Performance improvement
+
+Example:
+
+[source,bash]
+----
+git commit -m "fix(cache): include fiscal_period in fundamental cache keys
+
+Ensures cache files are properly named with fiscal period (e.g.,
+fundamental_AAPL_2025-Q4.json.gz) instead of generic names. This prevents
+cache key collisions across different fiscal periods."
+----
+
+== Important File References
+
+=== Core Agent Implementation
+
+* `agents/base.py:50-150` - InvestmentAgent lifecycle management
+* `agents/orchestrator.py:100-300` - Dependency graph and parallel execution
+* `agents/fundamental_agent.py:200-400` - Financial ratio calculations
+* `agents/synthesis_agent.py:150-350` - Multi-agent output merging
+
+=== Cache System
+
+* `utils/cache/cache_manager.py:50-200` - Priority-based retrieval logic
+* `utils/cache/file_cache_handler.py:30-120` - Gzipped JSON storage
+* `utils/cache/rdbms_cache_handler.py:40-150` - PostgreSQL persistence
+
+=== LLM Integration
+
+* `core/llm_semaphore.py:80-200` - VRAM-aware concurrency control
+* `core/resource_aware_pool.py:100-300` - Multi-server load balancing
+* `patterns/llm/llm_facade.py:50-150` - High-level LLM interface
+
+=== Data Extraction
+
+* `utils/sec_companyfacts_extractor.py:100-400` - SEC facts parsing
+* `utils/market_data_fetcher.py:50-200` - OHLCV data retrieval
+* `utils/ticker_cik_mapper.py:30-100` - Symbol ↔ CIK mapping
+
+=== Data Normalization
+
+* `utils/data_normalizer.py` - Central normalization module
+** `DataNormalizer.normalize_field_names()` - camelCase ↔ snake_case conversion
+** `DataNormalizer.round_financial_data()` - Precision standardization
+** `DataNormalizer.normalize_and_round()` - One-step normalization (recommended)
+** `DataNormalizer.assess_completeness()` - Data quality assessment
+** *CRITICAL*: All SEC data should be converted to snake_case at extraction point
+** *CRITICAL*: All agent outputs must use snake_case before caching
+
+== Performance Characteristics
+
+* *First Run (no cache)*: 30-60 seconds (fresh LLM calls)
+* *Cached Run*: <2 seconds (file/RDBMS lookup)
+* *Cache Hit Rate*: 80-90% (same-day repeated analysis)
+* *Throughput*: 1-5 stocks/hour (first run), unlimited (cached)
+* *VRAM Usage*: Dynamic based on model size and concurrency
+
+== Additional Resources
+
+* *README.adoc*: System overview and architectural diagrams
+* *ARCHITECTURE.adoc*: Detailed architecture documentation
+* *API_REFERENCE.adoc*: API endpoint documentation
+* *CLAUDE.md*: AI assistant guidance (for Claude Code)
+
+---
+
+*Last Updated:* 2025-11-02 +
+*Version:* 1.0.0 +
+*License:* Apache 2.0

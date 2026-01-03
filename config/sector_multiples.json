@@ -1,0 +1,30 @@
+{
+  "_metadata": {
+    "source": "placeholder",
+    "refresh_cadence_days": 7
+  },
+  "Technology": {
+    "pe": 25.0,
+    "ev_ebitda": 18.0,
+    "ps": 6.0,
+    "pb": 5.0,
+    "sample_size": 50,
+    "last_updated": "2025-03-18T00:00:00Z"
+  },
+  "Financials": {
+    "pe": 12.0,
+    "ev_ebitda": 10.0,
+    "ps": 2.5,
+    "pb": 1.2,
+    "sample_size": 45,
+    "last_updated": "2025-03-18T00:00:00Z"
+  },
+  "Utilities": {
+    "pe": 15.0,
+    "ev_ebitda": 9.0,
+    "ps": 2.0,
+    "pb": 1.5,
+    "sample_size": 32,
+    "last_updated": "2025-03-18T00:00:00Z"
+  }
+}

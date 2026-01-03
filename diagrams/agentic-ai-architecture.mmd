@@ -1,0 +1,157 @@
+graph TB
+    subgraph "API Gateway Layer"
+        REST_API[InvestiGator REST API<br/>FastAPI Framework<br/>Authentication & Rate Limiting<br/>Request Validation]
+        GRAPHQL_API[GraphQL Endpoint<br/>Flexible Query Interface<br/>Real-time Subscriptions<br/>Schema Definition]
+    end
+
+    subgraph "Agent Orchestration Framework"
+        AGENT_MANAGER[Agent Manager<br/>Agent Lifecycle Management<br/>Task Scheduling<br/>Resource Allocation]
+        TASK_QUEUE[Task Queue System<br/>Redis/RabbitMQ<br/>Priority Queues<br/>Dead Letter Queues]
+        AGENT_REGISTRY[Agent Registry<br/>Agent Discovery<br/>Capability Mapping<br/>Health Monitoring]
+    end
+
+    subgraph "Specialized Investment Agents"
+        SEC_AGENT[SEC Analysis Agent<br/>Filing Processing<br/>XBRL Parsing<br/>Regulatory Compliance]
+        TECHNICAL_AGENT[Technical Analysis Agent<br/>Chart Pattern Recognition<br/>Indicator Calculations<br/>Market Sentiment]
+        FUNDAMENTAL_AGENT[Fundamental Agent<br/>Financial Metrics<br/>Valuation Models<br/>Business Quality Score]
+        SYNTHESIS_AGENT[Investment Synthesis Agent<br/>Multi-modal Integration<br/>Risk Assessment<br/>Portfolio Optimization]
+        PEER_AGENT[Peer Group Agent<br/>Comparative Analysis<br/>Sector Benchmarking<br/>Relative Valuations]
+        MARKET_AGENT[Market Data Agent<br/>Real-time Price Feeds<br/>Options Data<br/>Economic Indicators]
+    end
+
+    subgraph "Ollama Integration Layer"
+        OLLAMA_GATEWAY[Ollama Gateway<br/>REST API Client<br/>Connection Pooling<br/>Model Management]
+        MODEL_ROUTER[Model Router<br/>Task-specific Routing<br/>Load Balancing<br/>Failover Handling]
+        
+        subgraph "Model Instances"
+            FUNDAMENTAL_LLM[Fundamental LLM<br/>phi4-reasoning<br/>Financial Analysis Expert]
+            TECHNICAL_LLM[Technical LLM<br/>qwen2.5:32b<br/>Chart Pattern Expert]
+            SYNTHESIS_LLM[Synthesis LLM<br/>llama-3.3-70b<br/>Investment Decision Expert]
+            GENERALIST_LLM[Generalist LLM<br/>gemma2:27b<br/>General Purpose Agent]
+        end
+    end
+
+    subgraph "Event-Driven Architecture"
+        EVENT_BUS[Event Bus<br/>Apache Kafka/NATS<br/>Event Sourcing<br/>Message Routing]
+        EVENT_STORE[Event Store<br/>Complete Audit Trail<br/>Event Replay<br/>Time Travel Debugging]
+        STREAM_PROCESSOR[Stream Processor<br/>Real-time Analytics<br/>Pattern Detection<br/>Alert Generation]
+    end
+
+    subgraph "Enhanced Data Layer"
+        DATA_MESH[Data Mesh Architecture<br/>Domain-owned Data<br/>Self-serve Infrastructure<br/>Federated Governance]
+        
+        subgraph "Data Sources"
+            SEC_ADAPTER[SEC EDGAR Adapter<br/>Rate Limiting<br/>Retry Logic<br/>Data Validation]
+            YAHOO_ADAPTER[Yahoo Finance Adapter<br/>Real-time Streaming<br/>Historical Data<br/>Options Chain]
+            NEWS_ADAPTER[News Data Adapter<br/>RSS Feeds<br/>Social Sentiment<br/>Event Detection]
+            MACRO_ADAPTER[Macro Data Adapter<br/>Economic Indicators<br/>Fed Data<br/>Treasury Rates]
+        end
+    end
+
+    subgraph "Multi-tier Caching Strategy"
+        L1_CACHE[L1 Cache - Redis<br/>Hot Data<br/>Sub-millisecond Access<br/>In-memory Storage]
+        L2_CACHE[L2 Cache - File System<br/>Warm Data<br/>SSD Storage<br/>Compression]
+        L3_CACHE[L3 Cache - PostgreSQL<br/>Cold Data<br/>Complex Queries<br/>ACID Compliance]
+        VECTOR_CACHE[Vector Cache - Qdrant<br/>Semantic Search<br/>Document Embeddings<br/>Similarity Matching]
+    end
+
+    subgraph "AI/ML Pipeline"
+        FEATURE_STORE[Feature Store<br/>Feature Engineering<br/>Data Lineage<br/>Feature Serving]
+        ML_MODELS[ML Models<br/>Price Prediction<br/>Risk Assessment<br/>Anomaly Detection]
+        EMBEDDING_SERVICE[Embedding Service<br/>Document Embeddings<br/>Semantic Search<br/>RAG Pipeline]
+    end
+
+    subgraph "Monitoring & Observability"
+        METRICS_COLLECTOR[Metrics Collector<br/>Prometheus<br/>Custom Metrics<br/>Business KPIs]
+        DISTRIBUTED_TRACING[Distributed Tracing<br/>Jaeger/Zipkin<br/>Request Flow<br/>Performance Analysis]
+        LOG_AGGREGATION[Log Aggregation<br/>ELK Stack<br/>Structured Logging<br/>Search & Analysis]
+        ALERTING[Alerting System<br/>PagerDuty Integration<br/>Smart Notifications<br/>Escalation Policies]
+    end
+
+    subgraph "Output & Integration"
+        REPORT_SERVICE[Report Service<br/>PDF Generation<br/>Interactive Dashboards<br/>Custom Templates]
+        NOTIFICATION_SERVICE[Notification Service<br/>Multi-channel Delivery<br/>Email, Slack, SMS<br/>Personalization]
+        WEBHOOK_SERVICE[Webhook Service<br/>External Integrations<br/>Portfolio Management<br/>Trading Platforms]
+    end
+
+    %% API Layer Connections
+    REST_API --> AGENT_MANAGER
+    GRAPHQL_API --> AGENT_MANAGER
+    
+    %% Agent Orchestration
+    AGENT_MANAGER --> TASK_QUEUE
+    AGENT_MANAGER --> AGENT_REGISTRY
+    TASK_QUEUE --> SEC_AGENT
+    TASK_QUEUE --> TECHNICAL_AGENT
+    TASK_QUEUE --> FUNDAMENTAL_AGENT
+    TASK_QUEUE --> SYNTHESIS_AGENT
+    TASK_QUEUE --> PEER_AGENT
+    TASK_QUEUE --> MARKET_AGENT
+    
+    %% Agent to Ollama Integration
+    SEC_AGENT --> OLLAMA_GATEWAY
+    TECHNICAL_AGENT --> OLLAMA_GATEWAY
+    FUNDAMENTAL_AGENT --> OLLAMA_GATEWAY
+    SYNTHESIS_AGENT --> OLLAMA_GATEWAY
+    
+    OLLAMA_GATEWAY --> MODEL_ROUTER
+    MODEL_ROUTER --> FUNDAMENTAL_LLM
+    MODEL_ROUTER --> TECHNICAL_LLM
+    MODEL_ROUTER --> SYNTHESIS_LLM
+    MODEL_ROUTER --> GENERALIST_LLM
+    
+    %% Event Architecture
+    AGENT_MANAGER --> EVENT_BUS
+    EVENT_BUS --> EVENT_STORE
+    EVENT_BUS --> STREAM_PROCESSOR
+    
+    %% Data Layer
+    SEC_AGENT --> SEC_ADAPTER
+    TECHNICAL_AGENT --> YAHOO_ADAPTER
+    MARKET_AGENT --> NEWS_ADAPTER
+    PEER_AGENT --> MACRO_ADAPTER
+    
+    %% Caching Strategy
+    SEC_AGENT --> L1_CACHE
+    L1_CACHE --> L2_CACHE
+    L2_CACHE --> L3_CACHE
+    SYNTHESIS_AGENT --> VECTOR_CACHE
+    
+    %% AI/ML Pipeline
+    DATA_MESH --> FEATURE_STORE
+    FEATURE_STORE --> ML_MODELS
+    FUNDAMENTAL_AGENT --> EMBEDDING_SERVICE
+    
+    %% Monitoring
+    AGENT_MANAGER --> METRICS_COLLECTOR
+    OLLAMA_GATEWAY --> DISTRIBUTED_TRACING
+    EVENT_BUS --> LOG_AGGREGATION
+    METRICS_COLLECTOR --> ALERTING
+    
+    %% Output Services
+    SYNTHESIS_AGENT --> REPORT_SERVICE
+    REPORT_SERVICE --> NOTIFICATION_SERVICE
+    NOTIFICATION_SERVICE --> WEBHOOK_SERVICE
+
+    %% Styling
+    classDef api fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    classDef orchestration fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef agents fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef ollama fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef events fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef data fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef cache fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef ai fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
+    classDef monitor fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
+    classDef output fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+
+    class REST_API,GRAPHQL_API api
+    class AGENT_MANAGER,TASK_QUEUE,AGENT_REGISTRY orchestration
+    class SEC_AGENT,TECHNICAL_AGENT,FUNDAMENTAL_AGENT,SYNTHESIS_AGENT,PEER_AGENT,MARKET_AGENT agents
+    class OLLAMA_GATEWAY,MODEL_ROUTER,FUNDAMENTAL_LLM,TECHNICAL_LLM,SYNTHESIS_LLM,GENERALIST_LLM ollama
+    class EVENT_BUS,EVENT_STORE,STREAM_PROCESSOR events
+    class DATA_MESH,SEC_ADAPTER,YAHOO_ADAPTER,NEWS_ADAPTER,MACRO_ADAPTER data
+    class L1_CACHE,L2_CACHE,L3_CACHE,VECTOR_CACHE cache
+    class FEATURE_STORE,ML_MODELS,EMBEDDING_SERVICE ai
+    class METRICS_COLLECTOR,DISTRIBUTED_TRACING,LOG_AGGREGATION,ALERTING monitor
+    class REPORT_SERVICE,NOTIFICATION_SERVICE,WEBHOOK_SERVICE output

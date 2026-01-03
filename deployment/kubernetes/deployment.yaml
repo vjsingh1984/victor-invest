@@ -1,0 +1,290 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: investigator-api
+  namespace: investigator
+  labels:
+    app: investigator
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: investigator
+      component: api
+  template:
+    metadata:
+      labels:
+        app: investigator
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: api
+        image: ghcr.io/investigator/investigator-api:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: investigator-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: investigator-secrets
+              key: redis-url
+        - name: OLLAMA_BASE_URL
+          value: "http://ollama-service:11434"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: MAX_WORKERS
+          value: "4"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: cache-storage
+          mountPath: /app/data/cache
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: cache-storage
+        persistentVolumeClaim:
+          claimName: cache-pvc
+      - name: config
+        configMap:
+          name: investigator-config
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: investigator-worker
+  namespace: investigator
+  labels:
+    app: investigator
+    component: worker
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: investigator
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: investigator
+        component: worker
+    spec:
+      containers:
+      - name: worker
+        image: ghcr.io/investigator/investigator-worker:latest
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: investigator-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: investigator-secrets
+              key: redis-url
+        - name: OLLAMA_BASE_URL
+          value: "http://ollama-service:11434"
+        - name: WORKER_CONCURRENCY
+          value: "2"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "3000m"
+        volumeMounts:
+        - name: cache-storage
+          mountPath: /app/data/cache
+      volumes:
+      - name: cache-storage
+        persistentVolumeClaim:
+          claimName: cache-pvc
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ollama
+  namespace: investigator
+spec:
+  serviceName: ollama-service
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+          name: api
+        env:
+        - name: OLLAMA_MODELS
+          value: "/models"
+        - name: OLLAMA_NUM_PARALLEL
+          value: "4"
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: "1"  # Request GPU if available
+          limits:
+            memory: "16Gi"
+            cpu: "8000m"
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - name: models-storage
+          mountPath: /models
+        livenessProbe:
+          httpGet:
+            path: /api/tags
+            port: 11434
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                ollama pull llama3.2:11b
+                ollama pull qwen2.5:14b
+                ollama pull phi3:mini
+  volumeClaimTemplates:
+  - metadata:
+      name: models-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: investigator-api
+  namespace: investigator
+  labels:
+    app: investigator
+    component: api
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: http
+  selector:
+    app: investigator
+    component: api
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+  namespace: investigator
+  labels:
+    app: ollama
+spec:
+  clusterIP: None
+  ports:
+  - port: 11434
+    name: api
+  selector:
+    app: ollama
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: investigator-api-hpa
+  namespace: investigator
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: investigator-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: investigator-worker-hpa
+  namespace: investigator
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: investigator-worker
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Pods
+    pods:
+      metric:
+        name: investigator_queue_size
+      target:
+        type: AverageValue
+        averageValue: "10"

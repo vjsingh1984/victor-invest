@@ -1,0 +1,175 @@
+graph TB
+    subgraph "Application Layer"
+        SEC_APP[SEC Analysis<br/>sec_fundamental.py<br/>Filing processing]
+        TECH_APP[Technical Analysis<br/>yahoo_technical.py<br/>Indicator calculations]
+        SYNTH_APP[Synthesis Engine<br/>synthesizer.py<br/>Investment recommendations]
+        PEER_APP[Peer Analysis<br/>Comparative metrics<br/>Russell 1000 data]
+    end
+
+    subgraph "Unified Cache Manager"
+        CACHE_MGR[Cache Manager<br/>utils/cache/cache_manager.py<br/>Priority-based routing<br/>TTL management<br/>Hit/Miss tracking]
+        
+        subgraph "Cache Operations"
+            GET_OP[GET Operation<br/>Priority-based lookup<br/>Automatic promotion<br/>Fallback chain]
+            SET_OP[SET Operation<br/>Multi-backend storage<br/>Compression handling<br/>Metadata tracking]
+            EXISTS_OP[EXISTS Operation<br/>Fast existence check<br/>Avoid data transfer<br/>Backend optimization]
+            DELETE_OP[DELETE Operation<br/>Cascading deletion<br/>Cleanup coordination<br/>Reference management]
+        end
+    end
+
+    subgraph "Storage Backend Layer - Priority Based"
+        subgraph "Priority 30: Memory Cache"
+            MEM_CACHE[Memory Cache Handler<br/>RAM-based storage<br/>Sub-millisecond access<br/>LRU eviction<br/>Process-local scope]
+        end
+        
+        subgraph "Priority 20: File Cache"
+            FILE_CACHE[File Cache Handler<br/>utils/cache/file_cache_handler.py<br/>JSON + gzip compression<br/>10-50ms access time]
+            
+            subgraph "File Structure"
+                LLM_FILES[LLM Cache Files<br/>data/llm_cache/{symbol}/<br/>llmresponse_*.json.gz<br/>prompt_*.txt.gz<br/>response_*.txt]
+                SEC_FILES[SEC Cache Files<br/>data/sec_cache/<br/>{symbol}_{cik}.json.gz<br/>Company facts data]
+                GENERAL_FILES[General Cache<br/>Configurable locations<br/>TTL-based cleanup<br/>Atomic operations]
+            end
+        end
+        
+        subgraph "Priority 15: Parquet Cache"
+            PARQUET_CACHE[Parquet Cache Handler<br/>utils/cache/parquet_cache_handler.py<br/>Columnar time-series storage<br/>15-30ms access time]
+            
+            subgraph "Parquet Structure"
+                TECH_PARQUET[Technical Data<br/>data/technical_cache/<br/>Price history<br/>Indicator calculations<br/>Volume data]
+                METRICS_PARQUET[Financial Metrics<br/>Quarterly data<br/>Historical comparisons<br/>Trend analysis]
+            end
+        end
+        
+        subgraph "Priority 10: Database Cache"
+            RDBMS_CACHE[RDBMS Cache Handler<br/>utils/cache/rdbms_cache_handler.py<br/>PostgreSQL JSONB<br/>50-200ms access time]
+            
+            subgraph "Database Tables"
+                LLM_TBL[(llm_responses)<br/>Structured LLM outputs<br/>Processing metadata<br/>Full-text search]
+                SEC_TBL[(sec_companyfacts)<br/>Financial statement data<br/>XBRL parsed content<br/>Historical archives]
+                TECH_TBL[(technical_indicators)<br/>Calculated indicators<br/>Time-series data<br/>Cross-symbol analysis]
+                PEER_TBL[(peer_metrics)<br/>Comparative data<br/>Sector benchmarks<br/>Russell 1000 mappings]
+            end
+        end
+        
+        subgraph "Priority 5: Vector Cache"
+            VECTOR_CACHE[Vector Cache Handler<br/>Semantic search<br/>Document embeddings<br/>Similarity matching]
+            
+            subgraph "Vector Storage"
+                SEMANTIC_DB[Vector Database<br/>Document embeddings<br/>Semantic similarity<br/>Content clustering]
+                FILING_VECTORS[Filing Vectors<br/>SEC document embeddings<br/>Content similarity search<br/>Historical pattern matching]
+            end
+        end
+    end
+
+    subgraph "Cache Intelligence Layer"
+        HIT_TRACKER[Hit/Miss Tracker<br/>Performance analytics<br/>Cache efficiency metrics<br/>Usage pattern analysis]
+        
+        PROMOTION_ENGINE[Promotion Engine<br/>Frequency-based promotion<br/>Hot data identification<br/>Automatic tier management]
+        
+        TTL_MANAGER[TTL Manager<br/>Time-to-live enforcement<br/>Staggered refresh<br/>Background cleanup]
+        
+        COMPRESSION_MGR[Compression Manager<br/>gzip level 9 (70-80% reduction)<br/>JSONB optimization<br/>Adaptive compression]
+        
+        WARMING_ENGINE[Cache Warming<br/>Predictive pre-loading<br/>Russell 1000 warming<br/>Scheduled population]
+    end
+
+    subgraph "Performance Optimization"
+        ASYNC_LOADER[Async Loader<br/>Background data loading<br/>Non-blocking operations<br/>Parallel processing]
+        
+        BATCH_PROCESSOR[Batch Processor<br/>Bulk operations<br/>Transaction optimization<br/>Reduced overhead]
+        
+        CONN_POOL[Connection Pooling<br/>Database connections<br/>Resource management<br/>Connection reuse]
+        
+        METRICS_COLLECTOR[Metrics Collector<br/>Operation timing<br/>Throughput measurement<br/>Error tracking]
+    end
+
+    subgraph "Cache Types & TTL Configuration"
+        CACHE_TYPES[Cache Type Definitions<br/>utils/cache/cache_types.py<br/>Enum-based typing<br/>TTL specifications]
+        
+        subgraph "TTL Matrix"
+            SHORT_TTL[Short TTL (1-7 days)<br/>technical_data: 1 day<br/>price_data: 1 day<br/>market_indicators: 1 day]
+            
+            MEDIUM_TTL[Medium TTL (30 days)<br/>llm_response: 30 days<br/>analysis_results: 30 days<br/>synthesis_output: 30 days]
+            
+            LONG_TTL[Long TTL (90+ days)<br/>sec_response: 90 days<br/>company_facts: 90 days<br/>quarterly_metrics: 90 days<br/>peer_data: 90 days]
+        end
+    end
+
+    %% Application to Cache Manager
+    SEC_APP --> CACHE_MGR
+    TECH_APP --> CACHE_MGR
+    SYNTH_APP --> CACHE_MGR
+    PEER_APP --> CACHE_MGR
+    
+    %% Cache Manager to Operations
+    CACHE_MGR --> GET_OP
+    CACHE_MGR --> SET_OP
+    CACHE_MGR --> EXISTS_OP
+    CACHE_MGR --> DELETE_OP
+    
+    %% Operations to Storage Backends
+    GET_OP --> MEM_CACHE
+    GET_OP --> FILE_CACHE
+    GET_OP --> PARQUET_CACHE
+    GET_OP --> RDBMS_CACHE
+    GET_OP --> VECTOR_CACHE
+    
+    SET_OP --> MEM_CACHE
+    SET_OP --> FILE_CACHE
+    SET_OP --> PARQUET_CACHE
+    SET_OP --> RDBMS_CACHE
+    SET_OP --> VECTOR_CACHE
+    
+    %% File Cache Structure
+    FILE_CACHE --> LLM_FILES
+    FILE_CACHE --> SEC_FILES
+    FILE_CACHE --> GENERAL_FILES
+    
+    %% Parquet Cache Structure
+    PARQUET_CACHE --> TECH_PARQUET
+    PARQUET_CACHE --> METRICS_PARQUET
+    
+    %% Database Cache Structure
+    RDBMS_CACHE --> LLM_TBL
+    RDBMS_CACHE --> SEC_TBL
+    RDBMS_CACHE --> TECH_TBL
+    RDBMS_CACHE --> PEER_TBL
+    
+    %% Vector Cache Structure
+    VECTOR_CACHE --> SEMANTIC_DB
+    VECTOR_CACHE --> FILING_VECTORS
+    
+    %% Intelligence Layer Integration
+    CACHE_MGR --> HIT_TRACKER
+    CACHE_MGR --> PROMOTION_ENGINE
+    CACHE_MGR --> TTL_MANAGER
+    CACHE_MGR --> COMPRESSION_MGR
+    CACHE_MGR --> WARMING_ENGINE
+    
+    %% Performance Optimization
+    CACHE_MGR --> ASYNC_LOADER
+    CACHE_MGR --> BATCH_PROCESSOR
+    RDBMS_CACHE --> CONN_POOL
+    CACHE_MGR --> METRICS_COLLECTOR
+    
+    %% Configuration
+    CACHE_MGR --> CACHE_TYPES
+    CACHE_TYPES --> SHORT_TTL
+    CACHE_TYPES --> MEDIUM_TTL
+    CACHE_TYPES --> LONG_TTL
+
+    %% Styling
+    classDef app fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef manager fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef storage fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef intelligence fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef performance fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef config fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+
+    class SEC_APP,TECH_APP,SYNTH_APP,PEER_APP app
+    class CACHE_MGR,GET_OP,SET_OP,EXISTS_OP,DELETE_OP manager
+    class MEM_CACHE,FILE_CACHE,PARQUET_CACHE,RDBMS_CACHE,VECTOR_CACHE,LLM_FILES,SEC_FILES,GENERAL_FILES,TECH_PARQUET,METRICS_PARQUET,LLM_TBL,SEC_TBL,TECH_TBL,PEER_TBL,SEMANTIC_DB,FILING_VECTORS storage
+    class HIT_TRACKER,PROMOTION_ENGINE,TTL_MANAGER,COMPRESSION_MGR,WARMING_ENGINE intelligence
+    class ASYNC_LOADER,BATCH_PROCESSOR,CONN_POOL,METRICS_COLLECTOR performance
+    class CACHE_TYPES,SHORT_TTL,MEDIUM_TTL,LONG_TTL config

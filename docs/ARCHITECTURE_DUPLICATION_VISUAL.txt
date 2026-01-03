@@ -1,0 +1,196 @@
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+INVESTIGATOR ARCHITECTURE DUPLICATION MAP
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+ENTRY POINT:
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ cli_orchestrator.py (USES NEW ARCHITECTURE)                                                      │
+│ ├─ from investigator.application import AgentOrchestrator ✓ (NEW)                               │
+│ ├─ from investigator.infrastructure.cache import CacheManager ✓ (NEW)                           │
+│ ├─ from investigator.infrastructure.llm import OllamaClient ✓ (NEW)                             │
+│ └─ from utils.monitoring import MetricsCollector ✗ (OLD - NOT MIGRATED)                        │
+└─────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+CRITICAL DUPLICATION #1: AGENT IMPLEMENTATIONS
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+OLD STRUCTURE (Still exists)              NEW STRUCTURE (Partially active)
+════════════════════════════════════════  ════════════════════════════════════════
+agents/                                   src/investigator/domain/agents/
+├─ base.py (707 lines)                   ├─ base.py (569 lines)
+│  ├─ class InvestmentAgent               │  ├─ class InvestmentAgent
+│  ├─ class AgentTask                     │  ├─ class AgentTask
+│  ├─ class AgentResult                   │  ├─ class AgentResult
+│  ├─ class TaskStatus                    │  ├─ class TaskStatus
+│  └─ class Priority                      │  └─ class Priority
+│
+├─ fundamental_agent.py (3206 lines)     ├─ fundamental.py (3249 lines)
+│  └─ class FundamentalAnalysisAgent      │  └─ class FundamentalAnalysisAgent
+│     STILL IMPORTED BY:                 │     IMPORTS FROM OLD:
+│     • agents/orchestrator.py            │     • agents.base (AgentResult, etc.) ✗✗✗
+│     • Old tests                         │
+│                                         │
+├─ synthesis_agent.py (2244 lines)       ├─ synthesis.py (2216 lines)
+│  └─ class SynthesisAgent                │  └─ class SynthesisAgent
+│     IMPORTS FROM OLD BASE               │     IMPORTS FROM OLD BASE ✗✗✗
+│                                         │
+├─ technical_agent.py (852 lines)        ├─ technical.py (841 lines)
+│  └─ class TechnicalAnalysisAgent        │  └─ class TechnicalAnalysisAgent
+│     IMPORTS FROM OLD BASE               │     IMPORTS FROM OLD BASE ✗✗✗
+│                                         │
+├─ sec_agent.py (878 lines)              ├─ sec.py (833 lines)
+│  └─ class SECAnalysisAgent              │  └─ class SECAnalysisAgent
+│     IMPORTS FROM OLD BASE               │     IMPORTS FROM OLD BASE ✗✗✗
+│                                         │
+└─ etf_market_context_agent.py (1078)   └─ market_context.py (1101 lines)
+   └─ class ETFMarketContextAgent            └─ class ETFMarketContextAgent
+      IMPORTS FROM OLD BASE                    IMPORTS FROM OLD BASE ✗✗✗
+
+STATUS: 90% IDENTICAL CODE, CONFLICTING INHERITANCE CHAINS
+TOTAL DUPLICATION: ~10,589 + 8,809 = 19,398 lines of nearly identical code
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+CRITICAL DUPLICATION #2: CACHE LAYER
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+OLD CACHE (Still in use)                  NEW CACHE (Also in use)
+════════════════════════════════════════  ════════════════════════════════════════
+utils/cache/                              src/investigator/infrastructure/cache/
+├─ cache_manager.py (1060 lines)         ├─ cache_manager.py (1109 lines)
+│  ├─ class CacheManager                  │  ├─ class CacheManager
+│  ├─ def get(key)                        │  ├─ def get(key)
+│  ├─ def put(key, value)                 │  ├─ def put(key, value)
+│  └─ ... 50+ more methods               │  └─ ... 50+ more methods
+│
+├─ cache_types.py                        ├─ cache_types.py
+│  └─ class CacheType(Enum)              │  └─ class CacheType(Enum)
+│
+├─ cache_base.py                         ├─ cache_base.py
+│  └─ class CacheStorageHandler          │  └─ class CacheStorageHandler
+│
+├─ file_cache_handler.py                 ├─ file_cache_handler.py
+├─ rdbms_cache_handler.py                ├─ rdbms_cache_handler.py
+├─ parquet_cache_handler.py              ├─ parquet_cache_handler.py
+├─ cache_cleaner.py                      ├─ cache_cleaner.py
+├─ cache_inspector.py                    ├─ cache_inspector.py
+└─ ... other files (800+ lines)          └─ ... other files (800+ lines)
+
+IMPORT PATTERN:
+• CLI imports from: investigator.infrastructure.cache (NEW) ✓
+• Domain agents import from: utils.cache (OLD) ✗
+• Tests import from: utils.cache (OLD) ✗
+
+STATUS: NEARLY 100% IDENTICAL, BOTH EXIST IN PARALLEL
+TOTAL DUPLICATION: ~3,000 + 3,100 = 6,100 lines of identical code
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+CRITICAL DUPLICATION #3: MODEL DEFINITIONS
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+OLD MODELS                                NEW MODELS
+════════════════════════════════════════  ════════════════════════════════════════
+agents/base.py                            src/investigator/domain/models/
+├─ @dataclass AgentTask                  ├─ analysis.py
+├─ @dataclass AgentResult                │  ├─ @dataclass AgentTask
+├─ enum TaskStatus                       │  ├─ @dataclass AgentResult
+├─ enum Priority                         │  └─ enum TaskStatus
+└─ enum AnalysisType                     │
+                                         ├─ recommendation.py
+                                         │  └─ @dataclass InvestmentRecommendation
+                                         │
+                                         └─ value_objects/
+                                            └─ Various value objects
+
+SAME CLASSES DEFINED IN BOTH LOCATIONS!
+Can import AgentTask from either:
+  • agents.base import AgentTask (old)
+  • investigator.domain.models.analysis import AgentTask (new)
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+RUNTIME DEPENDENCY GRAPH (CURRENT HYBRID STATE)
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────┐
+│   cli_orchestrator.py        │
+│   (Entry point - 1230 lines) │
+└──────────────┬───────────────┘
+               │
+      ┌────────┴────────┐
+      │                 │
+      ▼                 ▼
+┌──────────────────────────┐  ┌──────────────────────────┐
+│ investigator.application │  │ investigator.domain      │
+│ .orchestrator (NEW)      │  │ .agents.* (NEW)          │
+│                          │  │                          │
+│ ├─ AgentOrchestrator     │  │ ├─ FundamentalAgent      │
+│ ├─ AnalysisMode          │  │ ├─ SECAgent              │
+│ └─ Priority              │  │ ├─ TechnicalAgent        │
+└──────────┬───────────────┘  │ └─ SynthesisAgent        │
+           │                  │                          │
+           │  ┌───────────────► BUT THESE IMPORT FROM:  │
+           │  │                └──────────────────────────┘
+           │  │                         │
+           │  │                         ▼
+           │  │                ┌──────────────────────────┐
+           │  │                │ agents.base (OLD)       │
+           │  │                │ ✗ WRONG LAYER!          │
+           │  │                │                          │
+           │  │                │ ├─ InvestmentAgent       │
+           │  │                │ ├─ AgentTask             │
+           │  │                │ ├─ AgentResult           │
+           │  │                │ └─ TaskStatus            │
+           │  │                └──────────────────────────┘
+           │  │
+           ▼  ▼
+      ┌──────────────────────────────┐
+      │  utils.cache (OLD)           │
+      │  ✗ NEW agents still use this │
+      │                              │
+      │  ├─ CacheManager             │
+      │  ├─ CacheType                │
+      │  └─ Various handlers         │
+      └──────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+WHAT'S ACTUALLY BEING EXECUTED
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+When you run: python3 cli_orchestrator.py analyze AAPL
+
+1. CLI loads AgentOrchestrator from: NEW architecture ✓
+2. Orchestrator instantiates agents from: NEW domain layer ✓
+3. Domain agents inherit from: OLD agents.base ✗✗ PROBLEM
+4. Domain agents use cache from: OLD utils.cache ✗✗ PROBLEM
+5. Tests run against: OLD agents.* directly ✗✗ TESTS BYPASS NEW LAYER
+
+RESULT: Hybrid execution with conflicting dependencies
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+SUMMARY STATISTICS
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+Total Lines of Duplicated Code:        ~19,398 (agents) + 6,100 (cache) = 25,498+ lines
+Number of Duplicated Classes:          6+ (InvestmentAgent, AgentTask, AgentResult, etc.)
+Number of Duplicated Methods:          100+ (cache, agents, utilities)
+Number of Conflicting Import Paths:    12+ (can import same class from 2+ locations)
+Test Files Using OLD Imports:          80+ test files still use old agents.* imports
+Migration Completion:                  60% (CLI updated, but deep layers still duplicate)
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+DEDUPLICATION PRIORITY
+═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+IMMEDIATE (Fix next run):
+  1. Domain agents must import from domain models, NOT from agents.base
+  2. Break the circular/hybrid dependency chain
+
+SHORT-TERM (This week):
+  3. Consolidate cache layer - delete utils/cache/ after updating imports
+  4. Migrate test imports to use new architecture paths
+
+MEDIUM-TERM (Next week):
+  5. Remove entire /agents/ directory
+  6. Move remaining /utils/ content to infrastructure layer
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════

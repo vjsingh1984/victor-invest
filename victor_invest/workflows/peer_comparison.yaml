@@ -1,0 +1,134 @@
+# Peer Comparison Workflow
+# ========================
+# Analyze target company with peer group comparison
+# Uses LLM for comparative analysis synthesis
+
+workflows:
+  peer_comparison:
+    description: "Analyze target company with peer group comparison"
+
+    metadata:
+      version: "1.0"
+      author: "victor_invest"
+      vertical: investment
+      expected_duration_seconds: 120
+      llm_calls: 1
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Analyze Target Company
+      # =====================================================================
+      - id: analyze_target
+        type: compute
+        name: "Analyze Target Company"
+        handler: run_fundamental_analysis
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        output: target_analysis
+        next: [identify_peers]
+
+      # =====================================================================
+      # Stage 2: Identify Peer Group
+      # =====================================================================
+      - id: identify_peers
+        type: compute
+        name: "Identify Peer Group"
+        handler: identify_peers
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        input_mapping:
+          target_analysis: target_analysis
+        output: peer_list
+        next: [check_peers]
+
+      - id: check_peers
+        type: condition
+        name: "Check Peer Availability"
+        condition: "should_request_peer_comparison"
+        branches:
+          "compare_peers": analyze_peers
+          "skip_peers": generate_solo_report
+          "default": analyze_peers
+
+      # =====================================================================
+      # Stage 3: Analyze Peer Companies
+      # =====================================================================
+      - id: analyze_peers
+        type: compute
+        name: "Analyze Peer Companies"
+        handler: analyze_peers
+        constraints:
+          llm_allowed: false
+          timeout: 180
+        input_mapping:
+          peer_list: peer_list
+        output: peer_analyses
+        next: [compare_peers]
+
+      # =====================================================================
+      # Stage 4: Comparative Analysis (LLM)
+      # =====================================================================
+      - id: compare_peers
+        type: agent
+        name: "Compare Peer Group"
+        role: investment_analyst
+        goal: |
+          Compare the target company against its peer group.
+
+          ## Analysis Framework
+
+          1. **Relative Valuation**
+             - Compare P/E, P/S, EV/EBITDA multiples vs peers
+             - Identify if target is trading at premium or discount
+             - Justify valuation differential if any
+
+          2. **Growth Comparison**
+             - Revenue growth rates vs peers
+             - Earnings growth trajectory
+             - Market share trends
+
+          3. **Profitability Ranking**
+             - Gross margin vs peers
+             - Operating margin comparison
+             - ROE and ROIC analysis
+
+          4. **Technical Momentum**
+             - Relative strength vs peer group
+             - Price performance comparison
+
+          ## Output
+
+          Provide a clear assessment:
+          - Is the target company undervalued or overvalued relative to peers?
+          - What are the key differentiators?
+          - Investment recommendation in peer context
+        tool_budget: 0
+        llm_config:
+          temperature: 0.3
+          max_tokens: 3000
+        input_mapping:
+          target_analysis: target_analysis
+          peer_analyses: peer_analyses
+        output: peer_comparison
+        next: [complete]
+
+      - id: generate_solo_report
+        type: compute
+        name: "Generate Solo Report"
+        handler: generate_report
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        input_mapping:
+          synthesis: target_analysis
+        output: report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Comparison Complete"
+        transform: |
+          workflow_status = "completed"
+          analysis_mode = "peer_comparison"

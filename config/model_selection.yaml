@@ -1,0 +1,59 @@
+defaults:
+  include:
+    - dcf
+    - pe
+    - ev_ebitda
+    - ps
+    - pb
+    - ggm
+  exclude: []
+  min_models: 2
+  blocking_flags:
+    LOW_LIQUIDITY:
+      - ps
+
+archetypes:
+  high_growth:
+    include:
+      - dcf
+      - pe
+      - ps
+      - ev_ebitda
+    exclude:
+      - pb
+    blocking_flags:
+      OUTLIER_DETECTED:
+        - pb
+    secondary:
+      capital_intensive:
+        include:
+          - ev_ebitda
+        exclude: []
+  financial:
+    include:
+      - dcf
+      - pb
+      - pe
+      - ev_ebitda
+    exclude:
+      - ps
+    blocking_flags:
+      NEGATIVE_DENOMINATOR:
+        - pe
+  # Insurance companies should use P/B as the primary model
+  insurance:
+    include:
+      - pb
+      - dcf
+      - pe
+    exclude:
+      - ps
+      - ev_ebitda
+    blocking_flags: {}
+  mature_dividend:
+    include:
+      - dcf
+      - ggm
+      - pe
+      - ev_ebitda
+    exclude: []

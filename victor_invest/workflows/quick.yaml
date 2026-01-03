@@ -1,0 +1,66 @@
+# Quick Analysis Workflow
+# =======================
+# Technical analysis only - fastest execution (~5 seconds)
+# No LLM calls - pure deterministic compute pipeline
+
+workflows:
+  quick:
+    description: "Technical analysis only - fastest execution (~5 seconds)"
+
+    metadata:
+      version: "1.0"
+      author: "victor_invest"
+      vertical: investment
+      expected_duration_seconds: 5
+      llm_calls: 0
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Data Collection
+      # =====================================================================
+      - id: fetch_market_data
+        type: compute
+        name: "Fetch Market Data"
+        handler: fetch_market_data
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        output: market_data
+        next: [run_technical_analysis]
+
+      # =====================================================================
+      # Stage 2: Technical Analysis
+      # =====================================================================
+      - id: run_technical_analysis
+        type: compute
+        name: "Technical Analysis"
+        handler: run_technical_analysis
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        input_mapping:
+          market_data: market_data
+        output: technical_analysis
+        next: [synthesize]
+
+      # =====================================================================
+      # Stage 3: Quick Synthesis
+      # =====================================================================
+      - id: synthesize
+        type: compute
+        name: "Quick Synthesis"
+        handler: run_synthesis
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        input_mapping:
+          technical_analysis: technical_analysis
+        output: synthesis
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Analysis Complete"
+        transform: |
+          workflow_status = "completed"
+          analysis_mode = "quick"

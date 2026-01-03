@@ -1,0 +1,99 @@
+# Standard Analysis Workflow
+# ==========================
+# Technical + Fundamental analysis - balanced (~30 seconds)
+# No LLM calls - pure deterministic compute pipeline
+
+workflows:
+  standard:
+    description: "Technical + Fundamental analysis - balanced (~30 seconds)"
+
+    metadata:
+      version: "1.0"
+      author: "victor_invest"
+      vertical: investment
+      expected_duration_seconds: 30
+      llm_calls: 0
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Parallel Data Collection
+      # =====================================================================
+      - id: parallel_data_fetch
+        type: parallel
+        name: "Parallel Data Collection"
+        parallel_nodes: [fetch_sec_data, fetch_market_data]
+        join_strategy: all
+        next: [parallel_analysis]
+
+      - id: fetch_sec_data
+        type: compute
+        name: "Fetch SEC Data"
+        handler: fetch_sec_data
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        output: sec_data
+
+      - id: fetch_market_data
+        type: compute
+        name: "Fetch Market Data"
+        handler: fetch_market_data
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        output: market_data
+
+      # =====================================================================
+      # Stage 2: Parallel Analysis
+      # =====================================================================
+      - id: parallel_analysis
+        type: parallel
+        name: "Parallel Analysis"
+        parallel_nodes: [fundamental_analysis, technical_analysis]
+        join_strategy: all
+        next: [synthesize]
+
+      - id: fundamental_analysis
+        type: compute
+        name: "Fundamental Analysis"
+        handler: run_fundamental_analysis
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        input_mapping:
+          sec_data: sec_data
+        output: fundamental_analysis
+
+      - id: technical_analysis
+        type: compute
+        name: "Technical Analysis"
+        handler: run_technical_analysis
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        input_mapping:
+          market_data: market_data
+        output: technical_analysis
+
+      # =====================================================================
+      # Stage 3: Synthesis
+      # =====================================================================
+      - id: synthesize
+        type: compute
+        name: "Synthesis"
+        handler: run_synthesis
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        input_mapping:
+          fundamental_analysis: fundamental_analysis
+          technical_analysis: technical_analysis
+        output: synthesis
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Analysis Complete"
+        transform: |
+          workflow_status = "completed"
+          analysis_mode = "standard"

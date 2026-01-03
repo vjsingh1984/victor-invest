@@ -1,0 +1,49 @@
+= InvestiGator
+:toc: macro
+:toclevels: 2
+
+InvestiGator delivers institutional-grade investment research by combining SEC fundamentals, technical indicators, market context, and LLM synthesis. This README offers a lean quickstart and points to the detailed docs in `docs/`.
+
+toc::[]
+
+== Quick Start
+
+.Prereqs
+* Python 3.11+, macOS 12+ (Apple Silicon recommended)
+* PostgreSQL (for market data) and Ollama running locally (`brew install ollama`)
+
+.Setup
+[source,bash]
+----
+python3 -m venv venv
+source venv/bin/activate
+make dev-install
+cp config.json.sample config.json  # set SEC user agent, DB creds, Ollama params
+----
+
+.Run an analysis
+[source,bash]
+----
+python3 cli_orchestrator.py analyze AAPL -m standard -o results/AAPL.json
+# or
+make analyze SYMBOL=AAPL
+----
+
+== Key Locations
+
+* Source: `src/investigator/` (clean architecture: domain/application/infrastructure/interfaces/shared)
+* CLI entrypoints: `cli_orchestrator.py`, `src/investigator/cli.py`
+* Tests: `tests/`
+* Docs & architecture notes: `docs/` (see `docs/README.adoc`, `docs/DEVELOPER_GUIDE.adoc`)
+* Config/runtime data: `config/`, `data/`, `artifacts/`
+
+== Common Commands
+
+* `make dev-install` — install with dev extras (lint/type/test/viz/jupyter)
+* `make format` | `make lint` | `make type-check` | `make test` | `make test-cov`
+* `make run-dev` — run API dev server on `:8000`
+* `make clean` / `make clean-all` — remove build artifacts and caches
+
+== More Documentation
+
+See `docs/README.adoc` for architecture diagrams, and `docs/DEVELOPER_GUIDE.adoc` for detailed setup and workflows. An operations runbook lives in `docs/OPERATIONS_RUNBOOK.md`.

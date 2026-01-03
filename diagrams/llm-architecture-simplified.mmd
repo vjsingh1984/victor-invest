@@ -1,0 +1,85 @@
+graph TB
+    subgraph "Input Sources"
+        SEC_DATA[SEC Filing Data]
+        TECH_DATA[Technical Data]
+        PEER_DATA[Peer Group Data]
+    end
+
+    subgraph "Prompt Templates"
+        SEC_PROMPT[SEC Analysis Prompts]
+        TECH_PROMPT[Technical Prompts] 
+        SYNTH_PROMPT[Synthesis Prompts]
+    end
+
+    subgraph "LLM Models"
+        FUNDAMENTAL_MODEL[Fundamental Model<br/>phi4-reasoning 16GB]
+        TECHNICAL_MODEL[Technical Model<br/>qwen2.5 20GB]
+        SYNTHESIS_MODEL[Synthesis Model<br/>llama-3.3 40GB]
+    end
+
+    subgraph "Ollama Engine"
+        OLLAMA_CLIENT[Ollama Client]
+        GPU_ACCEL[Apple Silicon GPU]
+        INFERENCE_ENGINE[Inference Engine]
+    end
+
+    subgraph "Response Processing"
+        JSON_PARSER[JSON Parser]
+        SCORE_VALIDATOR[Score Validation]
+        REASONING_EXTRACT[Reasoning Extraction]
+    end
+
+    subgraph "LLM Cache System"
+        PROMPT_CACHE[Prompt Cache<br/>Per-symbol organization]
+        RESPONSE_CACHE[Response Cache<br/>Structured outputs]
+        THINKING_CACHE[Reasoning Cache<br/>Decision rationale]
+    end
+
+    subgraph "Output Integration"
+        REPORT_ENGINE[Report Generation]
+        PEER_INTEGRATION[Peer Analysis]
+        EMAIL_DELIVERY[Email Reports]
+    end
+
+    SEC_DATA --> SEC_PROMPT
+    TECH_DATA --> TECH_PROMPT
+    PEER_DATA --> SYNTH_PROMPT
+    
+    SEC_PROMPT --> FUNDAMENTAL_MODEL
+    TECH_PROMPT --> TECHNICAL_MODEL
+    SYNTH_PROMPT --> SYNTHESIS_MODEL
+    
+    FUNDAMENTAL_MODEL --> OLLAMA_CLIENT
+    TECHNICAL_MODEL --> OLLAMA_CLIENT
+    SYNTHESIS_MODEL --> OLLAMA_CLIENT
+    
+    OLLAMA_CLIENT --> GPU_ACCEL
+    GPU_ACCEL --> INFERENCE_ENGINE
+    
+    INFERENCE_ENGINE --> JSON_PARSER
+    JSON_PARSER --> SCORE_VALIDATOR
+    SCORE_VALIDATOR --> REASONING_EXTRACT
+    
+    REASONING_EXTRACT --> PROMPT_CACHE
+    REASONING_EXTRACT --> RESPONSE_CACHE
+    REASONING_EXTRACT --> THINKING_CACHE
+    
+    RESPONSE_CACHE --> REPORT_ENGINE
+    REPORT_ENGINE --> PEER_INTEGRATION
+    PEER_INTEGRATION --> EMAIL_DELIVERY
+
+    classDef input fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef prompt fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef model fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef engine fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef process fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef cache fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef output fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
+
+    class SEC_DATA,TECH_DATA,PEER_DATA input
+    class SEC_PROMPT,TECH_PROMPT,SYNTH_PROMPT prompt
+    class FUNDAMENTAL_MODEL,TECHNICAL_MODEL,SYNTHESIS_MODEL model
+    class OLLAMA_CLIENT,GPU_ACCEL,INFERENCE_ENGINE engine
+    class JSON_PARSER,SCORE_VALIDATOR,REASONING_EXTRACT process
+    class PROMPT_CACHE,RESPONSE_CACHE,THINKING_CACHE cache
+    class REPORT_ENGINE,PEER_INTEGRATION,EMAIL_DELIVERY output

@@ -1,0 +1,139 @@
+graph TB
+    subgraph "Input Data Sources"
+        SEC_DATA[SEC Filing Data<br/>10-K/10-Q Forms<br/>XBRL Financial Data<br/>Company Facts API]
+        TECH_DATA[Technical Data<br/>Price History<br/>Volume Data<br/>Market Indicators]
+        PEER_DATA[Peer Group Data<br/>Russell 1000<br/>Sector Classifications<br/>Comparative Metrics]
+    end
+
+    subgraph "Prompt Engineering Layer"
+        SEC_PROMPT[SEC Analysis Prompts<br/>prompts/sec_fundamental_analysis.j2<br/>Period-specific context<br/>Financial statement focus]
+        TECH_PROMPT[Technical Analysis Prompts<br/>prompts/technical_analysis.j2<br/>Indicator explanations<br/>Chart pattern recognition]
+        SYNTH_PROMPT[Synthesis Prompts<br/>prompts/investment_synthesis_*.j2<br/>Multi-modal integration<br/>Risk assessment focus]
+        
+        subgraph "Jinja2 Templates"
+            QUARTERLY_TEMPLATE[quarterly_fundamental_analysis.j2<br/>Earnings-focused analysis<br/>YoY comparisons]
+            COMPREHENSIVE_TEMPLATE[investment_synthesis_comprehensive.j2<br/>Full analysis integration<br/>Position sizing guidance]
+            RISK_TEMPLATE[risk_assessment.j2<br/>Downside scenario analysis<br/>Portfolio impact assessment]
+        end
+    end
+
+    subgraph "LLM Model Management"
+        MODEL_CONFIG[Model Configuration<br/>Context window detection<br/>Memory requirement calc<br/>Apple Silicon optimization]
+        
+        subgraph "Model Selection"
+            FUNDAMENTAL_MODEL[Fundamental Analysis Model<br/>phi4-reasoning 16GB<br/>128K context window<br/>Financial expertise focus]
+            TECHNICAL_MODEL[Technical Analysis Model<br/>qwen2.5:32b-instruct-q4_K_M 20GB<br/>32K context window<br/>Pattern recognition optimized]
+            SYNTHESIS_MODEL[Synthesis Model<br/>llama-3.3-70b-instruct-q4_k_m 40GB<br/>128K+ context window<br/>Multi-modal reasoning]
+        end
+        
+        subgraph "Context Management"
+            CONTEXT_CALC[Context Calculator<br/>Token estimation 4 chars per token<br/>Prompt + completion limits<br/>Model-specific optimization]
+            OVERFLOW_PREV[Overflow Prevention<br/>Automatic truncation<br/>Priority-based content selection<br/>Context window validation]
+        end
+    end
+
+    subgraph "Ollama Integration Layer"
+        OLLAMA_CLIENT[Ollama HTTP Client<br/>http://localhost:11434<br/>Model loading/unloading<br/>GPU memory management]
+        
+        subgraph "Model Execution"
+            GPU_ACCEL[Apple Silicon GPU<br/>Metal framework<br/>Unified memory architecture<br/>Neural engine utilization]
+            INFERENCE_ENGINE[Inference Engine<br/>Temperature: 0.3<br/>Top-p: 0.9<br/>Structured JSON output]
+            MEMORY_MGR[Memory Manager<br/>Real-time usage monitoring<br/>Model swapping<br/>Resource optimization]
+        end
+    end
+
+    subgraph "Response Processing Layer"
+        JSON_PARSER[JSON Response Parser<br/>Structured output validation<br/>Score extraction<br/>Error handling]
+        REASONING_EXTRACT[Reasoning Extraction<br/>LLM thinking capture<br/>Decision rationale<br/>Confidence assessment]
+        
+        subgraph "Response Validation"
+            SCORE_VALIDATOR[Score Validation<br/>0-10 range checking<br/>Consistency verification<br/>Outlier detection]
+            CONTENT_FILTER[Content Filtering<br/>Investment advice compliance<br/>Risk disclosure requirements<br/>Regulatory considerations]
+        end
+    end
+
+    subgraph "Comprehensive Cache System"
+        CACHE_MANAGER[Cache Manager<br/>Multi-backend routing<br/>TTL management<br/>Priority-based storage]
+        
+        subgraph "LLM-Specific Caching"
+            PROMPT_CACHE[Prompt Cache<br/>data/llm_cache/{symbol}/<br/>prompt_*.txt.gz<br/>Template + data combinations]
+            RESPONSE_CACHE[Response Cache<br/>llmresponse_*.json.gz<br/>Structured LLM outputs<br/>Processing metadata]
+            THINKING_CACHE[Thinking Cache<br/>response_*.txt<br/>LLM reasoning process<br/>Transparent decision making]
+        end
+        
+        subgraph "Cache Structure"
+            SYMBOL_DIRS[Symbol Directories<br/>Per-ticker organization<br/>AAPL/, GOOGL/, MSFT/]
+            PERIOD_CACHE[Period-based Caching<br/>_2025-Q1.json.gz<br/>_2024-FY.json.gz<br/>Quarterly analysis tracking]
+            ANALYSIS_TYPES[Analysis Type Separation<br/>_sec_comprehensive<br/>_technical_analysis<br/>_investment_synthesis]
+        end
+    end
+
+    subgraph "Integration & Output"
+        REPORT_ENGINE[Report Generation<br/>PDF creation<br/>Chart integration<br/>Executive summaries]
+        PEER_INTEGRATION[Peer Group Integration<br/>Relative valuations<br/>Sector benchmarking<br/>Comparative analysis]
+        EMAIL_DELIVERY[Email Delivery<br/>Weekly reports<br/>Alert notifications<br/>SMTP/TLS security]
+    end
+
+    %% Data Flow Connections
+    SEC_DATA --> SEC_PROMPT
+    TECH_DATA --> TECH_PROMPT
+    PEER_DATA --> SYNTH_PROMPT
+    
+    SEC_PROMPT --> QUARTERLY_TEMPLATE
+    SYNTH_PROMPT --> COMPREHENSIVE_TEMPLATE
+    SYNTH_PROMPT --> RISK_TEMPLATE
+    
+    QUARTERLY_TEMPLATE --> MODEL_CONFIG
+    COMPREHENSIVE_TEMPLATE --> MODEL_CONFIG
+    RISK_TEMPLATE --> MODEL_CONFIG
+    
+    MODEL_CONFIG --> FUNDAMENTAL_MODEL
+    MODEL_CONFIG --> TECHNICAL_MODEL
+    MODEL_CONFIG --> SYNTHESIS_MODEL
+    
+    FUNDAMENTAL_MODEL --> CONTEXT_CALC
+    TECHNICAL_MODEL --> CONTEXT_CALC
+    SYNTHESIS_MODEL --> CONTEXT_CALC
+    
+    CONTEXT_CALC --> OVERFLOW_PREV
+    OVERFLOW_PREV --> OLLAMA_CLIENT
+    
+    OLLAMA_CLIENT --> GPU_ACCEL
+    GPU_ACCEL --> INFERENCE_ENGINE
+    INFERENCE_ENGINE --> MEMORY_MGR
+    
+    MEMORY_MGR --> JSON_PARSER
+    JSON_PARSER --> REASONING_EXTRACT
+    
+    REASONING_EXTRACT --> SCORE_VALIDATOR
+    SCORE_VALIDATOR --> CONTENT_FILTER
+    
+    CONTENT_FILTER --> CACHE_MANAGER
+    CACHE_MANAGER --> PROMPT_CACHE
+    CACHE_MANAGER --> RESPONSE_CACHE
+    CACHE_MANAGER --> THINKING_CACHE
+    
+    PROMPT_CACHE --> SYMBOL_DIRS
+    RESPONSE_CACHE --> PERIOD_CACHE
+    THINKING_CACHE --> ANALYSIS_TYPES
+    
+    CACHE_MANAGER --> REPORT_ENGINE
+    REPORT_ENGINE --> PEER_INTEGRATION
+    PEER_INTEGRATION --> EMAIL_DELIVERY
+
+    %% Styling
+    classDef input fill:#e3f2fd,stroke:#0277bd,stroke-width:2px
+    classDef prompt fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef model fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef ollama fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef process fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef cache fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+    classDef output fill:#fff8e1,stroke:#fbc02d,stroke-width:2px
+
+    class SEC_DATA,TECH_DATA,PEER_DATA input
+    class SEC_PROMPT,TECH_PROMPT,SYNTH_PROMPT,QUARTERLY_TEMPLATE,COMPREHENSIVE_TEMPLATE,RISK_TEMPLATE prompt
+    class MODEL_CONFIG,FUNDAMENTAL_MODEL,TECHNICAL_MODEL,SYNTHESIS_MODEL,CONTEXT_CALC,OVERFLOW_PREV model
+    class OLLAMA_CLIENT,GPU_ACCEL,INFERENCE_ENGINE,MEMORY_MGR ollama
+    class JSON_PARSER,REASONING_EXTRACT,SCORE_VALIDATOR,CONTENT_FILTER process
+    class CACHE_MANAGER,PROMPT_CACHE,RESPONSE_CACHE,THINKING_CACHE,SYMBOL_DIRS,PERIOD_CACHE,ANALYSIS_TYPES cache
+    class REPORT_ENGINE,PEER_INTEGRATION,EMAIL_DELIVERY output

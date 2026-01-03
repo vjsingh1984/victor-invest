@@ -1,0 +1,23 @@
+{
+  "total_revenue": {
+    "description": "Total Revenue/Sales",
+    "global_fallback": [
+      "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "Revenues",
+      "SalesRevenueNet"
+    ],
+    "sector_specific": {
+      "Utilities": [
+        "RegulatedOperatingRevenue",
+        "ElectricUtilityRevenue",
+        "RevenuesExcludingInterestAndDividends",
+        "Revenues"
+      ],
+      "Financials": [
+        "InterestAndDividendIncomeOperating",
+        "InterestIncomeOperating",
+        "Revenues"
+      ]
+    }
+  }
+}

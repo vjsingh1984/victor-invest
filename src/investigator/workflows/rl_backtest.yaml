@@ -1,0 +1,233 @@
+# RL Backtest Workflow
+#
+# Historical backtesting pipeline for validating valuation model accuracy.
+# Simulates predictions at historical dates and compares against actual outcomes.
+# Used by rl_backtest.py for model training and validation.
+#
+# Usage:
+#   executor.execute("rl_backtest", {
+#       "symbols": ["AAPL", "GOOGL"],
+#       "start_date": "2020-01-01",
+#       "end_date": "2023-12-31",
+#       "holding_periods": [30, 60, 90, 180]
+#   })
+
+workflows:
+  rl_backtest:
+    description: "Historical backtesting for RL training and model validation"
+
+    metadata:
+      vertical: investment
+      category: backtesting
+      complexity: high
+
+    temporal_context:
+      as_of_date: $ctx.current_backtest_date
+      lookback_periods: 8  # Quarters of historical data
+
+    batch_config:
+      batch_size: 10
+      max_concurrent: 5
+      continue_on_error: true
+
+    nodes:
+      # Stage 1: Generate backtest date grid
+      - id: generate_dates
+        type: compute
+        handler: data_transform
+        inputs:
+          start_date: $ctx.start_date
+          end_date: $ctx.end_date
+          frequency: monthly  # Monthly backtest points
+        output: backtest_dates
+        next: [process_backtest_dates]
+
+      # Stage 2: Process each backtest date
+      - id: process_backtest_dates
+        type: parallel
+        parallel_nodes: [backtest_date_pipeline]
+        iterator: $ctx.backtest_dates
+        iterator_var: backtest_date
+        join_strategy: all_settled
+        next: [calculate_rewards]
+
+      # Per-date pipeline: process all symbols at this date
+      - id: backtest_date_pipeline
+        type: compute
+        handler: sequential_tools
+        tools:
+          - handler: data_transform
+            inputs:
+              date: $ctx.backtest_date
+              symbols: $ctx.symbols
+        output: date_batch
+        next: [process_symbols_at_date]
+
+      - id: process_symbols_at_date
+        type: parallel
+        parallel_nodes: [symbol_backtest]
+        iterator: $ctx.symbols
+        iterator_var: symbol
+        join_strategy: all_settled
+        output: date_results
+
+      # Per-symbol backtest at specific date
+      - id: symbol_backtest
+        type: compute
+        handler: sequential_tools
+        tools:
+          # Point-in-time data fetch
+          - handler: sec_data_extract
+            inputs:
+              symbol: $ctx.symbol
+              as_of_date: $ctx.backtest_date
+              num_quarters: 8
+          # Historical price at backtest date
+          - handler: price_data_fetch
+            inputs:
+              symbol: $ctx.symbol
+              target_date: $ctx.backtest_date
+              lookback_days: 365
+          # Valuation at backtest date
+          - handler: valuation_compute
+            inputs:
+              symbol: $ctx.symbol
+              as_of_date: $ctx.backtest_date
+          # Get actual future prices for reward calculation
+          - handler: price_data_fetch
+            inputs:
+              symbol: $ctx.symbol
+              target_date: $ctx.outcome_date  # backtest_date + holding_period
+              lookback_days: 1
+        output: symbol_backtest_result
+
+      # Stage 3: Calculate rewards from actual outcomes
+      - id: calculate_rewards
+        type: compute
+        handler: data_transform
+        inputs:
+          backtest_results: $ctx.process_backtest_dates
+          holding_periods: $ctx.holding_periods
+        output: reward_calculations
+        next: [aggregate_performance]
+
+      # Stage 4: Aggregate performance metrics
+      - id: aggregate_performance
+        type: compute
+        handler: data_transform
+        inputs:
+          rewards: $ctx.reward_calculations
+          group_by: [symbol, tier, sector]
+        output: performance_metrics
+        next: []
+
+  # Single symbol backtest (for debugging/testing)
+  single_symbol_backtest:
+    description: "Backtest single symbol across date range"
+
+    metadata:
+      vertical: investment
+      category: backtesting
+      complexity: medium
+
+    nodes:
+      - id: generate_dates
+        type: compute
+        handler: data_transform
+        inputs:
+          start_date: $ctx.start_date
+          end_date: $ctx.end_date
+          frequency: monthly
+        output: backtest_dates
+        next: [run_backtest_dates]
+
+      - id: run_backtest_dates
+        type: parallel
+        parallel_nodes: [single_date_backtest]
+        iterator: $ctx.backtest_dates
+        iterator_var: date
+        join_strategy: all_settled
+        next: [summarize]
+
+      - id: single_date_backtest
+        type: compute
+        handler: sequential_tools
+        tools:
+          - handler: sec_data_extract
+            inputs:
+              symbol: $ctx.symbol
+              as_of_date: $ctx.date
+          - handler: price_data_fetch
+            inputs:
+              symbol: $ctx.symbol
+              target_date: $ctx.date
+          - handler: rl_weight_decision
+            inputs:
+              symbol: $ctx.symbol
+          - handler: valuation_compute
+            inputs:
+              symbol: $ctx.symbol
+              as_of_date: $ctx.date
+        output: date_result
+
+      - id: summarize
+        type: compute
+        handler: data_transform
+        inputs:
+          results: $ctx.run_backtest_dates
+        output: backtest_summary
+        next: []
+
+  # RL training data generation
+  rl_training_data:
+    description: "Generate training data for RL policy"
+
+    metadata:
+      vertical: investment
+      category: ml_training
+      complexity: high
+
+    batch_config:
+      batch_size: 20
+      max_concurrent: 10
+
+    nodes:
+      # Generate experiences from historical data
+      - id: generate_experiences
+        type: parallel
+        parallel_nodes: [experience_pipeline]
+        iterator: $ctx.training_samples  # List of (symbol, date) tuples
+        iterator_var: sample
+        join_strategy: all_settled
+        next: [format_training_data]
+
+      - id: experience_pipeline
+        type: compute
+        handler: sequential_tools
+        tools:
+          - handler: sec_data_extract
+            inputs:
+              symbol: $ctx.sample.symbol
+              as_of_date: $ctx.sample.date
+          - handler: price_data_fetch
+            inputs:
+              symbol: $ctx.sample.symbol
+              target_date: $ctx.sample.date
+          - handler: rl_weight_decision
+            inputs:
+              symbol: $ctx.sample.symbol
+          - handler: valuation_compute
+            inputs:
+              symbol: $ctx.sample.symbol
+        output: experience
+
+      # Format for RL training
+      - id: format_training_data
+        type: compute
+        handler: data_transform
+        inputs:
+          experiences: $ctx.generate_experiences
+          include_rewards: $ctx.include_rewards
+          normalize_features: true
+        output: training_data
+        next: []

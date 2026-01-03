@@ -1,0 +1,257 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "investigator"
+version = "0.1.0"
+description = "Institutional-grade investment research combining SEC fundamentals, technical indicators, and LLM synthesis"
+readme = {file = "README.adoc", content-type = "text/plain"}
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+authors = [
+    {name = "Vijay Singh"}
+]
+keywords = [
+    "investment",
+    "research",
+    "sec",
+    "financial-analysis",
+    "llm",
+    "ollama",
+    "fundamental-analysis",
+    "technical-analysis"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+dependencies = [
+    # Victor AI Framework (local wheel)
+    # Install with: pip install ../codingagent/dist/victor-0.2.0-py3-none-any.whl
+    # Note: victor-core provides Agent, AgentSpec, StateGraph, ToolSet, etc.
+
+    # Core dependencies
+    "requests>=2.31.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "aiohttp>=3.9.0",
+
+    # API Framework
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.4.0",
+    "python-multipart>=0.0.6",
+
+    # Yahoo Finance API
+    "yfinance>=0.2.0",
+
+    # XML parsing
+    "lxml>=4.9.0",
+
+    # JSON handling
+    "ujson>=5.8.0",
+    "orjson>=3.9.0",
+
+    # Data processing
+    "pyarrow>=13.0.0",
+
+    # PDF generation
+    "reportlab>=4.0.0",
+    "markdown>=3.5.0",
+
+    # Email functionality
+    "secure-smtplib>=0.1.1",
+    "aiosmtplib>=3.0.0",
+
+    # Progress bars and CLI
+    "tqdm>=4.66.0",
+    "click>=8.1.0",
+    "rich>=13.6.0",
+
+    # Date/time handling
+    "python-dateutil>=2.8.0",
+    "pendulum>=2.1.0",
+
+    # Caching
+    "diskcache>=5.6.0",
+    "redis[hiredis]>=5.0.0",
+    "aiocache>=0.12.0",
+
+    # Configuration
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+
+    # Database
+    "alembic>=1.12.0",
+    "asyncpg>=0.29.0",
+
+    # Message Queue
+    "celery>=5.3.0",
+    "kombu>=5.3.0",
+
+    # Monitoring
+    "prometheus-client>=0.18.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-instrumentation-fastapi>=0.41b0",
+
+    # Vector Database
+    "qdrant-client>=1.6.0",
+
+    # WebSocket
+    "websockets>=12.0.0",
+    "python-socketio>=5.10.0",
+
+    # Security
+    "cryptography>=41.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+
+    # Data Validation
+    "marshmallow>=3.20.0",
+    "cerberus>=1.3.0",
+
+    # Logging
+    "structlog>=23.2.0",
+    "loguru>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "coverage>=7.3.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+    "flake8>=6.1.0",
+]
+viz = [
+    "matplotlib>=3.7.0",
+    "plotly>=5.15.0",
+]
+jupyter = [
+    "jupyter>=1.0.0",
+    "ipykernel>=6.25.0",
+]
+
+[project.scripts]
+# Main CLI entry point - pip installable, cross-platform
+investigator = "investigator.cli:main"
+# Alias for backwards compatibility
+inv = "investigator.cli:main"
+# Victor-powered CLI
+victor-invest = "victor_invest.cli:main"
+# Legacy CLI (deprecated - use 'investigator' instead)
+investigator-legacy = "cli_orchestrator:cli"
+
+[project.urls]
+Homepage = "https://github.com/vsingh/investigator"
+Documentation = "https://github.com/vsingh/investigator/docs"
+Repository = "https://github.com/vsingh/investigator"
+
+[tool.setuptools]
+package-dir = {"" = "src", "victor_invest" = "victor_invest"}
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["investigator*", "victor_invest*"]
+exclude = ["tests*", "docs*"]
+
+[tool.black]
+line-length = 120
+target-version = ['py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | data
+  | artifacts
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_gitignore = true
+skip = [".venv", "build", "dist", "data", "artifacts"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "yfinance.*",
+    "qdrant_client.*",
+    "diskcache.*",
+    "plotly.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=investigator --cov-report=term-missing"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "llm: marks tests that require LLM access",
+    "db: marks tests that require database access",
+]
+
+[tool.coverage.run]
+source = ["src/investigator"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]

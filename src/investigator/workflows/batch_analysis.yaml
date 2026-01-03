@@ -1,0 +1,186 @@
+# Batch Analysis Workflow
+#
+# Pipeline for processing multiple stocks in parallel.
+# Used by batch_analysis_runner.py for screening and ranking.
+#
+# Usage:
+#   executor.execute("batch_analysis", {
+#       "symbols": ["AAPL", "GOOGL", "MSFT"],
+#       "batch_size": 5
+#   })
+
+workflows:
+  batch_analysis:
+    description: "Batch stock analysis for screening and ranking"
+
+    metadata:
+      vertical: investment
+      category: batch_valuation
+      complexity: high
+
+    batch_config:
+      batch_size: 5
+      max_concurrent: 3
+      retry_strategy: end_of_batch
+      continue_on_error: true
+
+    nodes:
+      # Stage 1: Initialize batch processing
+      - id: init_batch
+        type: compute
+        handler: data_transform
+        inputs:
+          symbols: $ctx.symbols
+          analysis_date: $ctx.analysis_date
+        output: batch_context
+        next: [process_symbols]
+
+      # Stage 2: Parallel symbol processing (batch node)
+      - id: process_symbols
+        type: parallel
+        parallel_nodes: [symbol_pipeline]
+        iterator: $ctx.symbols
+        iterator_var: current_symbol
+        join_strategy: all_settled
+        next: [aggregate_results]
+
+      # Per-symbol pipeline (executed for each symbol)
+      - id: symbol_pipeline
+        type: compute
+        handler: sequential_tools
+        tools:
+          - handler: metadata_fetch
+            inputs:
+              symbol: $ctx.current_symbol
+          - handler: price_data_fetch
+            inputs:
+              symbol: $ctx.current_symbol
+              target_date: $ctx.analysis_date
+          - handler: sec_data_extract
+            inputs:
+              symbol: $ctx.current_symbol
+              num_quarters: 8
+          - handler: valuation_compute
+            inputs:
+              symbol: $ctx.current_symbol
+        output: symbol_result
+
+      # Stage 3: Aggregate and rank results
+      - id: aggregate_results
+        type: compute
+        handler: data_transform
+        inputs:
+          results: $ctx.process_symbols
+          sort_by: upside_pct
+          sort_order: desc
+        output: ranked_results
+        next: []
+
+  # Sector-focused batch analysis
+  sector_batch_analysis:
+    description: "Batch analysis for a specific sector"
+
+    metadata:
+      vertical: investment
+      category: sector_screening
+      complexity: high
+
+    batch_config:
+      batch_size: 10
+      max_concurrent: 5
+
+    nodes:
+      # Stage 1: Get sector symbols
+      - id: get_sector_symbols
+        type: compute
+        handler: data_transform
+        inputs:
+          sector: $ctx.sector
+          universe: $ctx.universe  # sp500, russell1000, all
+          limit: $ctx.limit
+        output: sector_symbols
+        next: [process_sector]
+
+      # Stage 2: Process all sector symbols
+      - id: process_sector
+        type: parallel
+        parallel_nodes: [sector_symbol_pipeline]
+        iterator: $ctx.sector_symbols
+        iterator_var: symbol
+        join_strategy: all_settled
+        next: [sector_ranking]
+
+      - id: sector_symbol_pipeline
+        type: compute
+        handler: sequential_tools
+        tools:
+          - handler: price_data_fetch
+            inputs:
+              symbol: $ctx.symbol
+          - handler: sec_data_extract
+            inputs:
+              symbol: $ctx.symbol
+              num_quarters: 8
+          - handler: sector_valuation
+            inputs:
+              symbol: $ctx.symbol
+        output: sector_symbol_result
+
+      # Stage 3: Rank within sector
+      - id: sector_ranking
+        type: compute
+        handler: data_transform
+        inputs:
+          results: $ctx.process_sector
+          group_by: industry
+          sort_by: upside_pct
+        output: sector_rankings
+        next: []
+
+  # Quick screening workflow
+  quick_screening:
+    description: "Fast screening for top opportunities"
+
+    metadata:
+      vertical: investment
+      category: screening
+      complexity: low
+
+    batch_config:
+      batch_size: 20
+      max_concurrent: 10
+      timeout: 30  # Fast timeout per symbol
+
+    nodes:
+      - id: quick_screen
+        type: parallel
+        parallel_nodes: [quick_check]
+        iterator: $ctx.symbols
+        iterator_var: symbol
+        join_strategy: fastest_n
+        join_count: 50  # Return top 50 fastest
+        next: [filter_opportunities]
+
+      - id: quick_check
+        type: compute
+        handler: sequential_tools
+        tools:
+          - handler: price_data_fetch
+            inputs:
+              symbol: $ctx.symbol
+              lookback_days: 30
+          - handler: metadata_fetch
+            inputs:
+              symbol: $ctx.symbol
+        output: quick_result
+
+      - id: filter_opportunities
+        type: compute
+        handler: conditional_branch
+        inputs:
+          results: $ctx.quick_screen
+          filter:
+            min_upside: 10
+            max_pe: 30
+        output: opportunities
+        next: []

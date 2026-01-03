@@ -1,0 +1,417 @@
+= InvestiGator - Development Progress Tracker
+:toc:
+:toc-title: Table of Contents
+:toclevels: 3
+:sectanchors:
+:sectnums:
+
+Last Updated: 2025-11-03
+
+== Current Status Summary
+
+=== ✅ Completed (Major Achievements)
+
+1. **Phase 1: Agent Architecture Refactoring** ✅ COMPLETE
+   - SEC Agent as single source of truth for CompanyFacts data
+   - Dependency graph corrected (SEC → Fundamental → Synthesis)
+   - Single SEC API call (50% reduction in API calls)
+   - Cache-only mode for Fundamental Agent
+
+2. **Phase 2: Bulk Table Hybrid Strategy** ✅ COMPLETE
+   - Tiered staleness approach implemented (180d, 270d thresholds)
+   - Bulk data now preferred for historical quarters
+   - API calls minimized for recent quarters only
+   - File: `utils/sec_data_strategy.py:211-295` (FIXED)
+
+3. **Phase 3: Data Normalization** ✅ COMPLETE
+   - snake_case conversion across all agents
+   - Canonical key mapping for XBRL tags
+   - DataNormalizer utility integrated
+   - Decimal to float conversion in bulk table processing
+
+4. **Phase 4: Valuation Models** ✅ COMPLETE
+   - DCF (Discounted Cash Flow) integrated
+   - GGM (Gordon Growth Model) integrated
+   - 10Y Treasury rate from FRED API for WACC
+   - 20% payout ratio threshold for GGM applicability
+   - Integrated into executive summary extraction
+
+=== ❌ Outstanding Issues (Blocking)
+
+1. **Issue #1: Missing Data in Synthesis Output** 🔴 CRITICAL
+   - **Symptom**: All recent analyses show `market_cap: N/A`, `recommendation: N/A`
+   - **Status**: All result files from Nov 3 show "N/A" values
+   - **Files Checked**: AAPL, MSFT, NEE, JNJ bugfix/canonical/healthcare tests
+   - **Impact**: No valid recommendations being generated or stored
+
+2. **Issue #2: Data Flow Break** 🔴 CRITICAL
+   - **Location**: Between Fundamental Agent → Synthesis Agent
+   - **Evidence**: Fundamental agent has data structure (status, analysis, valuation, ratios)
+   - **Problem**: Synthesis agent not receiving or parsing the data correctly
+   - **Result**: All output fields return "N/A"
+
+3. **Issue #3: Executive Summary Generation Failure** 🔴 CRITICAL
+   - **Function**: `generate_executive_summary()` in `cli_orchestrator.py:96-177`
+   - **Issue**: Cannot extract data from analysis results
+   - **Cascade Effect**: No valid summary → No database storage → No cross-symbol comparison
+
+---
+
+== Detailed Analysis
+
+=== Phase 1: Agent Architecture Refactoring ✅
+
+==== Implementation Summary
+
+**Files Modified:**
+- `agents/orchestrator.py` (dependency graph, mode configuration)
+- `agents/sec_agent.py` (single source of truth)
+- `agents/fundamental_agent.py` (cache-only mode)
+
+**Results:**
+- SEC API calls: 2 → 1 (50% reduction)
+- API time: ~20s → ~11s (45% reduction)
+- Cache hit rate: 0% → 100% for Fundamental Agent
+
+**Evidence from Git Log:**
+```
+ea9542a fix(fundamental): add quarterly_data to company_data for DCF/GGM valuation
+9c28429 perf(sec): replace raw_companyfacts with summary to reduce JSON size by 4MB
+3a46e90 fix(fundamental): complete snake_case conversion for all cached dict keys
+```
+
+=== Phase 2: Bulk Table Hybrid Strategy ✅
+
+==== Original Problem (FROM PROGRESS.adoc)
+```
+Retrieved 8 filings for AAPL from bulk tables
+Bulk data stale (184 days). Using 0 historical quarters from bulk
+Hybrid strategy: 0 bulk + 8 API = 8 total quarters  ❌ BUG
+```
+
+==== Fixed Implementation
+**File**: `utils/sec_data_strategy.py:245-295`
+
+**Strategy** (Verified in Code):
+```python
+if bulk_age <= 180:
+    # Use most bulk (7 quarters), fetch latest 1 from API
+    use_bulk_quarters = sorted_bulk[1:8]  # Skip most recent, use next 7
+elif bulk_age <= 270:
+    # Use bulk for older quarters (6), fetch recent 2 from API
+    use_bulk_quarters = sorted_bulk[2:8]  # Skip 2 most recent, use next 6
+else:
+    # Use bulk only for oldest quarters (4), fetch recent 4 from API
+    use_bulk_quarters = sorted_bulk[4:8]  # Use oldest 4 from bulk
+```
+
+**Status**: ✅ IMPLEMENTED (code verified in sec_data_strategy.py)
+
+=== Phase 3: Data Normalization ✅
+
+==== Achievements
+
+**Evidence from Git Log:**
+```
+cee9818 refactor(data): implement unified snake_case data layer across pipeline
+4f5183e fix(data): use canonical name for cost_of_revenue extraction
+38d0798 fix(extractor): use XBRLTagAliasMapper for ALL JSON API metrics
+71e84c3 fix(extractor): use XBRLTagAliasMapper for JSON API revenue extraction
+```
+
+**Components:**
+- `utils/data_normalizer.py` - Central normalization
+- `utils/canonical_key_mapper.py` - XBRL tag aliasing
+- All agents use `DataNormalizer.normalize_and_round()`
+
+=== Phase 4: Valuation Models ✅
+
+==== DCF & GGM Integration
+
+**Evidence from Git Log:**
+```
+ea9542a fix(fundamental): add quarterly_data to company_data for DCF/GGM valuation
+a2a26f4 feat(valuation): integrate DCF and GGM into executive summary extraction
+e5aba48 feat(valuation): add 20% payout ratio threshold for GGM applicability
+4748b79 feat(valuation): integrate professional DCF and GGM with comprehensive metrics
+d465916 feat(valuation): integrate 10Y Treasury rate from FRED API for DCF WACC
+```
+
+**Components:**
+- `utils/gordon_growth_model.py` - GGM valuation
+- `agents/fundamental_agent.py` - DCF/GGM integration
+- FRED API integration for risk-free rate
+
+---
+
+== Critical Blocker: Data Flow Investigation
+
+=== Problem Statement
+
+**All recent analyses (Nov 3, 2025) show empty/N/A values:**
+
+```json
+{
+  "market_cap": "N/A",
+  "recommendation": "N/A",
+  "confidence_level": "N/A",
+  "current_price": "N/A",
+  "price_target_12m": "N/A",
+  "investment_grade": "N/A"
+}
+```
+
+**Yet, the analysis DOES run** (files created, agents execute, no crashes).
+
+=== Data Structure Analysis
+
+**Verified Structure** (from `results/AAPL_bugfix_test.json`):
+
+```
+Top-level keys: ['sec', 'technical', 'fundamental', 'market_context', 'synthesis']
+
+Fundamental keys: ['status', 'symbol', 'analysis', 'valuation', 'ratios',
+                   'quality_score', 'data_quality', 'confidence',
+                   'investment_grade', 'fair_value']
+
+Synthesis keys: ['status', 'symbol', 'analysis', 'synthesis', 'recommendation',
+                 'confidence', 'risk_score', 'action_plan', 'pdf_report']
+```
+
+**However, when we inspect the ACTUAL values:**
+
+```python
+# Fundamental ratios
+fund.get('ratios', {}) → {}  # Empty dict
+ratios.get('market_cap') → N/A
+ratios.get('pe_ratio') → N/A
+ratios.get('current_price') → N/A
+
+# Valuation
+valuation.get('response', {}) → {}  # Empty dict
+val_response.get('investment_grade') → N/A
+val_response.get('price_target_12_month') → N/A
+```
+
+=== Root Cause Hypothesis
+
+**Problem**: Agent results have the KEYS but NOT the VALUES.
+
+**Possible Causes:**
+
+1. **Fundamental Agent Processing Failure**
+   - Agent completes without error
+   - But doesn't populate `ratios`, `valuation.response`
+   - Data quality issues causing early return?
+   - LLM response parsing failure?
+
+2. **Executive Summary Extraction Logic**
+   - File: `cli_orchestrator.py:96-177`
+   - Function navigates nested dicts with `.get()` defaults to 'N/A'
+   - If actual data is missing, defaults trigger
+   - Need to check agent output BEFORE summary extraction
+
+3. **Data Normalization Side Effect**
+   - Recent snake_case conversion (commits 3a46e90, cee9818)
+   - Possible key mismatch: camelCase keys vs snake_case lookups?
+   - Need to verify field name consistency
+
+=== Investigation Plan (P0 - URGENT)
+
+[options="header"]
+|===
+| Step | Task | Command/File | Expected Outcome
+| 1 | Check Fundamental Agent execution logs | Search logs for "Calculated market cap" | Should show successful calculation
+| 2 | Verify Fundamental Agent output structure | Print `fund.get('ratios')` raw output | Should have populated dict, not empty
+| 3 | Check data quality validation | Review `agents/fundamental_agent.py` quality checks | May be rejecting valid data
+| 4 | Trace synthesis input | Add logging to `agents/synthesis_agent.py` | Show what data synthesis receives
+| 5 | Verify key naming consistency | Check snake_case vs camelCase in agent outputs | Ensure consistent naming
+|===
+
+---
+
+== Next Steps (Priority Order)
+
+=== Immediate (P0) - BLOCKING 🔴
+
+1. **Debug Data Flow Break** [CRITICAL]
+   ```bash
+   # Step 1: Run test analysis with verbose logging
+   python3 cli_orchestrator.py analyze AAPL -m standard -o results/AAPL_debug.json 2>&1 | tee /tmp/aapl_debug.log
+
+   # Step 2: Check Fundamental Agent output
+   grep -A 20 "Fundamental Agent.*AAPL" /tmp/aapl_debug.log
+
+   # Step 3: Verify ratios calculation
+   grep "Calculated.*market cap" /tmp/aapl_debug.log
+   grep "Updated company_data" /tmp/aapl_debug.log
+
+   # Step 4: Inspect raw JSON structure
+   python3 -c "
+   import json
+   data = json.load(open('results/AAPL_debug.json'))
+   print('Fundamental ratios:', data.get('fundamental', {}).get('ratios', 'MISSING'))
+   print('Valuation:', data.get('fundamental', {}).get('valuation', 'MISSING'))
+   "
+   ```
+
+2. **Add Diagnostic Logging** [HIGH]
+   - Add logging to `agents/fundamental_agent.py` before returning result
+   - Add logging to `agents/synthesis_agent.py` at input parsing
+   - Add logging to `cli_orchestrator.py::generate_executive_summary()` showing raw inputs
+   - Files to modify:
+     * `agents/fundamental_agent.py:600-650` (post_process)
+     * `agents/synthesis_agent.py:50-100` (process input)
+     * `cli_orchestrator.py:96-177` (generate_executive_summary)
+
+3. **Verify Data Quality Validation** [HIGH]
+   - Check if data quality checks are too strict
+   - File: `agents/fundamental_agent.py` (search for "data_quality" checks)
+   - Hypothesis: Valid data being rejected due to strict thresholds
+   - Action: Review and potentially relax validation
+
+=== High Priority (P1)
+
+4. **Test with Known-Good Symbol** [MEDIUM]
+   - Use MSFT (large cap, complete data)
+   - Run with `--force-refresh` to bypass all caches
+   - Compare result structure with AAPL
+   - Determine if issue is symbol-specific or systemic
+
+5. **Review Recent Code Changes** [MEDIUM]
+   - Recent commits focused on data normalization
+   - Commits: `3a46e90`, `cee9818`, `4f5183e`
+   - Check if snake_case conversion broke key lookups
+   - Review: `utils/data_normalizer.py` field mappings
+
+6. **Integration Test Suite** [MEDIUM]
+   - Create test that validates agent output structure
+   - File: `tests/integration/test_agent_output_structure.py` (new)
+   - Verify each agent returns expected keys with values
+   - Automate regression detection
+
+=== Medium Priority (P2)
+
+7. **Database Schema Implementation** [LOW]
+   - Schema design complete (from previous session)
+   - File: `/tmp/investment_recommendations_schema_proposal.sql`
+   - **BLOCKED**: Requires valid recommendation data first
+   - Will resume after P0 issues resolved
+
+8. **Performance Optimization** [LOW]
+   - Bulk table usage verified in code
+   - Monitor actual performance in practice
+   - Consider updating bulk tables (<90 days staleness)
+
+---
+
+== Session History
+
+=== Session 1: 2025-11-02 (Agent Architecture)
+
+**Completed:**
+- Agent dependency graph fix
+- SEC Agent single source of truth
+- Fundamental Agent cache-only mode
+- Integration testing
+
+**Status**: ✅ Architecture refactoring complete
+
+=== Session 2: 2025-11-03 (Current - Data Quality Crisis)
+
+**Discovered:**
+- All analyses returning "N/A" for critical fields
+- Data structure exists but values missing
+- Recent commits (Oct-Nov) added valuation models successfully
+- But somewhere data flow broke
+
+**Current Focus**: Debug why agent results have empty values
+
+---
+
+== Success Metrics
+
+[options="header"]
+|===
+| Metric | Target | Current | Status
+| SEC API calls per analysis | 1 | 1 | ✅
+| Cache hit rate (Fundamental) | >80% | 100% | ✅
+| Bulk table usage | 75% | Unknown | ⚠️
+| Valid recommendations | 100% | 0% | ❌
+| Market cap populated | 100% | 0% | ❌
+| Executive summary quality | Good | N/A | ❌
+| Database storage | Yes | No | ❌
+|===
+
+---
+
+== Technical Debt & Future Enhancements
+
+=== Technical Debt
+
+1. **Missing Error Handling** [P2]
+   - Agents complete with "success" status even when data missing
+   - Need better validation and error reporting
+   - Add assertions for critical fields
+
+2. **Test Coverage** [P2]
+   - Limited integration tests for agent output validation
+   - No regression tests for data structure
+   - Need comprehensive test suite
+
+3. **Documentation** [P3]
+   - Agent output structure not documented
+   - Field naming conventions unclear
+   - Need API documentation
+
+=== Future Enhancements
+
+1. **Real-time Data Pipeline** [P3]
+   - WebSocket support for live updates
+   - Incremental updates vs full refresh
+   - Event-driven architecture
+
+2. **Multi-Symbol Optimization** [P3]
+   - Batch processing optimizations
+   - Parallel agent execution
+   - Shared context caching
+
+3. **Advanced Analytics** [P3]
+   - Sector rotation analysis
+   - Portfolio optimization
+   - Risk-adjusted return calculations
+
+---
+
+== Action Items for Next Session
+
+**Priority Order:**
+
+1. 🔴 **P0**: Debug and fix data flow break (agents → synthesis → summary)
+2. 🔴 **P0**: Add diagnostic logging to trace data loss
+3. 🟡 **P1**: Verify data quality validation not rejecting valid data
+4. 🟡 **P1**: Test with multiple symbols to isolate issue
+5. 🟢 **P2**: Create integration tests for agent output validation
+6. 🟢 **P2**: Resume database schema implementation
+
+**Estimated Time**: 3-4 hours for P0 items
+
+**Success Criteria**:
+- Valid market_cap value in synthesis output
+- Valid recommendation (not "N/A")
+- Executive summary with real data
+- Database storage triggered
+
+---
+
+**Session End: 2025-11-03**
+
+**Overall Progress:** 60% complete
+* ✅ Architecture refactoring: 100%
+* ✅ Hybrid strategy implementation: 100%
+* ✅ Data normalization: 100%
+* ✅ Valuation models: 100%
+* ❌ Data flow validation: 0% (BROKEN - critical blocker)
+* ❌ Database integration: 0% (blocked by data flow issue)
+
+**Critical Path:** Fix data flow → Validate output → Store in database → Cross-symbol queries

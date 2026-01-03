@@ -1,0 +1,981 @@
+{
+  "analysis_date": "2025-11-04",
+  "summary": {
+    "q2_both_individual": 2,
+    "q2_mixed_ytd": 8,
+    "q2_insufficient": 0,
+    "total_analyzed": 10
+  },
+  "stocks": [
+    {
+      "symbol": "AAPL",
+      "cik": "0000320193",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 14,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 14,
+            "qtrs_2": 14,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 14,
+            "qtrs_2": 0,
+            "qtrs_3": 14,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 17
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 2,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 2,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 2
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 6,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 6,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 6,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 6,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    },
+    {
+      "symbol": "MSFT",
+      "cik": "0000789019",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 21,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 21,
+            "qtrs_2": 21,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 21,
+            "qtrs_2": 0,
+            "qtrs_3": 21,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 21
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 2,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 0,
+            "qtrs_3": 2,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 2
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 9,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 9,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 9,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 9,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_1"
+    },
+    {
+      "symbol": "GOOGL",
+      "cik": "0001652044",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 19,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 19,
+            "qtrs_2": 19,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 19,
+            "qtrs_2": 0,
+            "qtrs_3": 19,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 19
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 2,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 2,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 2
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 11,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 11,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 11,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 11,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    },
+    {
+      "symbol": "AMZN",
+      "cik": "0001018724",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 16,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 1
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 16,
+            "qtrs_2": 16,
+            "qtrs_3": 0,
+            "qtrs_4": 1
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 16,
+            "qtrs_2": 0,
+            "qtrs_3": 16,
+            "qtrs_4": 1
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 21
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 1,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 1
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 1,
+            "qtrs_2": 1,
+            "qtrs_3": 0,
+            "qtrs_4": 1
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 1,
+            "qtrs_2": 0,
+            "qtrs_3": 1,
+            "qtrs_4": 1
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 1
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 11,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_1"
+    },
+    {
+      "symbol": "NVDA",
+      "cik": "0001045810",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 17,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 16,
+            "qtrs_2": 16,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 17,
+            "qtrs_2": 0,
+            "qtrs_3": 17,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 18
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 1,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 1,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 1,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 1
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    },
+    {
+      "symbol": "META",
+      "cik": "0001326801",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 11,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 11,
+            "qtrs_2": 11,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 11,
+            "qtrs_2": 0,
+            "qtrs_3": 11,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 13
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 2,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 2,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 2
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 7,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    },
+    {
+      "symbol": "TSLA",
+      "cik": "0001318605",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 11,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 11,
+            "qtrs_2": 11,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 11,
+            "qtrs_2": 0,
+            "qtrs_3": 11,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 11
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 2,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 2,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 2
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 5,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 5,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 5,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 5,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    },
+    {
+      "symbol": "JPM",
+      "cik": "0000019617",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 8,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 7,
+            "qtrs_2": 7,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 7,
+            "qtrs_2": 0,
+            "qtrs_3": 7,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 13
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 1,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 1,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 1,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 2
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 37,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 36,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 36,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 45,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    },
+    {
+      "symbol": "V",
+      "cik": "0001403161",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 8,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 8,
+            "qtrs_2": 8,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 8,
+            "qtrs_2": 0,
+            "qtrs_3": 8,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 8
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 1,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 1,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 1,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 1
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 2,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 2,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 2,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 2,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    },
+    {
+      "symbol": "UNH",
+      "cik": "0000731766",
+      "statements": {
+        "income_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 44,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 44,
+            "qtrs_2": 44,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 44,
+            "qtrs_2": 0,
+            "qtrs_3": 44,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 46
+          }
+        },
+        "cash_flow_statement": {
+          "Q1": {
+            "qtrs_0": 0,
+            "qtrs_1": 2,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 2,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 2,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 0,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 3
+          }
+        },
+        "balance_sheet": {
+          "Q1": {
+            "qtrs_0": 2,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q2": {
+            "qtrs_0": 2,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "Q3": {
+            "qtrs_0": 2,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          },
+          "FY": {
+            "qtrs_0": 11,
+            "qtrs_1": 0,
+            "qtrs_2": 0,
+            "qtrs_3": 0,
+            "qtrs_4": 0
+          }
+        }
+      },
+      "q2_recommendation": "qtrs_2_mixed"
+    }
+  ]
+}

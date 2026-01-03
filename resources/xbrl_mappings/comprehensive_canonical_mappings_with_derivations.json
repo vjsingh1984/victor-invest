@@ -1,0 +1,1187 @@
+{
+  "total_revenue": {
+    "description": "Total Revenue/Sales",
+    "global_fallback": [
+      "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "RevenueFromContractWithCustomerIncludingAssessedTax",
+      "Revenues",
+      "SalesRevenueNet",
+      "SalesRevenueGoodsNet",
+      "RevenueNet",
+      "InterestIncomeOperating",
+      "NetInterestIncome"
+    ],
+    "sector_specific": {
+      "Technology": [
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "SalesRevenueNet",
+        "Revenues"
+      ],
+      "Utilities": [
+        "RevenueFromContractWithCustomerIncludingAssessedTax",
+        "RegulatedAndUnregulatedOperatingRevenue",
+        "Revenues"
+      ],
+      "Financials": [
+        "RevenuesNetOfInterestExpense",
+        "InterestRevenueExpense",
+        "NetInterestIncome",
+        "InterestIncomeOperating",
+        "InvestmentIncomeNet",
+        "Revenues"
+      ],
+      "Energy": [
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "Revenues"
+      ],
+      "Real Estate": [
+        "RevenueFromContractWithCustomerIncludingAssessedTax",
+        "SalesRevenueNet",
+        "Revenues"
+      ]
+    }
+  },
+  "cost_of_revenue": {
+    "description": "Cost of Goods Sold/Cost of Revenue",
+    "global_fallback": [
+      "CostOfRevenue",
+      "CostOfGoodsAndServicesSold",
+      "CostOfGoodsSold",
+      "CostOfSales",
+      "CostOfServices",
+      "CostOfProductsSold",
+      "CostOfProductsAndServicesSold",
+      "CostOfGoodsSoldExcludingDepreciationAndAmortization",
+      "RestaurantOperatingCosts",
+      "RetailCostOfSales"
+    ],
+    "sector_specific": {
+      "Consumer Discretionary": [
+        "CostOfGoodsSold",
+        "CostOfSales",
+        "CostOfGoodsAndServicesSold",
+        "CostOfProductsSold",
+        "CostOfProductsAndServicesSold",
+        "CostOfGoodsSoldExcludingDepreciationAndAmortization"
+      ],
+      "Consumer Staples": [
+        "CostOfGoodsSold",
+        "CostOfGoodsAndServicesSold",
+        "CostOfSales",
+        "CostOfProductsSold"
+      ],
+      "Industrials": [
+        "CostOfSales",
+        "CostOfGoodsSold",
+        "CostOfServices"
+      ],
+      "Energy": [
+        "CostOfGoodsSold",
+        "CostOfRevenue"
+      ],
+      "Communication Services": [
+        "CostOfRevenue",
+        "CostOfSales",
+        "ContentCosts"
+      ]
+    },
+    "derived": {
+      "enabled": true,
+      "formula": "total_revenue - gross_profit",
+      "formula_alt": "total_revenue - (total_revenue * gross_margin)",
+      "description": "Can be calculated from revenue and gross profit if not directly reported"
+    }
+  },
+  "gross_profit": {
+    "description": "Gross Profit",
+    "global_fallback": [
+      "GrossProfit",
+      "GrossProfitLoss",
+      "GrossOperatingProfit"
+    ],
+    "sector_specific": {
+      "Consumer Discretionary": [
+        "GrossProfit",
+        "GrossProfitLoss",
+        "GrossMargin"
+      ],
+      "Consumer Staples": [
+        "GrossProfit",
+        "GrossProfitLoss"
+      ]
+    },
+    "derived": {
+      "enabled": true,
+      "formula": "total_revenue - cost_of_revenue",
+      "required_fields": [
+        "total_revenue",
+        "cost_of_revenue"
+      ],
+      "description": "Calculate from revenue and COGS if not directly reported"
+    }
+  },
+  "net_income": {
+    "description": "Net Income/Loss",
+    "global_fallback": [
+      "NetIncomeLoss",
+      "NetIncomeLossAvailableToCommonStockholdersBasic",
+      "ProfitLoss"
+    ],
+    "sector_specific": {}
+  },
+  "operating_income": {
+    "description": "Operating Income/EBIT",
+    "global_fallback": [
+      "OperatingIncomeLoss",
+      "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "gross_profit - operating_expenses",
+      "formula_alt": "total_revenue - cost_of_revenue - operating_expenses",
+      "description": "Calculate from gross profit minus operating expenses"
+    }
+  },
+  "operating_cash_flow": {
+    "description": "Cash from Operating Activities",
+    "global_fallback": [
+      "NetCashProvidedByUsedInOperatingActivities",
+      "NetCashFlowOperatingActivities",
+      "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"
+    ],
+    "sector_specific": {}
+  },
+  "capital_expenditures": {
+    "description": "Capital Expenditures",
+    "global_fallback": [
+      "PaymentsToAcquirePropertyPlantAndEquipment",
+      "CapitalExpendituresIncurredButNotYetPaid",
+      "PaymentsForCapitalImprovements",
+      "PaymentsForCapitalExpenditures",
+      "PaymentsForPurchasesOfPropertyAndEquipment"
+    ],
+    "sector_specific": {
+      "Utilities": [
+        "CapitalExpendituresIncurredButNotYetPaid",
+        "PaymentsToAcquirePropertyPlantAndEquipment"
+      ],
+      "Technology": [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "CapitalExpendituresIncurredButNotYetPaid"
+      ],
+      "Energy": [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "PaymentsForProceedsFromOtherInvestingActivities",
+        "PaymentsForPropertyPlantAndEquipment"
+      ],
+      "Real Estate": [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "CapitalExpendituresIncurredButNotYetPaid"
+      ],
+      "Financials": [
+        "PaymentsForCapitalExpenditures",
+        "CapitalExpendituresNotYetPaid"
+      ],
+      "Industrials": [
+        "PaymentsToAcquireProductiveAssets",
+        "PaymentsForPurchasesOfPropertyAndEquipment"
+      ]
+    }
+  },
+  "free_cash_flow": {
+    "description": "Free Cash Flow (derived: OCF - CapEx)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "operating_cash_flow - capital_expenditures",
+      "required_fields": [
+        "operating_cash_flow",
+        "capital_expenditures"
+      ],
+      "description": "Always calculated as Operating Cash Flow minus CapEx"
+    }
+  },
+  "dividends_paid": {
+    "description": "Dividends Paid (Cash Outflow)",
+    "global_fallback": [
+      "PaymentsOfDividends",
+      "PaymentsOfDividendsCommonStock",
+      "PaymentsOfOrdinaryDividends",
+      "DividendsCashOutflow",
+      "PaymentsOfDividendsCommonStockAndNonredeemablePreferredStock",
+      "CashDividendsPaid",
+      "Dividends",
+      "CashDividendsForCommonStockholders",
+      "CashDividendsPaidToStockholders",
+      "DividendsPaidNet",
+      "CashDividendsPaidToCommonStockholders",
+      "DividendsPaidPreferredAndCommon",
+      "DividendsPaidCommonStockCash"
+    ],
+    "sector_specific": {
+      "Technology": [
+        "PaymentsOfDividendsCommonStock",
+        "PaymentsOfDividends"
+      ],
+      "Utilities": [
+        "PaymentsOfDividends"
+      ],
+      "Financials": [
+        "PaymentsOfDividends"
+      ],
+      "Energy": [
+        "PaymentsOfDividendsCommonStock",
+        "PaymentsOfDividendsMinorityInterest",
+        "PaymentsOfDividends"
+      ],
+      "Real Estate": [
+        "PaymentsOfDividendsCommonStock",
+        "PaymentsOfDividends",
+        "PaymentsOfDividendsPreferredStockAndPreferenceStock",
+        "PaymentsOfDividendsMinorityInterest"
+      ],
+      "Consumer Staples": [
+        "PaymentsOfDividendsCommonStock",
+        "CashDividendsPaid"
+      ],
+      "Consumer Discretionary": [
+        "PaymentsOfDividendsCommonStock",
+        "PaymentsOfDividends"
+      ]
+    }
+  },
+  "long_term_debt": {
+    "description": "Long-Term Debt",
+    "global_fallback": [
+      "LongTermDebt",
+      "LongTermDebtNoncurrent",
+      "LongTermDebtAndCapitalLeaseObligations",
+      "ConvertibleLongTermNotesPayable",
+      "LongTermDebtExcludingCurrentMaturities",
+      "LongTermNotesPayable",
+      "ConvertibleSeniorNotes"
+    ],
+    "sector_specific": {}
+  },
+  "short_term_debt": {
+    "description": "Short-Term Debt",
+    "global_fallback": [
+      "ShortTermDebt",
+      "ShortTermBorrowings",
+      "DebtCurrent",
+      "CommercialPaper",
+      "LongTermDebtCurrent",
+      "ConvertibleNotesPayableCurrent",
+      "NotesPayableCurrent",
+      "CurrentPortionOfLongTermDebt",
+      "FinanceLeaseLiabilityCurrent",
+      "FederalFundsPurchasedAndSecuritiesSoldUnderAgreementsToRepurchase",
+      "OtherShortTermBorrowings"
+    ],
+    "sector_specific": {
+      "Real Estate": [
+        "MortgageLoansOnRealEstateCurrent",
+        "SecuredDebtCurrent",
+        "DebtObligationsShortTerm"
+      ],
+      "Financials": [
+        "FederalFundsPurchasedAndSecuritiesSoldUnderAgreementsToRepurchase",
+        "OtherShortTermBorrowings",
+        "ShortTermBorrowings",
+        "CommercialPaper",
+        "InterestBearingDepositsInBanks",
+        "InterestBearingDepositLiabilities"
+      ]
+    }
+  },
+  "total_debt": {
+    "description": "Total Debt",
+    "global_fallback": [
+      "DebtLongTermAndShortTermCombinedAmount",
+      "LongTermDebtAndCapitalLeaseObligations",
+      "DebtAndCapitalLeaseObligations",
+      "Debt"
+    ],
+    "sector_specific": {
+      "Financials": [
+        "Deposits",
+        "DepositsLiabilities",
+        "InterestBearingDepositLiabilities",
+        "InterestBearingDepositLiabilitiesDomestic",
+        "InterestBearingDepositLiabilitiesForeign",
+        "NoninterestBearingDepositLiabilitiesDomestic",
+        "NoninterestBearingDepositLiabilitiesForeign",
+        "TimeDeposits",
+        "FederalHomeLoanBankAdvances",
+        "FederalFundsPurchasedAndSecuritiesSoldUnderAgreementsToRepurchase",
+        "OtherShortTermBorrowings",
+        "ShortTermBorrowings",
+        "SubordinatedDebt",
+        "TradingLiabilities"
+      ]
+    },
+    "derived": {
+      "enabled": true,
+      "formula": "long_term_debt + short_term_debt",
+      "required_fields": [
+        "long_term_debt",
+        "short_term_debt"
+      ],
+      "description": "Calculate from Long-Term Debt + Short-Term Debt if total not reported"
+    }
+  },
+  "total_assets": {
+    "description": "Total Assets",
+    "global_fallback": [
+      "Assets",
+      "AssetsCurrent"
+    ],
+    "sector_specific": {}
+  },
+  "current_assets": {
+    "description": "Current Assets",
+    "global_fallback": [
+      "AssetsCurrent"
+    ],
+    "sector_specific": {}
+  },
+  "total_liabilities": {
+    "description": "Total Liabilities",
+    "global_fallback": [
+      "Liabilities",
+      "LiabilitiesCurrent",
+      "LiabilitiesAndStockholdersEquity",
+      "LiabilitiesNoncurrent"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "total_assets - stockholders_equity",
+      "required_fields": [
+        "total_assets",
+        "stockholders_equity"
+      ],
+      "description": "Derived when liabilities tag missing"
+    }
+  },
+  "current_liabilities": {
+    "description": "Current Liabilities",
+    "global_fallback": [
+      "LiabilitiesCurrent"
+    ],
+    "sector_specific": {}
+  },
+  "stockholders_equity": {
+    "description": "Shareholders/Stockholders Equity",
+    "global_fallback": [
+      "StockholdersEquity",
+      "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+      "StockholdersEquityDeficit"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "total_assets - total_liabilities",
+      "required_fields": [
+        "total_assets",
+        "total_liabilities"
+      ],
+      "description": "Calculate from Assets - Liabilities if not directly reported (accounting identity)"
+    }
+  },
+  "cash_and_equivalents": {
+    "description": "Cash and Cash Equivalents",
+    "global_fallback": [
+      "CashAndCashEquivalentsAtCarryingValue",
+      "Cash",
+      "CashAndDueFromBanks",
+      "InterestBearingDepositsInOtherBanks",
+      "CashAndBankBalances",
+      "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"
+    ],
+    "sector_specific": {}
+  },
+  "accounts_receivable": {
+    "description": "Accounts Receivable (Net)",
+    "global_fallback": [
+      "AccountsReceivableNetCurrent",
+      "AccountsReceivableNet",
+      "AccountsReceivableTradeNet",
+      "AccountsReceivableTradeCurrent",
+      "ReceivablesNetCurrent",
+      "TradeAndOtherReceivablesNetCurrent",
+      "NotesAndAccountsReceivableNet"
+    ],
+    "sector_specific": {
+      "Consumer Discretionary": [
+        "AccountsReceivableTradeNet",
+        "AccountsReceivableTradeCurrent",
+        "TradeAndOtherReceivablesNetCurrent"
+      ],
+      "Consumer Staples": [
+        "AccountsReceivableNet",
+        "TradeAndOtherReceivablesNetCurrent"
+      ],
+      "Industrials": [
+        "AccountsReceivableTradeNet",
+        "AccountsReceivableNet"
+      ],
+      "Technology": [
+        "ReceivablesNetCurrent",
+        "AccountsReceivableTradeNet"
+      ]
+    }
+  },
+  "inventory": {
+    "description": "Inventory",
+    "global_fallback": [
+      "InventoryNet",
+      "Inventory",
+      "InventoriesNet",
+      "MerchandiseInventories",
+      "FinishedGoodsAndWorkInProcess",
+      "InventoryFinishedGoods",
+      "InventoryWorkInProcess",
+      "InventoryRawMaterials",
+      "InventoryRetail"
+    ],
+    "sector_specific": {
+      "Consumer Discretionary": [
+        "MerchandiseInventories",
+        "InventoryRetail",
+        "InventoryFinishedGoods"
+      ],
+      "Consumer Staples": [
+        "InventoryNet",
+        "InventoryFinishedGoods",
+        "InventoryWorkInProcess",
+        "InventoryRawMaterials"
+      ],
+      "Industrials": [
+        "FinishedGoodsAndWorkInProcess",
+        "InventoryWorkInProcess",
+        "InventoryRawMaterials"
+      ]
+    }
+  },
+  "property_plant_equipment": {
+    "description": "Property, Plant & Equipment (Gross)",
+    "global_fallback": [
+      "PropertyPlantAndEquipmentGross",
+      "PropertyPlantAndEquipmentNet"
+    ],
+    "sector_specific": {}
+  },
+  "accumulated_depreciation": {
+    "description": "Accumulated Depreciation",
+    "global_fallback": [
+      "AccumulatedDepreciationDepletionAndAmortizationPropertyPlantAndEquipment"
+    ],
+    "sector_specific": {}
+  },
+  "property_plant_equipment_net": {
+    "description": "Property, Plant & Equipment (Net)",
+    "global_fallback": [
+      "PropertyPlantAndEquipmentNet"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "property_plant_equipment - accumulated_depreciation",
+      "required_fields": [
+        "property_plant_equipment",
+        "accumulated_depreciation"
+      ],
+      "description": "Calculate from PP&E Gross - Accumulated Depreciation"
+    }
+  },
+  "goodwill": {
+    "description": "Goodwill",
+    "global_fallback": [
+      "Goodwill"
+    ],
+    "sector_specific": {}
+  },
+  "intangible_assets": {
+    "description": "Intangible Assets (Net)",
+    "global_fallback": [
+      "IntangibleAssetsNetExcludingGoodwill",
+      "FiniteLivedIntangibleAssetsNet"
+    ],
+    "sector_specific": {}
+  },
+  "retained_earnings": {
+    "description": "Retained Earnings",
+    "global_fallback": [
+      "RetainedEarningsAccumulatedDeficit"
+    ],
+    "sector_specific": {}
+  },
+  "research_and_development_expense": {
+    "description": "Research & Development Expense",
+    "global_fallback": [
+      "ResearchAndDevelopmentExpense",
+      "ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost"
+    ],
+    "sector_specific": {}
+  },
+  "selling_general_administrative_expense": {
+    "description": "Selling, General & Administrative Expense",
+    "global_fallback": [
+      "SellingGeneralAndAdministrativeExpense",
+      "SellingAndMarketingExpense",
+      "GeneralAndAdministrativeExpense"
+    ],
+    "sector_specific": {}
+  },
+  "operating_expenses": {
+    "description": "Total Operating Expenses",
+    "global_fallback": [
+      "OperatingExpenses",
+      "OperatingCostsAndExpenses",
+      "TotalOperatingCostsAndExpenses",
+      "OperatingExpense"
+    ],
+    "sector_specific": {
+      "Consumer Discretionary": [
+        "SellingGeneralAndAdministrativeExpense",
+        "SellingAndMarketingExpense",
+        "StoreOperatingExpenses",
+        "GeneralAndAdministrativeExpense",
+        "OperatingCostsAndExpenses"
+      ],
+      "Consumer Staples": [
+        "SellingGeneralAndAdministrativeExpense",
+        "SellingAndMarketingExpense",
+        "GeneralAndAdministrativeExpense",
+        "OperatingCostsAndExpenses"
+      ],
+      "Technology": [
+        "OperatingCostsAndExpenses",
+        "OperatingExpense"
+      ]
+    },
+    "derived": {
+      "enabled": true,
+      "formula": "research_and_development_expense + selling_general_administrative_expense",
+      "formula_alt": "gross_profit - operating_income",
+      "description": "Calculate from R&D + SG&A or Gross Profit - Operating Income"
+    }
+  },
+  "interest_expense": {
+    "description": "Interest Expense",
+    "global_fallback": [
+      "InterestExpense",
+      "InterestExpenseDebt",
+      "InterestExpenseBorrowings",
+      "InterestExpenseContinuingOperations",
+      "InterestPaidNet"
+    ],
+    "sector_specific": {}
+  },
+  "income_tax_expense": {
+    "description": "Income Tax Expense (Benefit)",
+    "global_fallback": [
+      "IncomeTaxExpenseBenefit"
+    ],
+    "sector_specific": {}
+  },
+  "effective_tax_rate": {
+    "description": "Effective Tax Rate",
+    "global_fallback": [
+      "EffectiveIncomeTaxRateReconciliationAtFederalStatutoryIncomeTaxRate",
+      "EffectiveIncomeTaxRateContinuingOperations"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "income_tax_expense / (net_income + income_tax_expense)",
+      "formula_alt": "income_tax_expense / operating_income",
+      "required_fields": [
+        "income_tax_expense",
+        "net_income"
+      ],
+      "description": "Calculate as Tax Expense / Pre-Tax Income (EBT). For WACC calculations."
+    }
+  },
+  "interest_coverage": {
+    "description": "Interest Coverage Ratio (Times Interest Earned)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "operating_income / interest_expense",
+      "formula_alt": "(net_income + interest_expense + income_tax_expense) / interest_expense",
+      "required_fields": [
+        "operating_income",
+        "interest_expense"
+      ],
+      "description": "Calculate as EBIT / Interest Expense. Measures ability to pay interest obligations."
+    }
+  },
+  "depreciation_amortization": {
+    "description": "Depreciation & Amortization",
+    "global_fallback": [
+      "DepreciationDepletionAndAmortization",
+      "DepreciationAmortizationAndAccretionNet",
+      "Depreciation"
+    ],
+    "sector_specific": {}
+  },
+  "stock_based_compensation": {
+    "description": "Stock-Based Compensation Expense",
+    "global_fallback": [
+      "AllocatedShareBasedCompensationExpense",
+      "ShareBasedCompensation"
+    ],
+    "sector_specific": {}
+  },
+  "deferred_revenue": {
+    "description": "Deferred Revenue (Current)",
+    "global_fallback": [
+      "DeferredRevenueCurrent",
+      "ContractWithCustomerLiabilityCurrent",
+      "DeferredRevenue"
+    ],
+    "sector_specific": {
+      "Information Technology": [
+      "ContractWithCustomerLiabilityCurrent",
+      "ContractWithCustomerLiability",
+      "ContractWithCustomerLiabilityNoncurrent",
+      "ContractWithCustomerLiabilityRevenueRecognized",
+      "ContractWithCustomerAssetNet",
+      "ContractWithCustomerRefundLiability",
+      "DeferredRevenueRelatedToContractWithCustomers",
+      "DeferredRevenueRemainingPerformanceObligation",
+      "DeferredRevenueSubscription"
+    ],
+      "Communication Services": [
+        "ContractWithCustomerLiabilityCurrent",
+        "ContractWithCustomerLiability"
+      ],
+      "Consumer Discretionary": [
+        "DeferredRevenueAndCredits",
+        "DeferredRevenueLeasesNet",
+        "AdvanceRent",
+        "DeferredRentCredit",
+        "DeferredRentReceivablesNet",
+        "GiftCardLiability",
+        "DeferredGiftCardRevenue",
+        "DeferredMerchandiseRevenue",
+        "LoyaltyProgramDeferredRevenue"
+      ],
+      "Real Estate": [
+        "DeferredRevenueLeasesNet",
+        "AdvanceRent",
+        "DeferredRentReceivablesNet",
+        "DeferredRentCredit"
+      ],
+      "Industrials": [
+        "DeferredRevenueCurrent",
+        "DeferredRevenueAndCredits"
+      ]
+    }
+  },
+  "accounts_payable": {
+    "description": "Accounts Payable",
+    "global_fallback": [
+      "AccountsPayableCurrent",
+      "AccountsPayable",
+      "AccountsPayableTradeCurrent",
+      "TradeAccountsPayableCurrent",
+      "AccountsPayableAndAccruedLiabilitiesCurrent",
+      "AccountsPayableAndAccruedExpenses",
+      "AccountsPayableTrade",
+      "AccountsPayableTradeAndOtherCurrent"
+    ],
+    "sector_specific": {
+      "Consumer Discretionary": [
+        "AccountsPayableTradeCurrent",
+        "AccountsPayableAndAccruedLiabilitiesCurrent",
+        "TradeAccountsPayableCurrent"
+      ],
+      "Consumer Staples": [
+        "AccountsPayableTradeCurrent",
+        "AccountsPayableTrade",
+        "AccountsPayableAndAccruedExpenses"
+      ],
+      "Industrials": [
+        "AccountsPayableTradeCurrent",
+        "AccountsPayableTrade"
+      ]
+    }
+  },
+  "accrued_liabilities": {
+    "description": "Accrued Liabilities",
+    "global_fallback": [
+      "AccruedLiabilitiesCurrent",
+      "AccruedLiabilities",
+      "AccruedExpensesCurrent",
+      "AccruedExpensesAndOtherCurrentLiabilities",
+      "OtherAccruedLiabilitiesCurrent",
+      "AccruedCompensationAndBenefits",
+      "AccruedLiabilitiesAndDeferredIncome",
+      "OtherAccruedLiabilities"
+    ],
+    "sector_specific": {
+      "Consumer Discretionary": [
+        "AccruedExpensesCurrent",
+        "AccruedExpensesAndOtherCurrentLiabilities",
+        "OtherAccruedLiabilitiesCurrent"
+      ],
+      "Consumer Staples": [
+        "AccruedExpensesCurrent",
+        "AccruedCompensationAndBenefits",
+        "AccruedExpensesAndOtherCurrentLiabilities"
+      ],
+      "Technology": [
+        "OtherAccruedLiabilitiesCurrent",
+        "AccruedExpensesCurrent"
+      ]
+    }
+  },
+  "preferred_stock_dividends": {
+    "description": "Preferred Stock Dividends",
+    "global_fallback": [
+      "DividendsPreferredStock",
+      "PaymentsOfDividendsPreferredStockAndPreferenceStock",
+      "PreferredStockDividendsDeclared",
+      "DividendsOnPreferredStock",
+      "DividendsPerSharePreferredStockDeclared",
+      "PreferredStockDividends",
+      "PreferredStockDividendsPerShareDeclared",
+      "PreferredStockDividendsRequirement",
+      "PreferredStockDividendsPaid",
+      "PreferredStockDividendsPerShareCashPaid",
+      "PreferredStockDividendsPerShare",
+      "DividendsPreferredStockCash",
+      "DividendsPreferredStockStock",
+      "DividendsOnPreferredStockAndPreferenceStock",
+      "PreferredDividends",
+      "PreferredStockDividendsAndOtherAdjustments",
+      "OtherPreferredStockDividendsAndAdjustments",
+      "PreferredStockDividendsIncomeStatementImpact",
+      "PreferredStockDividendsPerSharePaid",
+      "PreferredStockSeriesADividendsDeclared",
+      "PreferredStockSeriesBDividendsDeclared",
+      "PreferredStockSeriesCDividendsDeclared",
+      "PreferredStockSeriesDDividendsDeclared"
+    ],
+    "sector_specific": {
+      "Financials": [
+        "DividendsPreferredStock",
+        "PreferredStockDividendsDeclared",
+        "PreferredStockDividendsRequirement",
+        "PreferredStockDividendsPaid"
+      ],
+      "Real Estate": [
+        "PreferredStockDividendsDeclared",
+        "PreferredStockDividendsPerShareDeclared",
+        "PreferredStockDividends",
+        "PreferredStockSeriesADividendsDeclared",
+        "PreferredStockSeriesBDividendsDeclared"
+      ]
+    }
+  },
+  "common_stock_dividends": {
+    "description": "Common Stock Dividends Declared",
+    "global_fallback": [
+      "DividendsCommonStock",
+      "CommonStockDividendsPerShareDeclared",
+      "CommonStockDividendsPerShareCashPaid",
+      "DividendsPerShareCommonStockDeclared",
+      "DividendsOnCommonStock",
+      "CashDividendsCommonStockDeclared"
+    ],
+    "sector_specific": {}
+  },
+  "treasury_stock": {
+    "description": "Treasury Stock",
+    "global_fallback": [
+      "TreasuryStockValue"
+    ],
+    "sector_specific": {}
+  },
+  "other_comprehensive_income": {
+    "description": "Other Comprehensive Income (Loss)",
+    "global_fallback": [
+      "OtherComprehensiveIncomeLossNetOfTax",
+      "OtherComprehensiveIncomeLossNetOfTaxPortionAttributableToParent"
+    ],
+    "sector_specific": {}
+  },
+  "investing_cash_flow": {
+    "description": "Cash from Investing Activities",
+    "global_fallback": [
+      "NetCashProvidedByUsedInInvestingActivities"
+    ],
+    "sector_specific": {}
+  },
+  "financing_cash_flow": {
+    "description": "Cash from Financing Activities",
+    "global_fallback": [
+      "NetCashProvidedByUsedInFinancingActivities"
+    ],
+    "sector_specific": {}
+  },
+  "shares_outstanding": {
+    "description": "Shares Outstanding (Weighted Average)",
+    "global_fallback": [
+      "WeightedAverageNumberOfSharesOutstandingBasic",
+      "WeightedAverageNumberOfDilutedSharesOutstanding",
+      "WeightedAverageDilutedSharesOutstanding",
+      "CommonStockSharesOutstanding"
+    ],
+    "sector_specific": {},
+    "unit": "shares"
+  },
+  "earnings_per_share": {
+    "description": "Earnings Per Share (Basic)",
+    "global_fallback": [
+      "EarningsPerShareBasic",
+      "IncomeLossFromContinuingOperationsPerBasicShare"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "net_income / shares_outstanding",
+      "required_fields": [
+        "net_income",
+        "shares_outstanding"
+      ],
+      "description": "Calculate from Net Income / Shares Outstanding if not directly reported"
+    }
+  },
+  "earnings_per_share_diluted": {
+    "description": "Earnings Per Share (Diluted)",
+    "global_fallback": [
+      "EarningsPerShareDiluted",
+      "IncomeLossFromContinuingOperationsPerDilutedShare"
+    ],
+    "sector_specific": {}
+  },
+  "market_cap": {
+    "description": "Market Capitalization (derived: price * shares)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "current_price * shares_outstanding",
+      "required_fields": [
+        "current_price",
+        "shares_outstanding"
+      ],
+      "description": "Always calculated as Current Price * Shares Outstanding"
+    }
+  },
+  "book_value": {
+    "description": "Book Value (Total Equity)",
+    "global_fallback": [
+      "StockholdersEquity"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "total_assets - total_liabilities",
+      "required_fields": [
+        "total_assets",
+        "total_liabilities"
+      ],
+      "description": "Calculate from Total Assets - Total Liabilities"
+    }
+  },
+  "book_value_per_share": {
+    "description": "Book Value Per Share",
+    "global_fallback": [
+      "BookValuePerShare"
+    ],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "stockholders_equity / shares_outstanding",
+      "required_fields": [
+        "stockholders_equity",
+        "shares_outstanding"
+      ],
+      "description": "Calculate from Stockholders Equity / Shares Outstanding"
+    }
+  },
+  "financial_total_deposits": {
+    "description": "Total deposits reported by financial institutions (support metric)",
+    "global_fallback": [
+      "Deposits",
+      "DepositsLiabilities",
+      "DepositsLiabilitiesCurrent",
+      "DepositsLiabilitiesNoncurrent",
+      "InterestBearingDepositLiabilities",
+      "InterestBearingDepositLiabilitiesDomestic",
+      "InterestBearingDepositLiabilitiesForeign",
+      "NoninterestBearingDepositLiabilitiesDomestic",
+      "NoninterestBearingDepositLiabilitiesForeign",
+      "TimeDeposits",
+      "DepositsDemand",
+      "DepositsTotal"
+    ],
+    "sector_specific": {
+      "Financials": [
+        "Deposits",
+        "DepositsLiabilities",
+        "InterestBearingDepositLiabilities",
+        "InterestBearingDepositLiabilitiesDomestic",
+        "InterestBearingDepositLiabilitiesForeign",
+        "NoninterestBearingDepositLiabilitiesDomestic",
+        "NoninterestBearingDepositLiabilitiesForeign",
+        "TimeDeposits"
+      ]
+    }
+  },
+  "financial_repo_borrowings": {
+    "description": "Federal funds purchased / repo borrowings (support metric)",
+    "global_fallback": [
+      "FederalFundsPurchasedAndSecuritiesSoldUnderAgreementsToRepurchase"
+    ],
+    "sector_specific": {
+      "Financials": [
+        "FederalFundsPurchasedAndSecuritiesSoldUnderAgreementsToRepurchase"
+      ]
+    }
+  },
+  "financial_fhlb_borrowings": {
+    "description": "Federal Home Loan Bank advances (support metric)",
+    "global_fallback": [
+      "FederalHomeLoanBankAdvances"
+    ],
+    "sector_specific": {
+      "Financials": [
+        "FederalHomeLoanBankAdvances"
+      ]
+    }
+  },
+  "financial_other_short_term_borrowings": {
+    "description": "Other short-term borrowings (support metric)",
+    "global_fallback": [
+      "OtherShortTermBorrowings",
+      "ShortTermBorrowings",
+      "CommercialPaper"
+    ],
+    "sector_specific": {
+      "Financials": [
+        "OtherShortTermBorrowings",
+        "ShortTermBorrowings",
+        "CommercialPaper"
+      ]
+    }
+  },
+  "working_capital": {
+    "description": "Working Capital",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "current_assets - current_liabilities",
+      "required_fields": [
+        "current_assets",
+        "current_liabilities"
+      ],
+      "description": "Always calculated as Current Assets - Current Liabilities"
+    }
+  },
+  "net_debt": {
+    "description": "Net Debt",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "total_debt - cash_and_equivalents",
+      "required_fields": [
+        "total_debt",
+        "cash_and_equivalents"
+      ],
+      "description": "Calculate as Total Debt - Cash & Equivalents"
+    }
+  },
+  "enterprise_value": {
+    "description": "Enterprise Value",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "market_cap + net_debt",
+      "formula_alt": "market_cap + total_debt - cash_and_equivalents",
+      "required_fields": [
+        "market_cap",
+        "total_debt",
+        "cash_and_equivalents"
+      ],
+      "description": "Calculate as Market Cap + Net Debt"
+    }
+  },
+  "dividend_payout_ratio": {
+    "description": "Dividend Payout Ratio (derived: dividends / net_income)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "dividends_paid / net_income",
+      "required_fields": [
+        "dividends_paid",
+        "net_income"
+      ],
+      "description": "Always calculated as Dividends Paid / Net Income"
+    }
+  },
+  "dividend_yield": {
+    "description": "Dividend Yield (derived: DPS / price)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "(dividends_paid / shares_outstanding) / current_price",
+      "required_fields": [
+        "dividends_paid",
+        "shares_outstanding",
+        "current_price"
+      ],
+      "description": "Calculate as (Dividends / Shares) / Current Price"
+    }
+  },
+  "current_ratio": {
+    "description": "Current Ratio",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "current_assets / current_liabilities",
+      "required_fields": [
+        "current_assets",
+        "current_liabilities"
+      ],
+      "description": "Always calculated as Current Assets / Current Liabilities"
+    }
+  },
+  "quick_ratio": {
+    "description": "Quick Ratio (Acid Test)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "(current_assets - inventory) / current_liabilities",
+      "required_fields": [
+        "current_assets",
+        "inventory",
+        "current_liabilities"
+      ],
+      "description": "Calculate as (Current Assets - Inventory) / Current Liabilities"
+    }
+  },
+  "debt_to_equity": {
+    "description": "Debt-to-Equity Ratio",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "total_debt / stockholders_equity",
+      "required_fields": [
+        "total_debt",
+        "stockholders_equity"
+      ],
+      "description": "Calculate as Total Debt / Stockholders Equity"
+    }
+  },
+  "return_on_assets": {
+    "description": "Return on Assets (ROA)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "net_income / total_assets",
+      "required_fields": [
+        "net_income",
+        "total_assets"
+      ],
+      "description": "Calculate as Net Income / Total Assets"
+    }
+  },
+  "return_on_equity": {
+    "description": "Return on Equity (ROE)",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "net_income / stockholders_equity",
+      "required_fields": [
+        "net_income",
+        "stockholders_equity"
+      ],
+      "description": "Calculate as Net Income / Stockholders Equity"
+    }
+  },
+  "gross_margin": {
+    "description": "Gross Profit Margin",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "gross_profit / total_revenue",
+      "required_fields": [
+        "gross_profit",
+        "total_revenue"
+      ],
+      "description": "Calculate as Gross Profit / Total Revenue"
+    }
+  },
+  "operating_margin": {
+    "description": "Operating Profit Margin",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "operating_income / total_revenue",
+      "required_fields": [
+        "operating_income",
+        "total_revenue"
+      ],
+      "description": "Calculate as Operating Income / Total Revenue"
+    }
+  },
+  "net_margin": {
+    "description": "Net Profit Margin",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "net_income / total_revenue",
+      "required_fields": [
+        "net_income",
+        "total_revenue"
+      ],
+      "description": "Calculate as Net Income / Total Revenue"
+    }
+  },
+  "asset_turnover": {
+    "description": "Asset Turnover Ratio",
+    "global_fallback": [],
+    "sector_specific": {},
+    "derived": {
+      "enabled": true,
+      "formula": "total_revenue / total_assets",
+      "required_fields": [
+        "total_revenue",
+        "total_assets"
+      ],
+      "description": "Calculate as Total Revenue / Total Assets"
+    }
+  },
+  "weighted_average_diluted_shares_outstanding": {
+    "description": "Weighted Average Diluted Shares Outstanding (for conservative valuation)",
+    "global_fallback": [
+      "WeightedAverageNumberOfDilutedSharesOutstanding",
+      "WeightedAverageNumberOfSharesOutstandingBasic",
+      "CommonStockSharesOutstanding"
+    ],
+    "unit": "shares",
+    "statement": "income_statement"
+  }
+}

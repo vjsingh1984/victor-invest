@@ -1,0 +1,14 @@
+                                                                                                                     format                                                                                                                     
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('A', '1090872', 'A Company', NULL, '2025-06-03 10:20:18.809902', '2025-06-03 10:20:18.809902') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AA', '1675149', 'AA Company', NULL, '2025-06-03 10:20:19.035414', '2025-06-03 10:20:19.035414') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AAAU', '1708646', 'AAAU Company', NULL, '2025-06-03 10:20:21.437849', '2025-06-03 10:20:21.437849') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AAC', '1829432', 'AAC Company', NULL, '2025-06-03 10:20:19.527488', '2025-06-03 10:20:19.527488') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AAC-UN', '1829432', 'AAC-UN Company', NULL, '2025-06-03 10:20:22.101502', '2025-06-03 10:20:22.101502') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AAC-WT', '1829432', 'AAC-WT Company', NULL, '2025-06-03 10:20:22.101791', '2025-06-03 10:20:22.101791') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AACG', '1420529', 'AACG Company', NULL, '2025-06-03 10:20:20.55997', '2025-06-03 10:20:20.55997') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AACI', '1844817', 'AACI Company', NULL, '2025-06-03 10:20:20.186042', '2025-06-03 10:20:20.186042') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AACIW', '1844817', 'AACIW Company', NULL, '2025-06-03 10:20:22.102076', '2025-06-03 10:20:22.102076') ON CONFLICT (ticker) DO NOTHING;
+ INSERT INTO ticker_cik_mapping (ticker, cik, company_name, exchange, created_at, updated_at) VALUES ('AACP', '1822365', 'AACP Company', NULL, '2025-06-03 10:20:21.438139', '2025-06-03 10:20:21.438139') ON CONFLICT (ticker) DO NOTHING;
+(10 rows)
+

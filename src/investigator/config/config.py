@@ -1,0 +1,2103 @@
+#!/usr/bin/env python3
+"""
+InvestiGator - Configuration Management Module
+Copyright (c) 2025 Vijaykumar Singh
+Licensed under the Apache License 2.0
+
+Common Configuration Module
+Handles all configuration settings for the Investment AI system
+"""
+
+import yaml
+import logging
+import os
+import re
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+
+@dataclass
+class DatabaseConfig:
+    """Database configuration"""
+
+    host: str
+    port: int
+    database: str
+    username: str
+    password: str
+    pool_size: int
+    max_overflow: int
+
+    @property
+    def url(self) -> str:
+        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+
+
+@dataclass
+class ModelSpec:
+    """Model specification from config.json - single source of truth for model configs"""
+
+    context_window: int
+    parameters: str
+    memory_gb: float
+    reasoning_score: float
+    thinking_capability: bool
+    default_num_predict: int
+    max_num_predict: int
+    architecture: str = ""
+    weights_vram_gb: float = 0.0
+    kv_cache_mb_per_1k_tokens: float = 120.0
+    kv_cache_overhead_pct: float = 0.2
+
+    def __post_init__(self) -> None:
+        if not self.weights_vram_gb:
+            self.weights_vram_gb = float(self.memory_gb)
+        self.memory_gb = float(self.memory_gb)
+        if not self.kv_cache_mb_per_1k_tokens:
+            self.kv_cache_mb_per_1k_tokens = 120.0
+        if not self.kv_cache_overhead_pct:
+            self.kv_cache_overhead_pct = 0.2
+
+
+@dataclass
+class OllamaConfig:
+    """Ollama AI configuration"""
+
+    base_url: str
+    models: Dict[str, str]
+    timeout: int
+    max_retries: int
+    min_context_size: int
+    num_llm_threads: int
+    num_predict: Dict[str, int]
+    model_specs: Dict[str, ModelSpec] = field(default_factory=dict)  # Model specifications (single source of truth)
+    context_sizes: Dict[str, int] = field(default_factory=dict)  # Model-specific context sizes (legacy)
+    model_info_cache: Dict[str, Dict[str, int]] = field(default_factory=dict)  # Cache for model info
+
+    # Multi-server pool configuration
+    keep_alive: int = -1  # Keep models loaded (-1 = indefinitely)
+    servers: Optional[List[Any]] = None  # List of server configurations
+    pool_strategy: str = "most_capacity"  # Load balancing strategy
+
+    # TOON format configuration (Token-Oriented Object Notation for token efficiency)
+    use_toon_format: bool = False  # Enable TOON format for input prompts (30-87% token savings)
+    toon_agents: Dict[str, bool] = field(default_factory=dict)  # Per-agent TOON toggles
+
+    def get_context_size(self, model_name: str) -> int:
+        """Get context size for specific model, fallback to min_context_size"""
+        return self.context_sizes.get(model_name, self.min_context_size)
+
+
+@dataclass
+class SECConfig:
+    """SEC EDGAR API configuration"""
+
+    user_agent: str
+    base_url: str
+    rate_limit: int
+    cache_dir: str
+    ticker_cache_file: str
+    max_retries: int
+    timeout: int
+    frame_api_concepts: dict
+    frame_api_details: dict
+    xbrl_tag_abbreviations: dict
+
+    # Submission and period configuration
+    require_submissions: bool
+    max_periods_to_analyze: int
+    include_amended_filings: bool
+
+
+@dataclass
+class EmailConfig:
+    """Email configuration"""
+
+    enabled: bool
+    smtp_server: str
+    smtp_port: int
+    username: str
+    password: str
+    from_address: str
+    recipients: List[str]
+    use_tls: bool
+
+
+@dataclass
+class AnalysisConfig:
+    """Analysis parameters"""
+
+    fundamental_weight: float
+    technical_weight: float
+    min_score_for_buy: float
+    max_score_for_sell: float
+    lookback_days: int
+    min_volume: int
+    max_prompt_tokens: int = 32768
+
+
+@dataclass
+class AgentTimeoutConfig:
+    """Agent timeout configuration (resolves Technical Debt Issue 6.4)"""
+
+    technical_analysis: int = 240  # seconds
+    fundamental_analysis: int = 360  # seconds
+    synthesis: int = 120  # seconds
+    market_context: int = 180  # seconds
+    default_timeout: int = 900  # 15 minutes
+
+
+@dataclass
+class OrchestratorConfig:
+    """Orchestrator configuration (resolves Technical Debt Issue 6.4)"""
+
+    max_concurrent_analyses: int = 5
+    max_concurrent_agents: int = 10
+    task_dependency_max_retries: int = 100
+    task_dependency_backoff_seconds: float = 0.5
+
+
+@dataclass
+class LoggingConfig:
+    """Consolidated logging configuration"""
+
+    # Symbol-specific logging
+    symbol_log_max_bytes: int
+    symbol_log_backup_count: int
+    symbol_log_format: str
+
+    # Main consolidated logging
+    main_log_max_bytes: int
+    main_log_backup_count: int
+    main_log_format: str
+    main_log_file: str
+
+
+class CacheStorageType(Enum):
+    """Cache storage types"""
+
+    DISK = "disk"
+    RDBMS = "rdbms"
+    DISABLED = "disabled"
+
+
+@dataclass
+class CacheConfig:
+    """Cache configuration for a specific data type"""
+
+    enabled: bool = True
+    storage_type: CacheStorageType = CacheStorageType.DISK
+    priority: int = 1  # Negative priority means write-only (no retrieval)
+
+    # Disk cache settings
+    disk_path: Optional[str] = None
+    filename_pattern: str = "{symbol}_{data_type}.json"
+
+    # RDBMS cache settings
+    table_name: Optional[str] = None
+    key_column: str = "symbol"
+    data_column: str = "data"
+
+    # TTL and cleanup settings
+    ttl_hours: Optional[int] = None  # None means no expiration
+    max_entries: Optional[int] = None  # Max entries before cleanup
+
+    def __post_init__(self):
+        """Validate cache configuration"""
+        if self.enabled:
+            if self.storage_type == CacheStorageType.DISK and not self.disk_path:
+                raise ValueError("disk_path required for disk cache")
+            elif self.storage_type == CacheStorageType.RDBMS and not self.table_name:
+                raise ValueError("table_name required for RDBMS cache")
+
+
+@dataclass
+class CacheHandlerConfig:
+    """Configuration for a specific cache handler (disk or rdbms)"""
+
+    enabled: bool = True
+    priority: int = 10
+
+    # Handler-specific settings
+    settings: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        # Ensure settings is a dict
+        if self.settings is None:
+            self.settings = {}
+
+
+@dataclass
+class CacheTypeConfig:
+    """Configuration for a specific cache type"""
+
+    enabled: bool = True
+    ttl_hours: int = 24
+
+    # Storage handler configurations
+    disk: CacheHandlerConfig = field(
+        default_factory=lambda: CacheHandlerConfig(
+            enabled=True,
+            priority=20,
+            settings={
+                "base_path": "data/{cache_type}_cache",
+                "file_pattern": "{symbol}_{key_suffix}.json.gz",
+                "compression": "gzip",
+                "compression_level": 9,
+                "create_symbol_dirs": True,
+            },
+        )
+    )
+
+    rdbms: CacheHandlerConfig = field(
+        default_factory=lambda: CacheHandlerConfig(
+            enabled=True,
+            priority=10,
+            settings={"table_suffix": "_store", "upsert_on_conflict": True, "connection_pool": "default"},
+        )
+    )
+
+
+@dataclass
+class CacheControlConfig:
+    """
+    Comprehensive cache control configuration.
+
+    Provides fine-grained control over:
+    - Cache types and their TTLs
+    - Storage handlers (disk/rdbms) per cache type
+    - Handler-specific settings (paths, compression, etc.)
+    - Global cache behavior (read/write/refresh)
+    """
+
+    # Global cache behavior
+    read_from_cache: bool = True
+    write_to_cache: bool = True
+    force_refresh: bool = False
+    force_refresh_symbols: Optional[List[str]] = None
+
+    # Cache type configurations with natural key patterns
+    cache_types: Dict[str, CacheTypeConfig] = field(
+        default_factory=lambda: {
+            "sec_response": CacheTypeConfig(
+                ttl_hours=2160,  # 90 days - SEC API calls are rate-limited and expensive
+                disk=CacheHandlerConfig(
+                    priority=20,
+                    settings={
+                        "base_path": "data/sec_cache",
+                        "file_pattern": "{symbol}/{symbol}_quarterly_summary_{fiscal_year}-{fiscal_period}.json.gz",
+                        "natural_key_order": ["symbol", "fiscal_year", "fiscal_period", "form_type", "category"],
+                        "compression": "gzip",
+                        "compression_level": 9,
+                        "create_symbol_dirs": True,
+                    },
+                ),
+                rdbms=CacheHandlerConfig(
+                    priority=10,
+                    settings={
+                        "table_name": "sec_responses",
+                        "natural_key_order": ["symbol", "fiscal_year", "fiscal_period", "form_type", "category"],
+                        "upsert_on_conflict": True,
+                    },
+                ),
+            ),
+            "llm_response": CacheTypeConfig(
+                ttl_hours=720,  # 30 days - LLM calls are expensive
+                disk=CacheHandlerConfig(
+                    priority=20,
+                    settings={
+                        "base_path": "data/llm_cache",
+                        "file_pattern": "{symbol}_{llm_type}.json.gz",  # Simplified pattern
+                        "natural_key_order": ["symbol", "llm_type"],
+                        "compression": "gzip",
+                        "compression_level": 9,
+                        "create_symbol_dirs": True,
+                    },
+                ),
+                rdbms=CacheHandlerConfig(
+                    priority=10,
+                    settings={
+                        "table_name": "llm_responses",
+                        "natural_key_order": ["symbol", "fiscal_year", "fiscal_period", "llm_type"],
+                        "upsert_on_conflict": True,
+                    },
+                ),
+            ),
+            "technical_data": CacheTypeConfig(
+                ttl_hours=24,  # 1 day - technical data changes frequently
+                disk=CacheHandlerConfig(
+                    priority=20,
+                    settings={
+                        "base_path": "data/technical_cache",
+                        "file_pattern": "{symbol}/{analysis_date}_technical.parquet",
+                        "natural_key_order": ["symbol", "analysis_date"],
+                        "compression": "gzip",
+                        "compression_level": 9,
+                        "engine": "fastparquet",
+                        "create_symbol_dirs": True,
+                    },
+                ),
+                rdbms=CacheHandlerConfig(enabled=False),  # Technical data uses parquet only
+            ),
+            "submission_data": CacheTypeConfig(
+                ttl_hours=168,  # 7 days - staggered refresh for Russell 1000
+                disk=CacheHandlerConfig(
+                    priority=20,
+                    settings={
+                        "base_path": "data/sec_cache/submissions",
+                        "file_pattern": "{symbol}_{cik}_submissions.json.gz",
+                        "natural_key_order": ["symbol", "cik"],
+                        "compression": "gzip",
+                        "compression_level": 9,
+                        "enable_staggered_ttl": True,  # Enable symbol-specific TTL
+                        "ttl_strategy": "russell_1000_weekly",
+                    },
+                ),
+                rdbms=CacheHandlerConfig(
+                    priority=10,
+                    settings={
+                        "table_name": "sec_submissions",
+                        "natural_key_order": ["symbol", "cik"],
+                        "upsert_on_conflict": True,
+                        "enable_staggered_ttl": True,
+                    },
+                ),
+            ),
+            "company_facts": CacheTypeConfig(
+                ttl_hours=168,  # 7 days - aligned with submission refresh strategy
+                disk=CacheHandlerConfig(
+                    priority=20,
+                    settings={
+                        "base_path": "data/sec_cache/facts/processed",
+                        "file_pattern": "{symbol}_{cik}_companyfacts.json.gz",
+                        "natural_key_order": ["symbol", "cik"],
+                        "compression": "gzip",
+                        "compression_level": 9,
+                        "enable_staggered_ttl": True,
+                        "ttl_strategy": "russell_1000_weekly",
+                    },
+                ),
+                rdbms=CacheHandlerConfig(
+                    priority=10,
+                    settings={
+                        "table_name": "sec_companyfacts",
+                        "natural_key_order": ["symbol", "cik"],
+                        "upsert_on_conflict": True,
+                        "enable_staggered_ttl": True,
+                        "partition_by_symbol": True,  # Optimize for CIK-based queries
+                    },
+                ),
+            ),
+            "quarterly_metrics": CacheTypeConfig(
+                ttl_hours=2160,  # 90 days to align with quarterly announcements
+                disk=CacheHandlerConfig(
+                    priority=20,
+                    settings={
+                        "base_path": "data/sec_cache",
+                        "file_pattern": "{symbol}/{symbol}_quarterly_metrics_{fiscal_year}-{fiscal_period}.json.gz",
+                        "natural_key_order": ["symbol", "fiscal_year", "fiscal_period", "form_type"],
+                        "compression": "gzip",
+                        "compression_level": 9,
+                        "create_symbol_dirs": True,
+                    },
+                ),
+                rdbms=CacheHandlerConfig(
+                    priority=10,
+                    settings={
+                        "table_name": "quarterly_metrics",
+                        "natural_key_order": ["symbol", "fiscal_year", "fiscal_period", "form_type"],
+                        "upsert_on_conflict": True,
+                    },
+                ),
+            ),
+            "market_context": CacheTypeConfig(
+                ttl_hours=24,  # 1 day - market context changes daily
+                disk=CacheHandlerConfig(
+                    priority=20,
+                    settings={
+                        "base_path": "data/market_context_cache",
+                        "file_pattern": "{scope}_{data_type}_{date}.json.gz",
+                        "natural_key_order": ["scope", "data_type", "date"],
+                        "compression": "gzip",
+                        "compression_level": 9,
+                        "create_symbol_dirs": False,  # Market context is NOT symbol-specific
+                    },
+                ),
+                rdbms=CacheHandlerConfig(enabled=False),  # Market context uses JSON only
+            ),
+        }
+    )
+
+    # Backward compatibility properties
+    @property
+    def storage(self) -> List[str]:
+        """Get list of enabled storage backends"""
+        storage = []
+        for cache_type, config in self.cache_types.items():
+            if config.disk.enabled and "disk" not in storage:
+                storage.append("disk")
+            if config.rdbms.enabled and "rdbms" not in storage:
+                storage.append("rdbms")
+        return storage
+
+    @property
+    def types(self) -> Optional[List[str]]:
+        """Get list of enabled cache types"""
+        enabled_types = [cache_type for cache_type, config in self.cache_types.items() if config.enabled]
+        return enabled_types if enabled_types else None
+
+    @property
+    def use_cache(self) -> bool:
+        """Check if caching is enabled at all"""
+        return bool(self.storage) and bool(self.types)
+
+    @property
+    def use_disk_cache(self) -> bool:
+        """Check if disk caching is enabled"""
+        return "disk" in self.storage
+
+    @property
+    def use_rdbms_cache(self) -> bool:
+        """Check if RDBMS caching is enabled"""
+        return "rdbms" in self.storage
+
+    def is_cache_type_enabled(self, cache_type: str) -> bool:
+        """Check if a specific cache type is enabled"""
+        if not self.use_cache:
+            return False
+
+        # Map from CacheType enum values to config strings
+        type_map = {
+            "sec_response": "sec_response",
+            "llm_response": "llm_response",
+            "technical_data": "technical_data",
+            "submission_data": "submission_data",
+            "company_facts": "company_facts",
+            "quarterly_metrics": "quarterly_metrics",
+            "market_context": "market_context",  # NEW: Market-wide and sector data
+        }
+
+        config_name = type_map.get(cache_type, cache_type)
+        cache_config = self.cache_types.get(config_name)
+        return cache_config is not None and cache_config.enabled
+
+    def get_cache_config(self, cache_type: str) -> Optional[CacheTypeConfig]:
+        """Get configuration for a specific cache type"""
+        type_map = {
+            "sec_response": "sec_response",
+            "llm_response": "llm_response",
+            "technical_data": "technical_data",
+            "submission_data": "submission_data",
+            "company_facts": "company_facts",
+            "quarterly_metrics": "quarterly_metrics",
+            "market_context": "market_context",  # NEW: Market-wide and sector data
+        }
+
+        config_name = type_map.get(cache_type, cache_type)
+        return self.cache_types.get(config_name)
+
+
+@dataclass
+class VectorDBConfig:
+    """Vector database configuration for semantic search capabilities"""
+
+    enabled: bool = False
+
+    # Storage paths
+    db_path: str = "data/vector_db"
+
+    # Embedding configuration
+    embedding_model: str = "all-MiniLM-L6-v2"  # SentenceTransformers model
+    embedding_dimension: int = 384  # Dimension for all-MiniLM-L6-v2
+
+    # RocksDB configuration
+    rocksdb_max_open_files: int = 300000
+    rocksdb_write_buffer_size: int = 67108864  # 64MB
+    rocksdb_max_write_buffer_number: int = 3
+    rocksdb_compression: str = "lz4"  # lz4, snappy, zlib, bz2, zstd
+
+    # FAISS configuration
+    faiss_index_type: str = "IndexFlatIP"  # Inner Product for cosine similarity
+    faiss_normalize_embeddings: bool = True
+
+    # Content processing
+    max_content_length: int = 5000  # Max chars for embedding generation
+    min_content_length: int = 50  # Min chars to consider for vectorization
+
+    # Event analysis - driven by submission router
+    enable_event_analysis: bool = True
+    event_analysis_forms: List[str] = field(default_factory=lambda: ["8-K", "8-K/A", "DEF 14A", "4", "13D", "13G"])
+    event_storage_ttl_hours: int = 168  # 7 days for event data
+
+    # Submission-driven processing
+    submission_driven_mode: bool = True  # Process events from submission data
+    event_extraction_batch_size: int = 10  # Process events in batches
+
+    # Cache integration with submission lifecycle
+    vector_cache_priority: int = 5  # Priority vs other cache handlers
+    enable_promotion: bool = True  # Promote frequently accessed content to vector cache
+    integrate_with_submission_ttl: bool = True  # Use submission TTL strategy
+
+    # Performance settings
+    batch_size: int = 32  # Batch size for embedding generation
+    max_search_results: int = 100  # Max results to return from similarity search
+    similarity_threshold: float = 0.5  # Minimum similarity score
+
+    def get_storage_path(self, sub_path: str = "") -> str:
+        """Get path for vector storage components"""
+        base = Path(self.db_path)
+        if sub_path:
+            return str(base / sub_path)
+        return str(base)
+
+
+@dataclass
+class ParquetConfig:
+    """Parquet storage configuration - uniform gzip compression for all data"""
+
+    engine: str = "fastparquet"  # Options: "fastparquet", "pyarrow"
+    compression: str = "gzip"  # Uniform compression across all data
+    compression_level: Optional[int] = 9  # Maximum compression for gzip
+
+    # PyArrow specific options (also use gzip for uniformity)
+    pyarrow_compression: str = "gzip"  # Uniform gzip compression
+    pyarrow_compression_level: Optional[int] = 9  # Maximum compression for gzip
+
+    # Common options
+    use_dictionary: bool = True  # Dictionary encoding for string columns
+    row_group_size: Optional[int] = None  # Number of rows per row group
+
+    def get_write_kwargs(self) -> Dict[str, any]:
+        """Get kwargs for to_parquet based on engine"""
+        if self.engine == "fastparquet":
+            return {"engine": "fastparquet", "compression": self.compression, "index": True}
+        elif self.engine == "pyarrow":
+            kwargs = {
+                "engine": "pyarrow",
+                "compression": self.pyarrow_compression,
+                "index": True,
+                "use_dictionary": self.use_dictionary,
+            }
+            # Add compression level if applicable
+            if self.pyarrow_compression in ["zstd", "gzip", "brotli"]:
+                kwargs["compression"] = {
+                    "codec": self.pyarrow_compression,
+                    "compression_level": self.pyarrow_compression_level,
+                }
+            if self.row_group_size:
+                kwargs["row_group_size"] = self.row_group_size
+            return kwargs
+        else:
+            raise ValueError(f"Unknown parquet engine: {self.engine}")
+
+
+@dataclass
+class CachingConfig:
+    """
+    Comprehensive caching configuration for all data types.
+
+    This class defines cache behaviors for:
+    1. SEC API responses (submissions, company facts, consolidated frames)
+    2. LLM analysis responses (fundamental, technical, synthesis)
+    3. Audit trails (write-only caches for compliance)
+
+    Cache Types:
+    - DISK: Files stored as {symbol}_{data_type}.json in specified path
+    - RDBMS: Records stored in database table with symbol as key
+    - DISABLED: No caching
+
+    Priority Levels:
+    - Positive (≥1): Normal cache with read/write operations
+    - Negative (<0): Write-only cache (no retrieval, for audit/backup)
+
+    Storage Patterns:
+    - SEC submissions: {symbol}_submissions.json (disk)
+    - Consolidated frames: {symbol}_{fiscal_year}_{fiscal_period} (RDBMS)
+    - LLM responses: {symbol}_{analysis_type}_{period}.json (disk/RDBMS)
+
+    TTL (Time To Live):
+    - SEC data: 24 hours (changes infrequently)
+    - Quarterly data: 168 hours (1 week, stable once filed)
+    - LLM analysis: 24-72 hours (may change with model updates)
+    - Synthesis reports: 168 hours (relatively stable)
+    """
+
+    # SEC API Response Caches
+    sec_submissions: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.DISK,
+            priority=1,
+            disk_path="data/sec_cache",
+            filename_pattern="{symbol}_submissions.json",
+            ttl_hours=24,  # SEC submissions change infrequently
+        )
+    )
+
+    sec_company_facts: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.DISK,
+            priority=1,
+            disk_path="data/sec_cache",
+            filename_pattern="{symbol}_companyfacts.json",
+            ttl_hours=24,
+        )
+    )
+
+    sec_consolidated_frames: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.RDBMS,
+            priority=1,
+            table_name="sec_consolidated_frames_cache",
+            key_column="cache_key",  # Format: {symbol}_{fiscal_year}_{fiscal_period}
+            data_column="consolidated_data",
+            ttl_hours=168,  # 1 week - quarterly data is stable
+        )
+    )
+
+    # LLM Response Caches
+    llm_sec_analysis: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.DISK,
+            priority=1,
+            disk_path="data/llm_cache",
+            filename_pattern="{symbol}_sec_analysis_{period}.json",
+            ttl_hours=72,  # 3 days - analysis may change with model updates
+        )
+    )
+
+    llm_technical_analysis: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.DISK,
+            priority=1,
+            disk_path="data/llm_cache",
+            filename_pattern="{symbol}_technical_analysis.json",
+            ttl_hours=24,  # 1 day - technical analysis changes frequently
+        )
+    )
+
+    llm_synthesis_reports: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.RDBMS,
+            priority=1,
+            table_name="llm_synthesis_cache",
+            key_column="report_key",  # Format: {symbol}_{analysis_date}
+            data_column="synthesis_data",
+            ttl_hours=168,  # 1 week - final reports are relatively stable
+        )
+    )
+
+    # Write-only caches (priority < 0) for audit/backup purposes
+    audit_sec_requests: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.RDBMS,
+            priority=-1,  # Write-only, no retrieval
+            table_name="sec_api_requests_audit",
+            key_column="request_id",
+            data_column="request_data",
+            max_entries=10000,  # Keep last 10k requests
+        )
+    )
+
+    audit_llm_interactions: CacheConfig = field(
+        default_factory=lambda: CacheConfig(
+            enabled=True,
+            storage_type=CacheStorageType.RDBMS,
+            priority=-1,  # Write-only, no retrieval
+            table_name="llm_interactions_audit",
+            key_column="interaction_id",
+            data_column="interaction_data",
+            max_entries=50000,  # Keep last 50k interactions
+        )
+    )
+
+    # Performance and behavior settings
+    cache_manager_settings: Dict[str, Union[str, int, float, bool]] = field(
+        default_factory=lambda: {
+            "default_timeout_seconds": 30,
+            "max_concurrent_operations": 10,
+            "compression_enabled": True,
+            "compression_threshold_bytes": 1024,  # Compress if > 1KB
+            "background_cleanup_enabled": True,
+            "cleanup_interval_hours": 6,
+            "metrics_collection_enabled": True,
+            "cache_hit_ratio_target": 0.85,
+        }
+    )
+
+    def get_cache_config(self, data_type: str) -> Optional[CacheConfig]:
+        """Get cache configuration for a specific data type"""
+        return getattr(self, data_type, None)
+
+
+class Config:
+    """Main configuration class"""
+
+    def __init__(self, config_file: str = "config.yaml"):
+        self.config_file = config_file
+        self._load_config()
+        self._setup_logging()
+
+    def _expand_env_vars(self, data: Any) -> Any:
+        """
+        Recursively expand environment variables in config data.
+        Supports syntax: ${VAR_NAME:-default_value}
+        """
+        if isinstance(data, dict):
+            return {k: self._expand_env_vars(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._expand_env_vars(item) for item in data]
+        elif isinstance(data, str):
+            # Match ${VAR_NAME:-default_value} or ${VAR_NAME}
+            pattern = r"\$\{([^}:]+)(?::-([^}]*))?\}"
+
+            def replace_env_var(match):
+                var_name = match.group(1)
+                default_value = match.group(2) if match.group(2) is not None else ""
+                return os.environ.get(var_name, default_value)
+
+            return re.sub(pattern, replace_env_var, data)
+        else:
+            return data
+
+    def _load_config(self):
+        """Load configuration from file and environment"""
+        # Load from YAML file (migrated from JSON)
+        config_data = {}
+        if os.path.exists(self.config_file):
+            with open(self.config_file, "r") as f:
+                config_data = yaml.safe_load(f)
+
+            # Expand environment variables in YAML (supports ${VAR:-default} syntax)
+            config_data = self._expand_env_vars(config_data)
+
+        # Override with environment variables
+        config_data = self._override_with_env(config_data)
+
+        # Initialize configuration objects with proper default merging
+        # Database config
+        database_config = self._default_database()
+        database_config.update(config_data.get("database", {}))
+        self.database = DatabaseConfig(**database_config)
+
+        # Ollama config
+        ollama_config = self._default_ollama()
+        user_ollama = config_data.get("ollama", {})
+        # Deep merge for models - only update if user provides non-empty models
+        if "models" in user_ollama:
+            if user_ollama["models"]:  # Only update if not empty
+                ollama_config["models"].update(user_ollama["models"])
+            # Remove models from user_ollama to avoid overwriting with empty dict
+            user_ollama = {k: v for k, v in user_ollama.items() if k != "models"}
+
+        # Parse model_specs into ModelSpec objects
+        if "model_specs" in user_ollama:
+            model_specs_dict = {}
+            for model_name, spec_data in user_ollama["model_specs"].items():
+                model_specs_dict[model_name] = ModelSpec(**spec_data)
+            user_ollama["model_specs"] = model_specs_dict
+
+        ollama_config.update(user_ollama)
+        self.ollama = OllamaConfig(**ollama_config)
+
+        # SEC config
+        sec_config = self._default_sec()
+        sec_config.update(config_data.get("sec", {}))
+        self.sec = SECConfig(**sec_config)
+
+        # Email config
+        email_config = self._default_email()
+        email_config.update(config_data.get("email", {}))
+        self.email = EmailConfig(**email_config)
+        # Analysis config
+        analysis_config = self._default_analysis()
+        analysis_config.update(config_data.get("analysis", {}))
+        self.analysis = AnalysisConfig(**analysis_config)
+
+        # Logging config
+        logging_config = self._default_logging()
+        logging_config.update(config_data.get("logging", {}))
+        self.logging = LoggingConfig(**logging_config)
+
+        # Caching config
+        caching_data = config_data.get("caching", {})
+        self.caching = self._build_caching_config(caching_data)
+
+        # Cache control config (using new structure, ignore old format)
+        cache_control_data = config_data.get("cache_control", {})
+        # Only use new format fields, ignore legacy ones
+        new_cache_control = {
+            "read_from_cache": cache_control_data.get("read_from_cache", True),
+            "write_to_cache": cache_control_data.get("write_to_cache", True),
+            "force_refresh": cache_control_data.get("force_refresh", False),
+            "force_refresh_symbols": cache_control_data.get("force_refresh_symbols", None),
+        }
+        self.cache_control = CacheControlConfig(**new_cache_control)
+
+        # Parquet config
+        parquet_config = self._default_parquet()
+        parquet_config.update(config_data.get("parquet", {}))
+        self.parquet = ParquetConfig(**parquet_config)
+
+        # Vector database config
+        vector_db_config = self._default_vector_db()
+        vector_db_config.update(config_data.get("vector_db", {}))
+        self.vector_db = VectorDBConfig(**vector_db_config)
+
+        # Other settings
+        self.stocks_to_track = config_data.get("stocks_to_track", self._default_stocks())
+        self.data_dir = Path(config_data.get("data_dir", "./data"))
+        self.reports_dir = Path(config_data.get("reports_dir", "./reports"))
+        self.logs_dir = Path(config_data.get("logs_dir", "./logs"))
+
+        # Store raw config for sections not yet parsed into dataclasses
+        # (e.g., valuation, dcf_valuation, market_context_multipliers)
+        self._raw_config = config_data
+
+        # Ensure directories exist
+        for directory in [self.data_dir, self.reports_dir, self.logs_dir, self.sec.cache_dir]:
+            Path(directory).mkdir(parents=True, exist_ok=True)
+
+    def _override_with_env(self, config_data: Dict) -> Dict:
+        """Override configuration with environment variables"""
+        env_mappings = {
+            "DB_HOST": ("database", "host"),
+            "DB_PORT": ("database", "port"),
+            "DB_NAME": ("database", "database"),
+            "DB_USER": ("database", "username"),
+            "DB_PASSWORD": ("database", "password"),
+            "OLLAMA_URL": ("ollama", "base_url"),
+            "EMAIL_USERNAME": ("email", "username"),
+            "EMAIL_PASSWORD": ("email", "password"),
+            "EMAIL_SMTP_SERVER": ("email", "smtp_server"),
+            "EMAIL_SMTP_PORT": ("email", "smtp_port"),
+        }
+
+        for env_var, (section, key) in env_mappings.items():
+            if env_var in os.environ:
+                if section not in config_data:
+                    config_data[section] = {}
+
+                value = os.environ[env_var]
+                # Convert to appropriate type
+                if key == "port":
+                    value = int(value)
+                elif key in ["enabled", "use_tls"]:
+                    value = value.lower() in ("true", "1", "yes")
+
+                config_data[section][key] = value
+
+        return config_data
+
+    def _default_database(self) -> Dict:
+        """Default database configuration"""
+        return {
+            "host": "localhost",
+            "port": 5432,
+            "database": "investment_ai",
+            "username": "investment_user",
+            "password": "investment_pass",
+            "pool_size": 10,
+            "max_overflow": 20,
+        }
+
+    def _default_ollama(self) -> Dict:
+        """Default Ollama configuration"""
+        return {
+            "base_url": "http://localhost:11434",
+            "timeout": 600,
+            "max_retries": 3,
+            "min_context_size": 8192,
+            "num_llm_threads": 1,
+            "models": {
+                "fundamental_analysis": "deepseek-r1:32b",
+                "technical_analysis": "deepseek-r1:32b",
+                "market_context": "deepseek-r1:32b",
+                "summary": "deepseek-r1:32b",
+                "comparison": "deepseek-r1:32b",
+                "decision": "deepseek-r1:32b",
+                "report_generation": "deepseek-r1:32b",
+                "synthesizer": "deepseek-r1:32b",
+                "quick_analysis": "deepseek-r1:32b",
+            },
+            "num_predict": {
+                "fundamental_analysis": 2048,
+                "technical_analysis": 2048,
+                "market_context": 2048,
+                "summary": 1536,
+                "comparison": 2048,
+                "decision": 4096,
+                "report_generation": 2048,
+                "synthesizer": 4096,
+                "quick_analysis": 1536,
+            },
+        }
+
+    def _default_sec(self) -> Dict:
+        """Default SEC configuration"""
+        return {
+            "user_agent": "InvestiGator/1.0 (singhvjd@gmail.com)",
+            "base_url": "https://data.sec.gov",
+            "rate_limit": 10,
+            "cache_dir": "./data/sec_cache",
+            "ticker_cache_file": "./data/ticker_cik_map.txt",
+            "max_retries": 3,
+            "timeout": 30,
+            # XBRL tag to abbreviation mapping for efficient storage and LLM consumption
+            "xbrl_tag_abbreviations": {
+                # Income Statement
+                "RevenueFromContractWithCustomerExcludingAssessedTax": "Revenue",
+                "NetIncomeLossAvailableToCommonStockholdersBasic": "NetIncome",
+                "OpIncome": "OpIncome",
+                "OperatingIncomeLoss": "OpIncome",
+                "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest": "PreTaxIncome",
+                "GrossProfit": "GrossProfit",
+                "EPS": "EPS",
+                "EarningsPerShareDiluted": "EPSDiluted",
+                "EarningsPerShareBasic": "EPSBasic",
+                "CostOfGoodsAndServicesSold": "COGS",
+                "CostOfRevenue": "COGS",
+                "SellingGeneralAndAdministrativeExpense": "SGA",
+                "ResearchAndDevelopmentExpense": "RnD",
+                "InterestExp": "InterestExp",
+                "InterestExpense": "InterestExp",
+                "TaxExp": "TaxExp",
+                "IncomeTaxExpenseBenefit": "TaxExp",
+                "DepreciationAndAmortization": "DA",
+                # Balance Sheet
+                "Assets": "TotalAssets",
+                "AssetsCurrent": "CurrentAssets",
+                "Liabilities": "TotalLiabilities",
+                "LiabilitiesCurrent": "CurrentLiab",
+                "Equity": "Equity",
+                "StockholdersEquity": "Equity",
+                "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents": "Cash",
+                "Cash": "Cash",
+                "AccountsNotesAndLoansReceivableNetCurrent": "AR",
+                "AccountsReceivableNetCurrent": "AR",
+                "Inventory": "Inventory",
+                "PPE": "PPE",
+                "PropertyPlantAndEquipmentNet": "PPE",
+                "Goodwill": "Goodwill",
+                "IntangibleAssetsNetExcludingGoodwill": "IntangibleAssets",
+                "UnsecuredDebt": "LongTermDebt",
+                "LongTermDebt": "LongTermDebt",
+                "AcctsPayable": "AP",
+                "AccountsPayableCurrent": "AP",
+                "RetainedEarn": "RetainedEarnings",
+                "RetainedEarnings": "RetainedEarnings",
+                "CommonStockValue": "CommonStock",
+                "TreasuryStockCommon": "TreasuryStock",
+                "AdditionalPaidInCapital": "APIC",
+                "AccumulatedOtherComprehensiveIncome": "AOCI",
+                # Cash Flow
+                "CF_Operations": "CFO",
+                "NetCashProvidedByUsedInOperatingActivities": "CFO",
+                "CF_Investing": "CFI",
+                "NetCashProvidedByUsedInInvestingActivities": "CFI",
+                "CF_Financing": "CFF",
+                "NetCashProvidedByUsedInFinancingActivities": "CFF",
+                "PaymentsToAcquirePropertyPlantAndEquipment": "CapEx",
+                "StockComp": "StockComp",
+                "ShareBasedCompensation": "StockComp",
+                "PaymentsOfDividendsCommonStock": "DividendsPaid",
+                "DividendsCommonStockCash": "DividendsPaid",
+                "PaymentsForRepurchaseOfCommonStock": "ShareRepurchases",
+                "TreasuryStockValueAcquiredCostMethod": "ShareRepurchases",
+                # Other/Shares
+                "SharesOut": "SharesOut",
+                "SharesOutstanding": "SharesOut",
+                "CommonStockSharesOutstanding": "SharesOut",
+                "SharesBasic": "SharesBasic",
+                "WeightedAverageNumberOfSharesOutstandingBasic": "SharesBasic",
+                "SharesDiluted": "SharesDiluted",
+                "WeightedAverageNumberOfDilutedSharesOutstanding": "SharesDiluted",
+                "EPSDiluted": "EPSDiluted",
+                "CommonStockDividendsPerShareDeclared": "DividendPerShare",
+                "ComprehensiveIncomeNetOfTax": "ComprehensiveIncome",
+                "OtherComprehensiveIncomeLossNetOfTaxPortionAttributableToParent": "OCI",
+                # Additional common variations
+                "Revenues": "Revenue",
+                "SalesRevenueNet": "Revenue",
+                "NetIncomeLoss": "NetIncome",
+                "ProfitLoss": "NetIncome",
+                "CostOfSales": "COGS",
+                "OperatingExpenses": "OpExpenses",
+                "CostsAndExpenses": "OpExpenses",
+                # Text-based disclosures (abbreviated for context efficiency)
+                "DocumentAndEntityInformation": "EntityInfo",
+                "EntityRegistrantName": "CompanyName",
+                "EntityCentralIndexKey": "CIK",
+                "ManagementDiscussionAndAnalysis": "MD&A",
+                "DisclosureOfRisksAndUncertainties": "RiskDisclosure",
+                "BusinessDescription": "BusinessDesc",
+                "GeneralBusinessDescription": "BusinessDesc",
+                "RiskFactors": "Risks",
+                "RiskManagement": "RiskMgmt",
+                "SignificantAccountingPolicies": "AcctPolicies",
+                "AccountingPoliciesAndMethods": "AcctPolicies",
+                "SegmentReporting": "Segments",
+                "ReportableSegments": "Segments",
+                "SubsequentEvents": "SubEvents",
+                "EventsOccurringAfterBalanceSheetDate": "PostBalEvents",
+                "CommitmentsAndContingencies": "Commitments",
+                "Contingencies": "Contingencies",
+            },
+            "frame_api_concepts": {
+                "income_statement": {
+                    # Revenue variations (from all_tags.txt)
+                    "revenues": [
+                        "RevenueFromContractWithCustomerExcludingAssessedTax",
+                        "Revenues",
+                        "SalesRevenueNet",
+                        "RevenueFromContractWithCustomerIncludingAssessedTax",
+                        "Revenue",
+                        "SalesRevenueGoodsNet",
+                        "SalesRevenueServicesNet",
+                        "TotalRevenues",
+                        "NetRevenues",
+                        "RevenueNet",
+                        "RevenuesNetOfInterestExpense",
+                    ],
+                    # Net Income variations
+                    "net_income": [
+                        "NetIncomeLoss",
+                        "NetIncomeLossAvailableToCommonStockholdersBasic",
+                        "ProfitLoss",
+                        "NetIncomeLossAttributableToParent",
+                        "NetIncomeLossAttributableToNoncontrollingInterest",
+                    ],
+                    # Operating Income variations
+                    "operating_income": [
+                        "OperatingIncomeLoss",
+                        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+                        "OperatingIncomeLossNoninterestExpense",
+                    ],
+                    # Gross Profit
+                    "gross_profit": ["GrossProfit"],
+                    # EPS variations
+                    "earnings_per_share": [
+                        "EarningsPerShareDiluted",
+                        "EarningsPerShareBasic",
+                        "EarningsPerShareBasicAndDiluted",
+                    ],
+                    # Cost variations
+                    "cost_of_revenue": [
+                        "CostOfGoodsAndServicesSold",
+                        "CostOfRevenue",
+                        "CostOfSales",
+                        "CostOfGoodsSold",
+                        "CostOfGoodsAndServiceExcludingDepreciationDepletionAndAmortization",
+                        "CostOfRevenueExcludingDepreciationDepletionAndAmortization",
+                    ],
+                    # Operating Expenses
+                    "operating_expenses": [
+                        "OperatingExpenses",
+                        "CostsAndExpenses",
+                        "SellingGeneralAndAdministrativeExpense",
+                        "OperatingCostsAndExpenses",
+                    ],
+                    # R&D
+                    "research_development": [
+                        "ResearchAndDevelopmentExpense",
+                        "ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost",
+                    ],
+                    # SG&A
+                    "selling_general_admin": [
+                        "SellingGeneralAndAdministrativeExpense",
+                        "SellingAndMarketingExpense",
+                        "GeneralAndAdministrativeExpense",
+                    ],
+                    # Interest
+                    "interest_expense": [
+                        "InterestExpense",
+                        "InterestExpenseDebt",
+                        "InterestExpenseDebtExcludingAmortization",
+                        "InterestExpenseNonoperating",
+                        "InterestExpenseNet",
+                    ],
+                    "interest_income": [
+                        "InterestIncomeOperating",
+                        "InterestAndOtherIncome",
+                        "InterestAndDividendIncomeOperating",
+                    ],
+                    # Tax
+                    "tax_expense": ["IncomeTaxExpenseBenefit", "CurrentIncomeTaxExpenseBenefit", "IncomeTaxes"],
+                    # Other Income Statement items
+                    "other_income": [
+                        "OtherNonoperatingIncomeExpense",
+                        "NonoperatingIncomeExpense",
+                        "OtherIncomeExpenseNet",
+                    ],
+                    "depreciation": [
+                        "DepreciationAndAmortization",
+                        "DepreciationDepletionAndAmortization",
+                        "DepreciationAmortizationAndAccretionNet",
+                    ],
+                    "production_startup": ["ProductionStartUpExpense", "StartupCosts"],
+                },
+                "balance_sheet": {
+                    # Assets
+                    "total_assets": ["Assets"],
+                    "current_assets": ["AssetsCurrent", "AssetsCurrentOther"],
+                    "cash_and_equivalents": [
+                        "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+                        "CashAndCashEquivalentsAtCarryingValue",
+                        "CashCashEquivalentsAndShortTermInvestments",
+                        "Cash",
+                    ],
+                    "short_term_investments": ["ShortTermInvestments", "MarketableSecuritiesCurrent"],
+                    "accounts_receivable": [
+                        "AccountsReceivableNetCurrent",
+                        "AccountsReceivableNet",
+                        "AccountsNotesAndLoansReceivableNetCurrent",
+                    ],
+                    "inventory": ["InventoryNet", "Inventory"],
+                    "prepaid_expenses": ["PrepaidExpenseAndOtherAssetsCurrent", "PrepaidExpenseCurrent"],
+                    "other_current_assets": ["OtherAssetsCurrent"],
+                    "property_plant_equipment": ["PropertyPlantAndEquipmentNet", "PropertyPlantAndEquipmentGross"],
+                    "goodwill": ["Goodwill"],
+                    "intangible_assets": [
+                        "IntangibleAssetsNetExcludingGoodwill",
+                        "IntangibleAssetsNetIncludingGoodwill",
+                    ],
+                    "long_term_investments": [
+                        "LongTermInvestments",
+                        "InvestmentsInAffiliatesSubsidiariesAssociatesAndJointVentures",
+                    ],
+                    "other_assets": ["OtherAssetsNoncurrent", "AssetsNoncurrentOther"],
+                    # Liabilities
+                    "total_liabilities": ["Liabilities", "LiabilitiesAndStockholdersEquity"],
+                    "current_liabilities": ["LiabilitiesCurrent"],
+                    "accounts_payable": ["AccountsPayableCurrent", "AccountsPayableAndAccruedLiabilitiesCurrent"],
+                    "accrued_liabilities": ["AccruedLiabilitiesCurrent", "AccruedIncomeTaxesCurrent"],
+                    "short_term_debt": ["ShortTermBorrowings", "LongTermDebtCurrent"],
+                    "other_current_liabilities": ["OtherLiabilitiesCurrent"],
+                    "long_term_debt": [
+                        "LongTermDebtNoncurrent",
+                        "LongTermDebt",
+                        "LongTermDebtAndCapitalLeaseObligations",
+                    ],
+                    "deferred_tax": ["DeferredTaxLiabilitiesNoncurrent", "DeferredIncomeTaxLiabilitiesNet"],
+                    "other_liabilities": ["OtherLiabilitiesNoncurrent"],
+                    # Equity
+                    "shareholders_equity": [
+                        "StockholdersEquity",
+                        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+                    ],
+                    "common_stock": ["CommonStockValue", "CommonStockParOrStatedValuePerShareValue"],
+                    "retained_earnings": ["RetainedEarningsAccumulatedDeficit", "RetainedEarnings"],
+                    "additional_paid_in_capital": ["AdditionalPaidInCapitalCommonStock", "AdditionalPaidInCapital"],
+                    "treasury_stock": ["TreasuryStockValue", "TreasuryStockCommonValue"],
+                    "accumulated_other_comprehensive_income": [
+                        "AccumulatedOtherComprehensiveIncomeLossNetOfTax",
+                        "AccumulatedOtherComprehensiveIncome",
+                    ],
+                },
+                "cash_flow": {
+                    # Operating Activities
+                    "operating_cash_flow": [
+                        "NetCashProvidedByUsedInOperatingActivities",
+                        "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
+                        "NetCashProvidedByOperatingActivities",
+                        "NetCashUsedInOperatingActivities",
+                        "CashProvidedByUsedInOperatingActivities",
+                    ],
+                    "depreciation": [
+                        "DepreciationDepletionAndAmortization",
+                        "DepreciationAndAmortization",
+                        "Depreciation",
+                    ],
+                    "amortization": ["AmortizationOfIntangibleAssets", "Amortization"],
+                    "stock_based_compensation": ["ShareBasedCompensation", "StockBasedCompensation"],
+                    "deferred_taxes": ["DeferredIncomeTaxExpenseBenefit", "IncreaseDecreaseInDeferredIncomeTaxes"],
+                    "changes_working_capital": [
+                        "IncreaseDecreaseInOperatingCapital",
+                        "IncreaseDecreaseInOperatingAssetsAndLiabilities",
+                    ],
+                    "accounts_receivable_changes": ["IncreaseDecreaseInAccountsReceivable"],
+                    "inventory_changes": ["IncreaseDecreaseInInventories"],
+                    "accounts_payable_changes": ["IncreaseDecreaseInAccountsPayable"],
+                    # Investing Activities
+                    "investing_cash_flow": [
+                        "NetCashProvidedByUsedInInvestingActivities",
+                        "NetCashProvidedByUsedInInvestingActivitiesContinuingOperations",
+                    ],
+                    "capital_expenditures": [
+                        "PaymentsToAcquirePropertyPlantAndEquipment",
+                        "PaymentsForCapitalImprovements",
+                        "CapitalExpenditures",
+                        "CapitalExpendituresIncurredButNotYetPaid",
+                        "PaymentsToAcquireProductiveAssets",
+                    ],
+                    "acquisitions": ["PaymentsToAcquireBusinessesNetOfCashAcquired", "PaymentsToAcquireBusinesses"],
+                    "asset_sales": ["ProceedsFromSaleOfPropertyPlantAndEquipment", "ProceedsFromSaleOfAssets"],
+                    "investment_purchases": ["PaymentsToAcquireInvestments", "PaymentsToAcquireMarketableSecurities"],
+                    "investment_sales": [
+                        "ProceedsFromSaleOfInvestments",
+                        "ProceedsFromSaleAndMaturityOfMarketableSecurities",
+                    ],
+                    # Financing Activities
+                    "financing_cash_flow": [
+                        "NetCashProvidedByUsedInFinancingActivities",
+                        "NetCashProvidedByUsedInFinancingActivitiesContinuingOperations",
+                    ],
+                    "dividends_paid": [
+                        "PaymentsOfDividendsCommonStock",
+                        "PaymentsOfDividends",
+                        "PaymentsOfOrdinaryDividends",
+                    ],
+                    "stock_repurchases": ["PaymentsForRepurchaseOfCommonStock", "PaymentsForRepurchaseOfEquity"],
+                    "stock_issuance": ["ProceedsFromIssuanceOfCommonStock", "ProceedsFromStockOptionsExercised"],
+                    "debt_issuance": ["ProceedsFromIssuanceOfLongTermDebt", "ProceedsFromDebtNetOfIssuanceCosts"],
+                    "debt_repayment": ["RepaymentsOfLongTermDebt", "RepaymentsOfDebt"],
+                    "other_financing": ["PaymentsForOtherFinancingActivities", "ProceedsFromOtherFinancingActivities"],
+                },
+                "other": {
+                    # Share data
+                    "shares_outstanding": ["CommonStockSharesOutstanding", "SharesOutstanding"],
+                    "shares_basic": ["WeightedAverageNumberOfSharesOutstandingBasic", "CommonStockSharesOutstanding"],
+                    "shares_diluted": ["WeightedAverageNumberOfDilutedSharesOutstanding"],
+                    "eps_basic": ["EarningsPerShareBasic"],
+                    "eps_diluted": ["EarningsPerShareDiluted"],
+                    "dividends_per_share": [
+                        "CommonStockDividendsPerShareDeclared",
+                        "CommonStockDividendsPerShareCashPaid",
+                    ],
+                    # Comprehensive Income
+                    "comprehensive_income": [
+                        "ComprehensiveIncomeLossNetOfTax",
+                        "ComprehensiveIncomeLossNetOfTaxIncludingPortionAttributableToNoncontrollingInterest",
+                    ],
+                    "other_comprehensive_income": [
+                        "OtherComprehensiveIncomeLossNetOfTaxPortionAttributableToParent",
+                        "OtherComprehensiveIncomeLossNetOfTax",
+                    ],
+                    # Additional metrics (these are typically calculated, not direct XBRL tags)
+                    "book_value_per_share": ["BookValuePerShare"],
+                    "working_capital": ["WorkingCapital"],
+                    "debt_to_equity": ["DebtToEquityRatio"],
+                    "current_ratio": ["CurrentRatio"],
+                    "quick_ratio": ["QuickRatio"],
+                    "gross_margin": ["GrossMargin"],
+                    "operating_margin": ["OperatingIncomeLossMargin"],
+                    "net_margin": ["ProfitMargin"],
+                    "return_on_assets": ["ReturnOnAssets"],
+                    "return_on_equity": ["ReturnOnEquity"],
+                    # Text-based disclosures (abbreviated for context efficiency)
+                    "footnotes_summary": [
+                        "DocumentAndEntityInformation",
+                        "EntityRegistrantName",
+                        "EntityCentralIndexKey",
+                    ],
+                    "mgmt_discussion": ["ManagementDiscussionAndAnalysis", "DisclosureOfRisksAndUncertainties"],
+                    "business_description": ["BusinessDescription", "GeneralBusinessDescription"],
+                    "risk_factors": ["RiskFactors", "RiskManagement"],
+                    "accounting_policies": ["SignificantAccountingPolicies", "AccountingPoliciesAndMethods"],
+                    "segment_reporting": ["SegmentReporting", "ReportableSegments"],
+                    "subsequent_events": ["SubsequentEvents", "EventsOccurringAfterBalanceSheetDate"],
+                    "commitments_contingencies": ["CommitmentsAndContingencies", "Contingencies"],
+                },
+            },
+            "frame_api_details": {
+                "income_statement_revenue": {
+                    "revenues": [
+                        "us-gaap:Revenues",
+                        "us-gaap:SalesRevenueNet",
+                        "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+                        "us-gaap:SalesRevenueServicesNet",
+                    ],
+                    "product_revenue": ["us-gaap:ProductSalesRevenue", "us-gaap:ProductRevenue"],
+                    "service_revenue": ["us-gaap:ServiceRevenue", "us-gaap:ServiceSalesRevenue"],
+                    "subscription_revenue": [
+                        "us-gaap:SubscriptionRevenue",
+                        "us-gaap:CloudSubscriptionsAndSupportRevenue",
+                    ],
+                    "licensing_revenue": ["us-gaap:LicensingRevenue", "us-gaap:LicenseRevenue"],
+                    "other_revenue": ["us-gaap:OtherRevenue", "us-gaap:RevenuesOther"],
+                },
+                "income_statement_cost_of_revenue": {
+                    "cost_of_revenue": [
+                        "us-gaap:CostOfRevenue",
+                        "us-gaap:CostOfGoodsAndServicesSold",
+                        "us-gaap:CostOfGoodsSold",
+                    ],
+                    "cost_of_product_revenue": ["us-gaap:CostOfProductRevenue", "us-gaap:CostOfGoodsSold"],
+                    "cost_of_service_revenue": ["us-gaap:CostOfServiceRevenue", "us-gaap:CostOfServices"],
+                },
+                "income_statement_gross_profit": {"gross_profit": ["us-gaap:GrossProfit"]},
+                "income_statement_operating_expenses": {
+                    "research_and_development_expense": ["us-gaap:ResearchAndDevelopmentExpense"],
+                    "selling_general_and_administrative_expense": ["us-gaap:SellingGeneralAndAdministrativeExpense"],
+                    "selling_and_marketing_expense": [
+                        "us-gaap:SellingAndMarketingExpense",
+                        "us-gaap:MarketingAndAdvertisingExpense",
+                    ],
+                    "general_and_administrative_expense": ["us-gaap:GeneralAndAdministrativeExpense"],
+                    "depreciation_expense": ["us-gaap:Depreciation"],
+                    "amortization_of_intangible_assets": ["us-gaap:AmortizationOfIntangibleAssets"],
+                    "depreciation_and_amortization": [
+                        "us-gaap:DepreciationAndAmortization",
+                        "us-gaap:DepreciationDepletionAndAmortization",
+                    ],
+                    "restructuring_charges": ["us-gaap:RestructuringCharges", "us-gaap:RestructuringCostsAndOther"],
+                    "impairment_charges": [
+                        "us-gaap:ImpairmentOfLongLivedAssetsHeldForUse",
+                        "us-gaap:GoodwillImpairmentLoss",
+                        "us-gaap:AssetImpairmentCharges",
+                    ],
+                },
+                "income_statement_operating_income": {
+                    "operating_income_loss": ["us-gaap:OperatingIncomeLoss"],
+                    "other_operating_income_expense": [
+                        "us-gaap:OtherOperatingIncomeExpenseNet",
+                        "us-gaap:OtherOperatingIncome",
+                    ],
+                },
+                "income_statement_non_operating_income_expense": {
+                    "interest_income": ["us-gaap:InvestmentIncomeInterest", "us-gaap:InterestIncomeOther"],
+                    "interest_expense": ["us-gaap:InterestExpense"],
+                    "investment_income_loss": ["us-gaap:InvestmentIncomeLoss", "us-gaap:GainsLossesOnInvestments"],
+                    "foreign_currency_transaction_gain_loss": ["us-gaap:ForeignCurrencyTransactionGainLossBeforeTax"],
+                    "other_nonoperating_income_expense": [
+                        "us-gaap:OtherNonoperatingIncomeExpense",
+                        "us-gaap:OtherIncomeExpenseNet",
+                    ],
+                },
+                "income_statement_income_before_tax": {
+                    "income_loss_from_continuing_operations_before_income_tax": [
+                        "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxExpenseBenefit",
+                        "us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+                    ]
+                },
+                "income_statement_income_tax": {
+                    "income_tax_expense_benefit": ["us-gaap:IncomeTaxExpenseBenefit"],
+                    "current_income_tax_expense_benefit": ["us-gaap:CurrentIncomeTaxExpenseBenefit"],
+                    "deferred_income_tax_expense_benefit": ["us-gaap:DeferredIncomeTaxExpenseBenefit"],
+                },
+                "income_statement_net_income": {
+                    "net_income_loss": ["us-gaap:NetIncomeLoss"],
+                    "net_income_loss_attributable_to_parent": [
+                        "us-gaap:NetIncomeLossAvailableToCommonStockholdersBasic"
+                    ],
+                    "net_income_loss_from_continuing_operations": [
+                        "us-gaap:IncomeLossFromContinuingOperationsNetOfTax"
+                    ],
+                    "net_income_loss_from_discontinued_operations": [
+                        "us-gaap:IncomeLossFromDiscontinuedOperationsNetOfTax"
+                    ],
+                    "earnings_per_share_basic": ["us-gaap:EarningsPerShareBasic"],
+                    "earnings_per_share_diluted": ["us-gaap:EarningsPerShareDiluted"],
+                    "weighted_average_shares_outstanding_basic": [
+                        "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic"
+                    ],
+                    "weighted_average_shares_outstanding_diluted": [
+                        "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding"
+                    ],
+                },
+                "balance_sheet_current_assets": {
+                    "cash_and_cash_equivalents": ["us-gaap:CashAndCashEquivalentsAtCarryingValue"],
+                    "short_term_investments": ["us-gaap:MarketableSecuritiesCurrent", "us-gaap:ShortTermInvestments"],
+                    "accounts_receivable_net": ["us-gaap:AccountsReceivableNetCurrent"],
+                    "inventories_net": ["us-gaap:InventoryNet", "us-gaap:InventoriesNet"],
+                    "prepaid_expenses_current": [
+                        "us-gaap:PrepaidExpenseCurrent",
+                        "us-gaap:PrepaidExpensesAndOtherCurrentAssets",
+                    ],
+                    "other_current_assets": ["us-gaap:OtherCurrentAssets"],
+                },
+                "balance_sheet_non_current_assets": {
+                    "property_plant_and_equipment_net": ["us-gaap:PropertyPlantAndEquipmentNet"],
+                    "goodwill": ["us-gaap:Goodwill"],
+                    "intangible_assets_net_excluding_goodwill": [
+                        "us-gaap:IntangibleAssetsNetExcludingGoodwill",
+                        "us-gaap:FiniteLivedIntangibleAssetsNet",
+                    ],
+                    "long_term_investments": ["us-gaap:LongTermInvestments", "us-gaap:MarketableSecuritiesNoncurrent"],
+                    "operating_lease_right_of_use_asset": ["us-gaap:OperatingLeaseRightOfUseAsset"],
+                    "finance_lease_right_of_use_asset": ["us-gaap:FinanceLeaseRightOfUseAsset"],
+                    "deferred_tax_assets_noncurrent": ["us-gaap:DeferredTaxAssetsNetNoncurrent"],
+                    "other_non_current_assets": ["us-gaap:OtherAssetsNoncurrent", "us-gaap:OtherNoncurrentAssets"],
+                },
+                "balance_sheet_current_liabilities": {
+                    "accounts_payable_current": [
+                        "us-gaap:AccountsPayableCurrent",
+                        "us-gaap:AccountsPayableTradeCurrent",
+                    ],
+                    "accrued_liabilities_current": [
+                        "us-gaap:AccruedLiabilitiesCurrent",
+                        "us-gaap:OtherAccruedLiabilitiesCurrent",
+                    ],
+                    "short_term_debt": [
+                        "us-gaap:ShortTermBorrowings",
+                        "us-gaap:DebtCurrent",
+                        "us-gaap:CommercialPaper",
+                    ],
+                    "current_portion_of_long_term_debt": ["us-gaap:LongTermDebtCurrentMaturities"],
+                    "operating_lease_liability_current": ["us-gaap:OperatingLeaseLiabilityCurrent"],
+                    "finance_lease_liability_current": ["us-gaap:FinanceLeaseLiabilityCurrent"],
+                    "deferred_revenue_current": [
+                        "us-gaap:DeferredRevenueCurrent",
+                        "us-gaap:ContractWithCustomerLiabilityCurrent",
+                    ],
+                    "income_taxes_payable_current": ["us-gaap:IncomeTaxesPayableCurrent"],
+                    "other_current_liabilities": ["us-gaap:OtherCurrentLiabilities"],
+                },
+                "balance_sheet_non_current_liabilities": {
+                    "long_term_debt_noncurrent": ["us-gaap:LongTermDebtNoncurrent", "us-gaap:DebtNoncurrent"],
+                    "operating_lease_liability_noncurrent": ["us-gaap:OperatingLeaseLiabilityNoncurrent"],
+                    "finance_lease_liability_noncurrent": ["us-gaap:FinanceLeaseLiabilityNoncurrent"],
+                    "deferred_tax_liabilities_noncurrent": ["us-gaap:DeferredTaxLiabilitiesNoncurrent"],
+                    "pension_and_other_postretirement_benefits_noncurrent": [
+                        "us-gaap:PensionAndOtherPostretirementDefinedBenefitPlansLiabilitiesNoncurrent"
+                    ],
+                    "other_non_current_liabilities": [
+                        "us-gaap:OtherLiabilitiesNoncurrent",
+                        "us-gaap:OtherNoncurrentLiabilities",
+                    ],
+                },
+                "balance_sheet_equity": {
+                    "common_stock_value": [
+                        "us-gaap:CommonStockValue",
+                        "us-gaap:CommonStocksIncludingAdditionalPaidInCapital",
+                    ],
+                    "preferred_stock_value": ["us-gaap:PreferredStockValue"],
+                    "additional_paid_in_capital": ["us-gaap:AdditionalPaidInCapital"],
+                    "retained_earnings_accumulated_deficit": ["us-gaap:RetainedEarningsAccumulatedDeficit"],
+                    "accumulated_other_comprehensive_income_loss": [
+                        "us-gaap:AccumulatedOtherComprehensiveIncomeLossNetOfTax"
+                    ],
+                    "treasury_stock_value": ["us-gaap:TreasuryStockValue"],
+                    "noncontrolling_interest_equity": ["us-gaap:MinorityInterest", "us-gaap:NoncontrollingInterest"],
+                },
+                "balance_sheet_totals": {
+                    "total_assets": ["us-gaap:Assets"],
+                    "total_liabilities": ["us-gaap:Liabilities"],
+                    "total_equity": ["us-gaap:StockholdersEquity", "us-gaap:PartnersCapital"],
+                    "total_liabilities_and_equity": ["us-gaap:LiabilitiesAndStockholdersEquity"],
+                },
+                "cash_flow_operating": {
+                    "net_cash_provided_by_operating_activities": ["us-gaap:NetCashProvidedByUsedInOperatingActivities"],
+                    "adjustments_to_reconcile_net_income_to_cash_from_ops_depreciation_amortization": [
+                        "us-gaap:DepreciationDepletionAndAmortization"
+                    ],
+                    "adjustments_to_reconcile_net_income_to_cash_from_ops_share_based_compensation": [
+                        "us-gaap:ShareBasedCompensation"
+                    ],
+                    "adjustments_to_reconcile_net_income_to_cash_from_ops_deferred_income_tax": [
+                        "us-gaap:DeferredIncomeTaxExpenseBenefit"
+                    ],
+                    "change_in_accounts_receivable_cf": ["us-gaap:IncreaseDecreaseInAccountsReceivableTrade"],
+                    "change_in_inventories_cf": ["us-gaap:IncreaseDecreaseInInventories"],
+                    "change_in_prepaid_expenses_cf": ["us-gaap:IncreaseDecreaseInPrepaidDeferredExpenseAndOtherAssets"],
+                    "change_in_accounts_payable_cf": ["us-gaap:IncreaseDecreaseInAccountsPayableTrade"],
+                    "change_in_accrued_liabilities_cf": ["us-gaap:IncreaseDecreaseInAccruedLiabilities"],
+                    "change_in_deferred_revenue_cf": ["us-gaap:IncreaseDecreaseInDeferredRevenue"],
+                },
+                "cash_flow_investing": {
+                    "net_cash_provided_by_investing_activities": ["us-gaap:NetCashProvidedByUsedInInvestingActivities"],
+                    "capital_expenditures": ["us-gaap:PaymentsToAcquirePropertyPlantAndEquipment"],
+                    "purchases_of_investments": ["us-gaap:PaymentsToAcquireInvestments"],
+                    "sales_maturities_of_investments": [
+                        "us-gaap:ProceedsFromSaleAndMaturityOfMarketableSecurities",
+                        "us-gaap:ProceedsFromSaleOfMarketableSecurities",
+                        "us-gaap:ProceedsFromMaturitiesOfMarketableSecurities",
+                    ],
+                    "acquisitions_net_of_cash_acquired": ["us-gaap:PaymentsToAcquireBusinessesNetOfCashAcquired"],
+                    "divestitures_net_of_cash_sold": ["us-gaap:ProceedsFromDivestitureOfBusinessesNetOfCashDivested"],
+                },
+                "cash_flow_financing": {
+                    "net_cash_provided_by_financing_activities": ["us-gaap:NetCashProvidedByUsedInFinancingActivities"],
+                    "proceeds_from_debt_issuance": ["us-gaap:ProceedsFromIssuanceOfLongTermDebt"],
+                    "repayments_of_debt": ["us-gaap:RepaymentsOfLongTermDebt"],
+                    "proceeds_from_equity_issuance": ["us-gaap:ProceedsFromIssuanceOfCommonStock"],
+                    "repurchases_of_equity": ["us-gaap:PaymentsForRepurchaseOfCommonStock"],
+                    "dividends_paid": ["us-gaap:PaymentsOfDividends", "us-gaap:DividendsPaid"],
+                },
+                "cash_flow_supplemental_and_other": {
+                    "interest_paid_cf": ["us-gaap:InterestPaid"],
+                    "income_taxes_paid_cf": ["us-gaap:IncomeTaxesPaid"],
+                    "effect_of_exchange_rate_on_cash": ["us-gaap:EffectOfExchangeRateOnCashAndCashEquivalents"],
+                    "cash_and_cash_equivalents_period_increase_decrease": [
+                        "us-gaap:CashAndCashEquivalentsPeriodIncreaseDecrease"
+                    ],
+                },
+                "notes_share_based_compensation": {
+                    "share_based_compensation_expense_note": [
+                        "us-gaap:ShareBasedCompensation",
+                        "us-gaap:StockBasedCompensation",
+                    ],
+                    "stock_options_outstanding_note": [
+                        "us-gaap:ShareBasedPaymentArrangementByShareBasedPaymentAwardOptionsOutstandingNumber"
+                    ],
+                    "restricted_stock_units_outstanding_note": [
+                        "us-gaap:ShareBasedPaymentArrangementByShareBasedPaymentAwardEquityInstrumentsOtherThanOptionsNonvestedNumber"
+                    ],
+                },
+                "notes_debt_details": {
+                    "long_term_debt_maturities_note": [
+                        "us-gaap:LongTermDebtMaturitiesRepaymentsOfPrincipalAfterYearFive"
+                    ],
+                    "debt_covenants_compliance_note": ["us-gaap:DebtInstrumentCovenantsCompliance"],
+                    "weighted_average_interest_rate_on_debt_note": ["us-gaap:DebtWeightedAverageInterestRate"],
+                },
+                "notes_leases_details": {
+                    "operating_lease_cost_note": ["us-gaap:LesseeOperatingLeaseExpense"],
+                    "finance_lease_cost_note": [
+                        "us-gaap:LesseeFinanceLeaseCostInterestComponent",
+                        "us-gaap:LesseeFinanceLeaseCostAmortizationOfRightOfUseAsset",
+                    ],
+                    "future_minimum_lease_payments_operating_note": [
+                        "us-gaap:OperatingLeaseLiabilityFutureLeasePayments"
+                    ],
+                    "future_minimum_lease_payments_finance_note": ["us-gaap:FinanceLeaseLiabilityFutureLeasePayments"],
+                    "weighted_average_lease_term_operating_note": ["us-gaap:OperatingLeaseWeightedAverageLeaseTerm"],
+                    "weighted_average_discount_rate_operating_note": [
+                        "us-gaap:OperatingLeaseWeightedAverageDiscountRate"
+                    ],
+                },
+                "notes_commitments_and_contingencies": {
+                    "purchase_commitments_note": ["us-gaap:UnconditionalPurchaseObligationAmount"],
+                    "legal_contingencies_accrual_note": ["us-gaap:AccrualForEnvironmentalLossContingencies"],
+                    "guarantees_outstanding_note": ["us-gaap:GuaranteesOfIndebtednessOfOthersAmount"],
+                },
+                "notes_fair_value_measurements": {
+                    "fair_value_assets_level_1_note": ["us-gaap:FairValueInputsLevel1Assets"],
+                    "fair_value_assets_level_2_note": ["us-gaap:FairValueInputsLevel2Assets"],
+                    "fair_value_assets_level_3_note": ["us-gaap:FairValueInputsLevel3Assets"],
+                    "fair_value_liabilities_level_1_note": ["us-gaap:FairValueInputsLevel1Liabilities"],
+                    "fair_value_liabilities_level_2_note": ["us-gaap:FairValueInputsLevel2Liabilities"],
+                    "fair_value_liabilities_level_3_note": ["us-gaap:FairValueInputsLevel3Liabilities"],
+                },
+                "notes_derivatives_and_hedging": {
+                    "notional_amount_of_interest_rate_swaps_note": ["us-gaap:InterestRateSwapNotionalAmount"],
+                    "notional_amount_of_foreign_currency_contracts_note": [
+                        "us-gaap:ForeignCurrencyContractNotionalAmount"
+                    ],
+                    "gain_loss_on_derivatives_recognized_in_oci_note": [
+                        "us-gaap:AccumulatedOtherComprehensiveIncomeLossNetGainLossFromCashFlowHedgesEffectNetOfTax"
+                    ],
+                    "gain_loss_on_derivatives_recognized_in_income_note": [
+                        "us-gaap:DerivativeInstrumentGainLossReclassifiedFromAccumulatedOCIIntoIncomeEffectivePortionBeforeTax"
+                    ],
+                },
+                "notes_income_taxes_details": {
+                    "effective_income_tax_rate_reconciliation_note": [
+                        "us-gaap:EffectiveIncomeTaxRateReconciliationAtFederalStatutoryIncomeTaxRate"
+                    ],
+                    "deferred_tax_assets_by_type_note": ["us-gaap:DeferredTaxAssetsTaxCreditCarryforwards"],
+                    "deferred_tax_liabilities_by_type_note": ["us-gaap:DeferredTaxLiabilitiesIntangibleAssets"],
+                    "valuation_allowance_for_deferred_tax_assets_note": [
+                        "us-gaap:ValuationAllowanceOfDeferredTaxAssets"
+                    ],
+                },
+                "notes_business_combinations_details": {
+                    "purchase_price_allocation_goodwill_note": [
+                        "us-gaap:BusinessCombinationRecognizedIdentifiableAssetsAcquiredAndLiabilitiesAssumedGoodwill"
+                    ],
+                    "purchase_price_allocation_intangibles_note": [
+                        "us-gaap:BusinessCombinationRecognizedIdentifiableAssetsAcquiredAndLiabilitiesAssumedIntangibleAssetsOtherThanGoodwill"
+                    ],
+                },
+                "notes_related_party_transactions": {
+                    "related_party_revenue_note": ["us-gaap:RevenueFromRelatedParties"],
+                    "related_party_purchases_note": ["us-gaap:PurchasesFromRelatedParties"],
+                    "due_from_related_parties_note": ["us-gaap:DueFromRelatedPartiesCurrent"],
+                    "due_to_related_parties_note": ["us-gaap:DueToRelatedPartiesCurrent"],
+                },
+                "notes_segment_information": {
+                    "segment_revenue_note": ["us-gaap:RevenueFromReportableSegments"],
+                    "segment_profit_loss_note": ["us-gaap:SegmentReportingProfitLoss"],
+                    "segment_assets_note": ["us-gaap:SegmentReportingAssets"],
+                },
+                "document_and_entity_information_dei": {
+                    "document_type_dei": ["dei:DocumentType"],
+                    "document_period_end_date_dei": ["dei:DocumentPeriodEndDate"],
+                    "entity_registrant_name_dei": ["dei:EntityRegistrantName"],
+                    "cik_dei": ["dei:EntityCentralIndexKey"],
+                    "trading_symbol_dei": ["dei:TradingSymbol"],
+                    "outstanding_shares_common_dei": ["dei:EntityCommonStockSharesOutstanding"],
+                    "public_float_dei": ["dei:EntityPublicFloat"],
+                },
+                "other_disclosures_and_metrics": {
+                    "research_and_development_assets_note": ["us-gaap:ResearchAndDevelopmentAssetNet"],
+                    "environmental_liabilities_note": ["us-gaap:AccrualForEnvironmentalLossContingenciesNoncurrent"],
+                    "restructuring_liability_note": ["us-gaap:RestructuringReserveCurrent"],
+                    "off_balance_sheet_arrangements_note": ["us-gaap:OffBalanceSheetArrangement"],
+                    "asset_retirement_obligation_note": ["us-gaap:AssetRetirementObligation"],
+                    "employee_benefit_plans_note": ["us-gaap:DefinedBenefitPlanNetPeriodicBenefitCost"],
+                },
+            },
+            "require_submissions": False,
+            "max_periods_to_analyze": 8,
+            "include_amended_filings": True,
+        }
+
+    def _default_email(self) -> Dict:
+        """Default email configuration"""
+        return {
+            "enabled": False,
+            "smtp_server": "smtp.gmail.com",
+            "smtp_port": 587,
+            "username": "",
+            "password": "",
+            "from_address": "",
+            "recipients": [],
+            "use_tls": True,
+        }
+
+    def _default_analysis(self) -> Dict:
+        """Default analysis configuration"""
+        return {
+            "fundamental_weight": 0.6,
+            "technical_weight": 0.4,
+            "min_score_for_buy": 7.0,
+            "max_score_for_sell": 4.0,
+            "lookback_days": 365,
+            "min_volume": 100000,
+            "max_prompt_tokens": 32768,
+        }
+
+    def _default_logging(self) -> Dict:
+        """Default logging configuration"""
+        return {
+            "symbol_log_max_bytes": 1024 * 1024,  # 1MB
+            "symbol_log_backup_count": 5,
+            "symbol_log_format": "%(asctime)s - %(levelname)s - %(name)s:%(lineno)d - %(message)s",
+            "main_log_max_bytes": 5 * 1024 * 1024,  # 5MB
+            "main_log_backup_count": 10,
+            "main_log_format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "main_log_file": "investigator.log",
+        }
+
+    def _default_stocks(self) -> List[str]:
+        """Default stock list"""
+        return ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "NVDA", "META", "NFLX", "CRM", "SNOW"]
+
+    def _default_parquet(self) -> Dict:
+        """Default parquet configuration - uniform gzip compression"""
+        return {
+            "engine": "fastparquet",
+            "compression": "gzip",
+            "compression_level": 9,
+            "pyarrow_compression": "gzip",  # Uniform gzip
+            "pyarrow_compression_level": 9,  # Maximum compression
+            "use_dictionary": True,
+            "row_group_size": None,
+        }
+
+    def _default_vector_db(self) -> Dict:
+        """Default vector database configuration"""
+        return {
+            "enabled": False,  # Disabled by default - user must opt-in
+            "db_path": "data/vector_db",
+            "embedding_model": "all-MiniLM-L6-v2",
+            "embedding_dimension": 384,
+            "rocksdb_max_open_files": 300000,
+            "rocksdb_write_buffer_size": 67108864,
+            "rocksdb_max_write_buffer_number": 3,
+            "rocksdb_compression": "lz4",
+            "faiss_index_type": "IndexFlatIP",
+            "faiss_normalize_embeddings": True,
+            "max_content_length": 5000,
+            "min_content_length": 50,
+            "enable_event_analysis": True,
+            "event_analysis_forms": ["8-K", "10-Q", "10-K"],
+            "vector_cache_priority": 5,
+            "enable_promotion": True,
+            "batch_size": 32,
+            "max_search_results": 100,
+            "similarity_threshold": 0.5,
+        }
+
+    def _default_cache_control(self) -> Dict:
+        """Default cache control configuration"""
+        return {
+            "storage": ["disk", "rdbms"],  # Both storage backends enabled by default
+            "types": None,  # None means all cache types enabled
+            "read_from_cache": True,
+            "write_to_cache": True,
+            "force_refresh": False,
+            "force_refresh_symbols": None,  # List of symbols to force refresh
+            "cache_ttl_override": None,
+        }
+
+    def _build_caching_config(self, caching_data: Dict) -> CachingConfig:
+        """Build caching configuration with user overrides"""
+        caching_config = CachingConfig()
+
+        # Apply user overrides for each cache type
+        for cache_type, user_config in caching_data.items():
+            if hasattr(caching_config, cache_type):
+                current_config = getattr(caching_config, cache_type)
+
+                # Update specific fields
+                for field_name, value in user_config.items():
+                    if field_name == "storage_type" and isinstance(value, str):
+                        value = CacheStorageType(value.lower())
+                    setattr(current_config, field_name, value)
+
+                # Re-validate after updates
+                current_config.__post_init__()
+
+        return caching_config
+
+    def _setup_logging(self):
+        """Setup logging configuration"""
+        log_file = os.path.join(self.logs_dir, "investment_ai.log")
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
+        )
+
+    def get_raw_section(self, section_name: str, default: Optional[Dict] = None) -> Dict:
+        """
+        Get raw config section that hasn't been parsed into dataclasses.
+
+        Use this for sections like 'valuation', 'dcf_valuation',
+        'market_context_multipliers' that are accessed directly from YAML.
+
+        Args:
+            section_name: Name of the config section (e.g., 'dcf_valuation')
+            default: Default value if section not found (defaults to empty dict)
+
+        Returns:
+            Raw config dictionary for the section
+        """
+        if default is None:
+            default = {}
+        return self._raw_config.get(section_name, default)
+
+    def get_symbol_log_file(self, symbol: str) -> str:
+        """Get symbol-specific log file path"""
+        return str(self.logs_dir / f"{symbol}.log")
+
+    def get_symbol_logger(self, symbol: str, module_name: str) -> logging.Logger:
+        """Get symbol-specific logger with file rotation"""
+        from logging.handlers import RotatingFileHandler
+
+        logger_name = f"{module_name}.{symbol}"
+        logger = logging.getLogger(logger_name)
+
+        # Remove existing handlers to avoid duplicates
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+
+        # Set logger level
+        logger.setLevel(logging.INFO)
+        logger.propagate = False  # Don't propagate to root logger
+
+        # Create file handler with rotation
+        log_file = self.get_symbol_log_file(symbol)
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=self.logging.symbol_log_max_bytes, backupCount=self.logging.symbol_log_backup_count
+        )
+
+        # Set formatter (no timestamp as requested)
+        formatter = logging.Formatter(self.logging.symbol_log_format)
+        file_handler.setFormatter(formatter)
+
+        # Add handler to logger
+        logger.addHandler(file_handler)
+
+        return logger
+
+    def get_main_logger(self, module_name: str = "investigator") -> logging.Logger:
+        """Get main consolidated logger with file rotation for non-symbol-specific messages"""
+        from logging.handlers import RotatingFileHandler
+
+        logger_name = f"main.{module_name}"
+        logger = logging.getLogger(logger_name)
+
+        # Remove existing handlers to avoid duplicates
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+
+        # Set logger level
+        logger.setLevel(logging.INFO)
+        logger.propagate = False  # Don't propagate to root logger
+
+        # Create file handler with rotation
+        log_file = self.logs_dir / self.logging.main_log_file
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=self.logging.main_log_max_bytes, backupCount=self.logging.main_log_backup_count
+        )
+
+        # Set formatter with timestamp for main log
+        formatter = logging.Formatter(self.logging.main_log_format)
+        file_handler.setFormatter(formatter)
+
+        # Add handler to logger
+        logger.addHandler(file_handler)
+
+        return logger
+
+    def get_symbol_cache_path(self, symbol: str, cache_type: str = "sec") -> Path:
+        """Get symbol-specific cache directory path"""
+        if cache_type == "sec":
+            # sec_cache/{symbol}/{category}_{formtype}_{period}.json
+            cache_dir = Path(self.sec.cache_dir) / symbol
+        elif cache_type == "llm":
+            # llm_cache/{symbol}/{category}_{formtype}_{period}.json
+            cache_dir = self.data_dir / "llm_cache" / symbol
+        else:
+            cache_dir = self.data_dir / f"{cache_type}_cache" / symbol
+
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir
+
+    def validate(self) -> List[str]:
+        """Validate configuration and return list of errors"""
+        errors = []
+
+        # Validate SEC configuration
+        if not self.sec.user_agent:
+            errors.append("SEC user agent is required for API access")
+
+        # Validate database connection details
+        if not all([self.database.host, self.database.database, self.database.username, self.database.password]):
+            errors.append("Database connection details are incomplete")
+
+        # Validate email settings if enabled
+        if self.email.enabled:
+            if not all([self.email.username, self.email.password, self.email.smtp_server]):
+                errors.append("Email settings are incomplete")
+
+            if not self.email.recipients:
+                errors.append("Email recipients list is empty")
+
+        # Validate stock list
+        if not self.stocks_to_track:
+            errors.append("No stocks configured for tracking")
+
+        # Validate caching configuration
+        try:
+            for cache_type in [
+                "sec_submissions",
+                "sec_company_facts",
+                "sec_consolidated_frames",
+                "llm_sec_analysis",
+                "llm_technical_analysis",
+                "llm_synthesis_reports",
+            ]:
+                config = self.caching.get_cache_config(cache_type)
+                if config and config.enabled:
+                    if config.storage_type == CacheStorageType.DISK and not config.disk_path:
+                        errors.append(f"Cache {cache_type}: disk_path required for disk storage")
+                    elif config.storage_type == CacheStorageType.RDBMS and not config.table_name:
+                        errors.append(f"Cache {cache_type}: table_name required for RDBMS storage")
+        except Exception as e:
+            errors.append(f"Caching configuration error: {e}")
+
+        return errors
+
+    def save_sample_config(self, filepath: str = "config.sample.json"):
+        """Save a sample configuration file"""
+        sample_config = {
+            "database": {
+                "host": "localhost",
+                "port": 5432,
+                "database": "investment_ai",
+                "username": "investment_user",
+                "password": "investment_pass",
+                "pool_size": 10,
+                "max_overflow": 20,
+            },
+            "ollama": {
+                "base_url": "http://localhost:11434",
+                "timeout": 600,
+                "max_retries": 3,
+                "min_context_size": 8192,
+                "num_llm_threads": 1,
+                "models": {
+                    "fundamental_analysis": "qwen3:32b",
+                    "technical_analysis": "qwen3:32b",
+                    "report_generation": "qwen3:32b",
+                    "synthesizer": "qwen3:32b",
+                },
+                "num_predict": {
+                    "fundamental_analysis": 2048,
+                    "technical_analysis": 1536,
+                    "report_generation": 2048,
+                    "synthesizer": 1536,
+                },
+            },
+            "sec": {
+                "user_agent": "InvestiGator/1.0 (singhvjd@gmail.com)",
+                "base_url": "https://data.sec.gov",
+                "rate_limit": 10,
+                "cache_dir": "./data/sec_cache",
+                "ticker_cache_file": "./data/ticker_cik_map.txt",
+                "max_retries": 3,
+                "timeout": 30,
+                "require_submissions": true,
+                "max_periods_to_analyze": 8,
+                "include_amended_filings": true,
+            },
+            "email": {
+                "enabled": True,
+                "smtp_server": "smtp.gmail.com",
+                "smtp_port": 587,
+                "username": "your-email@gmail.com",
+                "password": "your-gmail-app-password",
+                "from_address": "your-email@gmail.com",
+                "recipients": ["your-email@gmail.com"],
+                "use_tls": True,
+            },
+            "analysis": {
+                "fundamental_weight": 0.6,
+                "technical_weight": 0.4,
+                "min_score_for_buy": 7.0,
+                "max_score_for_sell": 4.0,
+                "lookback_days": 365,
+                "min_volume": 100000,
+            },
+            "logging": {
+                "symbol_log_max_bytes": 1048576,
+                "symbol_log_backup_count": 5,
+                "symbol_log_format": "%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+                "main_log_max_bytes": 5242880,
+                "main_log_backup_count": 10,
+                "main_log_format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                "main_log_file": "investigator.log",
+            },
+            "stocks_to_track": ["NVDA", "META", "NFLX", "CRM", "SNOW", "FSLR", "AAPL"],
+            "data_dir": "./data",
+            "reports_dir": "./reports",
+            "logs_dir": "./logs",
+            "caching": {
+                "sec_submissions": {
+                    "enabled": True,
+                    "storage_type": "disk",
+                    "priority": 1,
+                    "disk_path": "data/sec_cache",
+                    "filename_pattern": "{symbol}_submissions.json",
+                    "ttl_hours": 24,
+                },
+                "sec_company_facts": {
+                    "enabled": True,
+                    "storage_type": "disk",
+                    "priority": 1,
+                    "disk_path": "data/sec_cache",
+                    "filename_pattern": "{symbol}_companyfacts.json",
+                    "ttl_hours": 24,
+                },
+                "sec_consolidated_frames": {
+                    "enabled": True,
+                    "storage_type": "rdbms",
+                    "priority": 1,
+                    "table_name": "sec_consolidated_frames_cache",
+                    "key_column": "cache_key",
+                    "data_column": "consolidated_data",
+                    "ttl_hours": 168,
+                },
+                "llm_sec_analysis": {
+                    "enabled": True,
+                    "storage_type": "disk",
+                    "priority": 1,
+                    "disk_path": "data/llm_cache",
+                    "filename_pattern": "{symbol}_sec_analysis_{period}.json",
+                    "ttl_hours": 72,
+                },
+                "llm_technical_analysis": {
+                    "enabled": True,
+                    "storage_type": "disk",
+                    "priority": 1,
+                    "disk_path": "data/llm_cache",
+                    "filename_pattern": "{symbol}_technical_analysis.json",
+                    "ttl_hours": 24,
+                },
+                "llm_synthesis_reports": {
+                    "enabled": True,
+                    "storage_type": "rdbms",
+                    "priority": 1,
+                    "table_name": "llm_synthesis_cache",
+                    "key_column": "report_key",
+                    "data_column": "synthesis_data",
+                    "ttl_hours": 168,
+                },
+                "audit_sec_requests": {
+                    "enabled": True,
+                    "storage_type": "rdbms",
+                    "priority": -1,
+                    "table_name": "sec_api_requests_audit",
+                    "key_column": "request_id",
+                    "data_column": "request_data",
+                    "max_entries": 10000,
+                },
+                "audit_llm_interactions": {
+                    "enabled": True,
+                    "storage_type": "rdbms",
+                    "priority": -1,
+                    "table_name": "llm_interactions_audit",
+                    "key_column": "interaction_id",
+                    "data_column": "interaction_data",
+                    "max_entries": 50000,
+                },
+            },
+            "vector_db": {
+                "enabled": False,
+                "db_path": "data/vector_db",
+                "embedding_model": "all-MiniLM-L6-v2",
+                "embedding_dimension": 384,
+                "rocksdb_max_open_files": 300000,
+                "rocksdb_write_buffer_size": 67108864,
+                "rocksdb_max_write_buffer_number": 3,
+                "rocksdb_compression": "lz4",
+                "faiss_index_type": "IndexFlatIP",
+                "faiss_normalize_embeddings": True,
+                "max_content_length": 5000,
+                "min_content_length": 50,
+                "enable_event_analysis": True,
+                "event_analysis_forms": ["8-K", "10-Q", "10-K"],
+                "vector_cache_priority": 5,
+                "enable_promotion": True,
+                "batch_size": 32,
+                "max_search_results": 100,
+                "similarity_threshold": 0.5,
+            },
+        }
+
+        with open(filepath, "w") as f:
+            json.dump(sample_config, f, indent=2)
+
+        print(f"Sample configuration saved to {filepath}")
+
+
+# Global configuration instance
+_config_instance = None
+
+
+def get_config(config_path: Optional[str] = None) -> Config:
+    """
+    Get global configuration instance.
+
+    FIX Issue #2: Now accepts optional config_path to honor CLI --config flag.
+
+    Args:
+        config_path: Optional path to config file. If provided, reloads config
+                    from this path (useful for testing and alternate configs).
+                    If None, uses existing singleton or creates from default.
+
+    Returns:
+        Config: The global configuration object
+    """
+    global _config_instance
+    if _config_instance is None or config_path:
+        # If config_path provided, pass it to Config constructor
+        # Otherwise use default behavior
+        if config_path:
+            _config_instance = Config(config_file=config_path)
+        else:
+            _config_instance = Config()
+    return _config_instance

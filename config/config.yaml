@@ -1,0 +1,18 @@
+api:
+  host: 0.0.0.0
+  port: 8000
+  workers: 4
+cache:
+  file_cache_path: data/cache
+  redis_url: redis://localhost:6379
+  ttl_default: 3600
+monitoring:
+  export_interval: 60
+  metrics_port: 9090
+ollama:
+  base_url: http://localhost:11434
+  max_retries: 3
+  timeout: 300
+orchestrator:
+  max_concurrent_agents: 10
+  max_concurrent_analyses: 5

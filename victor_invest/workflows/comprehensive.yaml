@@ -1,0 +1,194 @@
+# Comprehensive Analysis Workflow
+# ================================
+# Full institutional-grade analysis (~60 seconds)
+# Uses LLM for final synthesis and recommendation generation
+
+workflows:
+  comprehensive:
+    description: "Full institutional-grade analysis with LLM synthesis"
+
+    metadata:
+      version: "1.0"
+      author: "victor_invest"
+      vertical: investment
+      expected_duration_seconds: 60
+      llm_calls: 1
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Parallel Data Collection
+      # =====================================================================
+      - id: parallel_data_fetch
+        type: parallel
+        name: "Parallel Data Collection"
+        parallel_nodes: [fetch_sec_data, fetch_market_data, fetch_macro_data]
+        join_strategy: all
+        next: [parallel_analysis]
+
+      - id: fetch_sec_data
+        type: compute
+        name: "Fetch SEC Data"
+        handler: fetch_sec_data
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        output: sec_data
+
+      - id: fetch_market_data
+        type: compute
+        name: "Fetch Market Data"
+        handler: fetch_market_data
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        output: market_data
+
+      - id: fetch_macro_data
+        type: compute
+        name: "Fetch Macro Data"
+        handler: fetch_macro_data
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        output: macro_data
+
+      # =====================================================================
+      # Stage 2: Parallel Analysis
+      # =====================================================================
+      - id: parallel_analysis
+        type: parallel
+        name: "Parallel Analysis"
+        parallel_nodes: [fundamental_analysis, technical_analysis, market_context_analysis]
+        join_strategy: all
+        next: [check_data_quality]
+
+      - id: fundamental_analysis
+        type: compute
+        name: "Fundamental Analysis"
+        handler: run_fundamental_analysis
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        input_mapping:
+          sec_data: sec_data
+        output: fundamental_analysis
+
+      - id: technical_analysis
+        type: compute
+        name: "Technical Analysis"
+        handler: run_technical_analysis
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        input_mapping:
+          market_data: market_data
+        output: technical_analysis
+
+      - id: market_context_analysis
+        type: compute
+        name: "Market Context Analysis"
+        handler: run_market_context_analysis
+        constraints:
+          llm_allowed: false
+          timeout: 30
+        input_mapping:
+          market_data: market_data
+          macro_data: macro_data
+        output: market_context
+
+      # =====================================================================
+      # Stage 3: Data Quality Check
+      # =====================================================================
+      - id: check_data_quality
+        type: condition
+        name: "Check Data Quality"
+        condition: "data_quality_check"
+        branches:
+          "high": synthesize
+          "acceptable": synthesize
+          "low": request_review
+          "default": synthesize
+
+      - id: request_review
+        type: hitl
+        name: "Request Human Review"
+        hitl_type: approval
+        prompt: |
+          ## Data Quality Warning
+
+          The analysis data quality is below threshold.
+
+          **Symbol:** {symbol}
+          **Data Quality Score:** {data_quality_score}%
+
+          **Issues Found:**
+          {data_quality_issues}
+
+          Proceed with synthesis despite data quality issues?
+        context_keys:
+          - symbol
+          - data_quality_score
+          - data_quality_issues
+        timeout: 300
+        fallback: continue
+        next: [synthesize]
+
+      # =====================================================================
+      # Stage 4: LLM-Enhanced Synthesis
+      # =====================================================================
+      - id: synthesize
+        type: agent
+        name: "Investment Synthesis"
+        role: investment_analyst
+        goal: |
+          Synthesize all analysis results into a comprehensive investment recommendation.
+
+          You have access to:
+          1. **Fundamental Analysis** - valuation models, financial metrics, growth rates
+          2. **Technical Analysis** - price trends, indicators, support/resistance levels
+          3. **Market Context** - sector performance, macro environment, volatility regime
+
+          Provide:
+          - Clear BUY/HOLD/SELL recommendation with conviction level
+          - Price target with methodology explanation
+          - Key catalysts that could drive the stock higher
+          - Key risks that investors should monitor
+          - Concise investment thesis narrative
+
+          Be specific and actionable. Avoid generic statements.
+        tool_budget: 0
+        llm_config:
+          temperature: 0.3
+          max_tokens: 4000
+        input_mapping:
+          fundamental_analysis: fundamental_analysis
+          technical_analysis: technical_analysis
+          market_context: market_context
+        output: synthesis
+        next: [generate_report]
+
+      # =====================================================================
+      # Stage 5: Report Generation
+      # =====================================================================
+      - id: generate_report
+        type: compute
+        name: "Generate Report"
+        handler: generate_report
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        input_mapping:
+          synthesis: synthesis
+          fundamental_analysis: fundamental_analysis
+          technical_analysis: technical_analysis
+          market_context: market_context
+        output: report
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Analysis Complete"
+        transform: |
+          workflow_status = "completed"
+          analysis_mode = "comprehensive"
+          output_files = [report]

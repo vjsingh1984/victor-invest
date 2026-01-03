@@ -1,0 +1,108 @@
+================================================================================
+FISCAL YEAR ASSIGNMENT - QUICK REFERENCE
+================================================================================
+
+QUESTION: Where is fiscal_year initially set in the SEC data processing pipeline?
+
+ANSWER:
+  File:     /Users/vijaysingh/code/InvestiGator/src/investigator/infrastructure/sec/data_processor.py
+  Method:   process_raw_data() [Line 1225]
+  Location: Line 1366 in the filing dictionary
+  Source:   actual_fiscal_year derived from period_end_date.year at line 1310
+
+================================================================================
+THE BUG
+================================================================================
+
+SYMPTOM:
+  ORCL Q2 ending 2024-11-30 → fiscal_year=2024 (WRONG - should be 2025)
+
+ROOT CAUSE:
+  Line 1310: actual_fiscal_year = period_end_date.year
+  
+  This assumes calendar-year fiscal years. For ORCL (FY ends May 31):
+  - Nov 30, 2024 is AFTER May 31
+  - Therefore it belongs to FY2025, not FY2024
+  - But period_end_date.year extracts 2024
+
+WHY THE Q1 FIX DOESN'T HELP:
+  Lines 1344-1361 only adjust Q1 periods
+  For Q2 (and Q3, Q4): condition "if actual_fp == 'Q1'" is FALSE
+  No adjustment applied → fiscal_year stays wrong
+
+================================================================================
+DATA FLOW
+================================================================================
+
+1. CompanyFacts API
+   └─ entry['end'] = "2024-11-30"
+
+2. process_raw_data() [Line 1305]
+   └─ period_end_date = datetime.strptime(period_end_str, '%Y-%m-%d')
+   └─ period_end_date = datetime(2024, 11, 30)
+
+3. process_raw_data() [Line 1310] ← INITIAL ASSIGNMENT
+   └─ actual_fiscal_year = period_end_date.year = 2024
+
+4. process_raw_data() [Line 1287]
+   └─ fiscal_year_end = "-05-31" (detected from 10-K entries)
+
+5. process_raw_data() [Line 1344]
+   └─ if actual_fp == 'Q1': [Q2 SKIPS THIS!]
+   └─ No adjustment applied
+
+6. process_raw_data() [Line 1366] ← STORED IN DICT
+   └─ filings[adsh]['fiscal_year'] = 2024 (INCORRECT)
+
+7. Database [Line ~1544]
+   └─ INSERT INTO sec_companyfacts_processed (fiscal_year=2024)
+   └─ ORCL Q2 stored with fiscal_year=2024 (WRONG!)
+
+================================================================================
+KEY FILES & LINES
+================================================================================
+
+Initial Assignment:
+  data_processor.py:1310       actual_fiscal_year = period_end_date.year
+
+Fiscal Year End Detection:
+  data_processor.py:1287       _detect_fiscal_year_end(raw_data, symbol)
+  data_processor.py:204        def _detect_fiscal_year_end()
+  fiscal_period_service.py:230 def detect_fiscal_year_end()
+
+Filing Dictionary:
+  data_processor.py:1366       'fiscal_year': actual_fiscal_year
+
+Q1 Adjustment (Buggy - Q1 ONLY):
+  data_processor.py:1344-1361  if actual_fp == 'Q1' and fiscal_year_end:
+
+Data Extraction:
+  data_processor.py:1444       fiscal_year=filing['fiscal_year']
+
+Database Write:
+  data_processor.py:~1544      _persist_processed_filings()
+
+================================================================================
+THE FIX
+================================================================================
+
+Change lines 1344-1361 from Q1-only to ALL quarters:
+
+CURRENT (BUGGY):
+  if actual_fp == 'Q1' and fiscal_year_end:
+
+PROPOSED (FIX):
+  if fiscal_year_end and actual_fp in ['Q1', 'Q2', 'Q3', 'Q4']:
+
+This ensures ALL quarters in non-calendar FY companies get adjusted when
+period_end is after fiscal_year_end.
+
+================================================================================
+SUPPORTING DOCUMENTS
+================================================================================
+
+Full traces created in docs/:
+  - FISCAL_YEAR_ASSIGNMENT_TRACE.md       (high-level explanation)
+  - FISCAL_YEAR_CODE_LOCATIONS.md         (detailed code snippets)
+  - FISCAL_YEAR_INITIAL_ASSIGNMENT_SUMMARY.md (comprehensive reference)
+

@@ -1,0 +1,487 @@
+# Data Sources Registry
+# =====================
+# Configuration-driven registry for all external economic data sources.
+# URLs can be updated here without code changes.
+#
+# Structure:
+#   source_id:
+#     name: Human-readable name
+#     category: fed_district | market_data | government
+#     frequency: daily | weekly | monthly | quarterly
+#     urls: List of URLs to try (primary first, then fallbacks)
+#     fred_series: FRED series ID as fallback (if available)
+#     parser: excel | csv | json | html
+#     parser_hints: Column names, patterns, etc.
+#     freshness_hours: Expected data freshness (for monitoring)
+
+version: "1.0"
+last_updated: "2025-01-02"
+
+# =============================================================================
+# ATLANTA FEDERAL RESERVE
+# =============================================================================
+atlanta_fed:
+  gdpnow:
+    name: "GDPNow Real-Time GDP Estimate"
+    category: fed_district
+    district: atlanta
+    frequency: weekly  # Updated ~6 times per quarter
+    urls:
+      - "https://www.atlantafed.org/-/media/documents/cqer/researchcq/gdpnow/GDPNowForecast.xlsx"
+      - "https://www.atlantafed.org/cqer/research/gdpnow"
+    fred_series: "GDPNOW"  # Atlanta Fed GDPNow on FRED
+    parser: excel_or_html
+    parser_hints:
+      excel_date_col: 0
+      excel_value_col: 1
+      html_patterns:
+        - 'GDP.*?(-?\d+\.\d+).*?percent'
+        - 'GDPNow.*?(-?\d+\.\d+)'
+        - 'estimate.*?(-?\d+\.\d+).*?percent'
+      value_range: [-15, 15]  # Sanity check
+    freshness_hours: 168  # Weekly updates
+
+  wage_growth_tracker:
+    name: "Wage Growth Tracker"
+    category: fed_district
+    district: atlanta
+    frequency: monthly
+    urls:
+      - "https://www.atlantafed.org/-/media/documents/datafiles/chcs/wage-growth-tracker/wage-growth-data.xlsx"
+    fred_series: "FRBATLWGTD12MNSA"  # Atlanta Fed Wage Growth Tracker - 12-month MA
+    parser: excel
+    parser_hints:
+      date_col_patterns: ["date", "month", "period"]
+      value_col_patterns: ["overall", "total", "median"]
+    freshness_hours: 744  # Monthly
+
+  business_inflation_expectations:
+    name: "Business Inflation Expectations Survey"
+    category: fed_district
+    district: atlanta
+    frequency: monthly
+    urls:
+      - "https://www.atlantafed.org/-/media/documents/research/inflationproject/bie/BIEData.xlsx"
+    fred_series: "ATLBIEF1Y"  # Atlanta Fed 1-Year Business Inflation Expectations
+    parser: excel
+    freshness_hours: 744
+
+# =============================================================================
+# PHILADELPHIA FEDERAL RESERVE
+# =============================================================================
+philadelphia_fed:
+  manufacturing_survey:
+    name: "Manufacturing Business Outlook Survey"
+    category: fed_district
+    district: philadelphia
+    frequency: monthly
+    urls:
+      - "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/mbos/historical-data/bos_historical_data.xlsx"
+      - "https://www.philadelphiafed.org/surveys-and-data/regional-economic-analysis/mbos-historical-data"
+    fred_series: "GFDEGDQ188S"  # Related but not exact
+    parser: excel
+    parser_hints:
+      date_col_patterns: ["date", "month", "period"]
+      value_col_patterns: ["diffusion", "index", "composite"]
+    freshness_hours: 744
+
+  leading_index:
+    name: "State Leading Index"
+    category: fed_district
+    district: philadelphia
+    frequency: monthly
+    urls:
+      - "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/sli/sli_historical_data.xlsx"
+    fred_series: "PAUSLEAD"  # PA State Leading Index (FRED)
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  coincident_index:
+    name: "State Coincident Index"
+    category: fed_district
+    district: philadelphia
+    frequency: monthly
+    urls:
+      - "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/sci/sci_historical_data.xlsx"
+    fred_series: "PAUSCONN"  # PA State Coincident Index (FRED)
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  ads_index:
+    name: "ADS Business Conditions Index"
+    category: fed_district
+    district: philadelphia
+    frequency: daily
+    urls:
+      - "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/ads/ads_index.xlsx"
+    fred_series: "ADSINDX"  # ADS Index on FRED
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 24
+
+# =============================================================================
+# CHICAGO FEDERAL RESERVE
+# =============================================================================
+chicago_fed:
+  cfnai:
+    name: "Chicago Fed National Activity Index"
+    category: fed_district
+    district: chicago
+    frequency: monthly
+    urls:
+      - "https://www.chicagofed.org/~/media/publications/cfnai/cfnai-data-series-xlsx.xlsx"
+      - "https://www.chicagofed.org/publications/cfnai/index"
+    fred_series: "CFNAI"  # Available on FRED!
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true  # FRED is more reliable
+      date_col_patterns: ["date", "month"]
+      cfnai_col_patterns: ["cfnai", "index"]
+      ma3_col_patterns: ["ma3", "moving", "3-month"]
+    freshness_hours: 744
+
+  nfci:
+    name: "National Financial Conditions Index"
+    category: fed_district
+    district: chicago
+    frequency: weekly
+    urls:
+      - "https://www.chicagofed.org/~/media/publications/nfci/nfci-data-series-xlsx.xlsx"
+    fred_series: "NFCI"  # Available on FRED!
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 168
+
+  anfci:
+    name: "Adjusted National Financial Conditions Index"
+    category: fed_district
+    district: chicago
+    frequency: weekly
+    urls:
+      - "https://www.chicagofed.org/~/media/publications/nfci/nfci-data-series-xlsx.xlsx"
+    fred_series: "ANFCI"  # Available on FRED!
+    parser: excel_or_fred
+    freshness_hours: 168
+
+# =============================================================================
+# CLEVELAND FEDERAL RESERVE
+# =============================================================================
+cleveland_fed:
+  inflation_expectations:
+    name: "Model-Based Inflation Expectations"
+    category: fed_district
+    district: cleveland
+    frequency: monthly
+    urls:
+      - "https://www.clevelandfed.org/-/media/files/charts/inflation-expectations/ie_data.xlsx"
+      - "https://www.clevelandfed.org/indicators-and-data/inflation-expectations"
+    fred_series: "EXPINF1YR"  # 1-Year Expected Inflation
+    parser: excel_or_fred
+    freshness_hours: 744
+
+  yield_curve_model:
+    name: "Yield Curve Recession Probability"
+    category: fed_district
+    district: cleveland
+    frequency: monthly
+    urls:
+      - "https://www.clevelandfed.org/-/media/files/charts/yield-curve/yield_curve_data.xlsx"
+    fred_series: "T10Y3M"  # 10Y-3M Treasury Spread (proxy for yield curve)
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  median_cpi:
+    name: "Median CPI"
+    category: fed_district
+    district: cleveland
+    frequency: monthly
+    urls:
+      - "https://www.clevelandfed.org/-/media/files/charts/median-cpi/median-cpi.xlsx"
+    fred_series: "MEDCPIM158SFRBCLE"  # Available on FRED!
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  trimmed_mean_cpi:
+    name: "16% Trimmed-Mean CPI"
+    category: fed_district
+    district: cleveland
+    frequency: monthly
+    urls:
+      - "https://www.clevelandfed.org/-/media/files/charts/median-cpi/median-cpi.xlsx"
+    fred_series: "TRMMEANCPIM158SFRBCLE"  # Available on FRED!
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+# =============================================================================
+# DALLAS FEDERAL RESERVE
+# =============================================================================
+dallas_fed:
+  texas_manufacturing:
+    name: "Texas Manufacturing Outlook Survey"
+    category: fed_district
+    district: dallas
+    frequency: monthly
+    urls:
+      - "https://www.dallasfed.org/-/media/Documents/research/surveys/tmos/tmos.xlsx"
+      - "https://www.dallasfed.org/research/surveys/tmos"
+    fred_series: "FRBDALTXMFGM"  # Dallas Fed Texas Manufacturing Index
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  texas_services:
+    name: "Texas Service Sector Outlook Survey"
+    category: fed_district
+    district: dallas
+    frequency: monthly
+    urls:
+      - "https://www.dallasfed.org/-/media/Documents/research/surveys/tssos/tssos.xlsx"
+    fred_series: "FRBDALTXSVCM"  # Dallas Fed Texas Services Index
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  trimmed_mean_pce:
+    name: "Trimmed Mean PCE Inflation"
+    category: fed_district
+    district: dallas
+    frequency: monthly
+    urls:
+      - "https://www.dallasfed.org/-/media/Documents/research/pce/pce_data.xlsx"
+    fred_series: "PCETRIM12M159SFRBDAL"  # Available on FRED!
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+# =============================================================================
+# KANSAS CITY FEDERAL RESERVE
+# =============================================================================
+kansas_city_fed:
+  manufacturing_survey:
+    name: "Tenth District Manufacturing Survey"
+    category: fed_district
+    district: kansas_city
+    frequency: monthly
+    urls:
+      - "https://www.kansascityfed.org/~/media/files/publicat/research/indicatorsdata/mfg/mfgdata.xlsx"
+      - "https://www.kansascityfed.org/research/indicatorsdata/mfg/"
+    fred_series: "FRBKCMSFG"  # Kansas City Fed Manufacturing Survey (composite)
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  kcfsi:
+    name: "Kansas City Financial Stress Index"
+    category: fed_district
+    district: kansas_city
+    frequency: weekly
+    urls:
+      - "https://www.kansascityfed.org/~/media/files/publicat/research/indicatorsdata/kcfsi/kcfsi.xlsx"
+    fred_series: "KCFSI"  # Available on FRED!
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 168
+
+  lmci:
+    name: "Labor Market Conditions Index"
+    category: fed_district
+    district: kansas_city
+    frequency: monthly
+    urls:
+      - "https://www.kansascityfed.org/~/media/files/publicat/research/indicatorsdata/lmci/lmci.xlsx"
+    fred_series: "FRBKCLMCILA"  # Level of Activity
+    parser: excel_or_fred
+    freshness_hours: 744
+
+# =============================================================================
+# RICHMOND FEDERAL RESERVE
+# =============================================================================
+richmond_fed:
+  manufacturing_survey:
+    name: "Fifth District Manufacturing Survey"
+    category: fed_district
+    district: richmond
+    frequency: monthly
+    urls:
+      - "https://www.richmondfed.org/-/media/RichmondFedOrg/research/regional_economy/surveys_of_business_conditions/manufacturing/xls/manufacturing_all.xlsx"
+    fred_series: "RICSIMFG"  # Richmond Fed Manufacturing Index (Shipments)
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  services_survey:
+    name: "Fifth District Service Sector Survey"
+    category: fed_district
+    district: richmond
+    frequency: monthly
+    urls:
+      - "https://www.richmondfed.org/-/media/RichmondFedOrg/research/regional_economy/surveys_of_business_conditions/services/xls/services_all.xlsx"
+    fred_series: "RICSSVC"  # Richmond Fed Services Index
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+# =============================================================================
+# NEW YORK FEDERAL RESERVE
+# =============================================================================
+new_york_fed:
+  recession_probability:
+    name: "Recession Probability (12-month ahead)"
+    category: fed_district
+    district: new_york
+    frequency: monthly
+    urls:
+      - "https://www.newyorkfed.org/medialibrary/media/research/capital_markets/Prob_Rec.xlsx"
+    fred_series: "RECPROUSM156N"  # Available on FRED!
+    parser: excel_or_fred
+    freshness_hours: 744
+
+  gscpi:
+    name: "Global Supply Chain Pressure Index"
+    category: fed_district
+    district: new_york
+    frequency: monthly
+    urls:
+      - "https://www.newyorkfed.org/medialibrary/media/research/policy/gscpi_data.xlsx"
+    fred_series: "GSCPI"  # NY Fed Global Supply Chain Pressure Index
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+  empire_state_mfg:
+    name: "Empire State Manufacturing Survey"
+    category: fed_district
+    district: new_york
+    frequency: monthly
+    urls:
+      - "https://www.newyorkfed.org/survey/empire/empiresurvey_dl"
+    fred_series: "GACDISA066MSFRBNY"  # General Business Conditions
+    parser: excel_or_fred
+    parser_hints:
+      fred_preferred: true
+    freshness_hours: 744
+
+# =============================================================================
+# CBOE VOLATILITY DATA
+# =============================================================================
+cboe:
+  vix:
+    name: "CBOE Volatility Index (VIX)"
+    category: market_data
+    frequency: daily
+    urls:
+      - "https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_VIX.json"
+    fred_series: "VIXCLS"  # Available on FRED!
+    parser: json_or_fred
+    parser_hints:
+      fred_preferred: false  # CBOE is more current
+      json_path: "data"
+      date_index: 0
+      close_index: 4
+    freshness_hours: 24
+
+  skew:
+    name: "CBOE SKEW Index"
+    category: market_data
+    frequency: daily
+    urls:
+      - "https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_SKEW.json"
+    fred_series: null
+    parser: json
+    parser_hints:
+      json_path: "data"
+      date_index: 0
+      close_index: 4
+    freshness_hours: 24
+
+  vix3m:
+    name: "CBOE 3-Month VIX"
+    category: market_data
+    frequency: daily
+    urls:
+      - "https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_VIX3M.json"
+    fred_series: null
+    parser: json
+    parser_hints:
+      json_path: "data"
+      date_index: 0
+      close_index: 4
+    freshness_hours: 24
+
+# =============================================================================
+# ISM DATA (via FRED)
+# =============================================================================
+ism:
+  manufacturing_pmi:
+    name: "ISM Manufacturing PMI"
+    category: government
+    frequency: monthly
+    urls: []  # Use FRED only
+    fred_series: "NAPM"  # ISM Manufacturing PMI
+    parser: fred_only
+    freshness_hours: 744
+
+  services_pmi:
+    name: "ISM Services PMI"
+    category: government
+    frequency: monthly
+    urls: []
+    fred_series: "NMFCI"  # ISM Non-Manufacturing Composite Index
+    parser: fred_only
+    freshness_hours: 744
+
+# =============================================================================
+# TREASURY DATA
+# =============================================================================
+treasury:
+  yield_curve:
+    name: "Treasury Yield Curve"
+    category: government
+    frequency: daily
+    urls:
+      - "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all"
+    fred_series: "DGS10"  # 10-Year as primary
+    parser: csv_or_fred
+    parser_hints:
+      related_series:
+        - DGS1MO
+        - DGS3MO
+        - DGS6MO
+        - DGS1
+        - DGS2
+        - DGS5
+        - DGS7
+        - DGS10
+        - DGS20
+        - DGS30
+    freshness_hours: 24
+
+# =============================================================================
+# METADATA
+# =============================================================================
+_meta:
+  fallback_strategy: "fred_first_if_preferred"
+  retry_count: 3
+  timeout_seconds: 30
+  cache_hours: 1
+  alert_on_stale: true

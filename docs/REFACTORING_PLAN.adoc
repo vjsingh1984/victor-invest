@@ -1,0 +1,290 @@
+// Refactoring Plan: Separate DB-Driven vs API-Driven Agents
+= Refactoring Plan: Database-Driven vs API-Driven Agent Architecture
+:icons: font
+
+== Design Goal
+
+**Separate fundamental analysis into TWO specialized agents:**
+
+1. **DatabaseFundamentalAgent** - Uses bulk-loaded SEC DERA tables
+   - Data source: sec_sub_data, sec_num_data (ADSH-based)
+   - Best for: Multi-quarter trends, historical analysis
+   - Latency: Low (<1 second)
+   - Staleness: Updated quarterly via SEC DERA bulk downloads
+
+2. **APIFundamentalAgent** - Uses CompanyFacts REST API
+   - Data source: SEC CompanyFacts API
+   - Best for: Latest filings, single-period analysis
+   - Latency: Medium (2-5 seconds)
+   - Freshness: Real-time (reflects latest filings within 24 hours)
+
+**Orchestrator decides which to use based on data availability and freshness.**
+
+== Architecture
+
+=== Current (Monolithic)
+
+```
+FundamentalAnalysisAgent
+├─ _get_financial_data()
+│  ├─ Check cache (mixed DB/API data)
+│  ├─ Try database → flattened mess
+│  ├─ Try API → different structure
+│  └─ Return inconsistent format
+└─ Dual path creates confusion
+```
+
+=== Proposed (Separated)
+
+```
+Orchestrator
+├─ Checks data freshness
+├─ Decides: DB agent OR API agent
+└─ Routes task accordingly
+
+DatabaseFundamentalAgent (NEW)
+├─ Queries sec_sub_data for latest filing
+├─ Gets ADSH
+├─ Fetches tag values from sec_num_data per ADSH
+├─ Supports multi-quarter (8 quarters = 2 years)
+├─ Returns: List[QuarterlyData] with proper fy/fp/adsh
+└─ Cache key: {symbol, fiscal_year, fiscal_period, adsh}
+
+APIFundamentalAgent (NEW)
+├─ Calls SEC CompanyFacts API
+├─ Extracts from us-gaap structure
+├─ Single quarter focus (latest)
+├─ Returns: Dict with flattened metrics + fy/fp from API
+└─ Cache key: {symbol, fiscal_year, fiscal_period, source='api'}
+```
+
+== Implementation Plan
+
+=== Step 1: Create DatabaseFundamentalAgent
+
+**File:** `agents/database_fundamental_agent.py`
+
+```python
+class DatabaseFundamentalAgent(InvestmentAgent):
+    """
+    Fundamental analysis using bulk-loaded SEC DERA tables
+
+    Data source: sec_sub_data + sec_num_data (ADSH-linked)
+    Advantage: Multi-quarter, fast, complete fiscal year data
+    Limitation: Updated quarterly (may be 90 days stale)
+    """
+
+    async def process(self, task: AgentTask) -> AgentResult:
+        symbol = task.context['symbol']
+        cik = task.context['cik']
+        num_quarters = task.context.get('num_quarters', 8)
+
+        # Use sec_data_strategy
+        strategy = get_fiscal_period_strategy()
+
+        # Get last N quarters
+        quarters = strategy.get_multiple_quarters(symbol, cik, num_quarters)
+
+        if not quarters:
+            raise ValueError(f"No bulk data for {symbol}")
+
+        # For each quarter, get tag values via ADSH
+        quarterly_data = []
+        for q in quarters:
+            metrics = strategy.get_num_data_for_adsh(
+                q['adsh'],
+                tags=['Revenues', 'Assets', 'Liabilities', ...]
+            )
+
+            quarterly_data.append(QuarterlyData(
+                fiscal_year=q['fiscal_year'],
+                fiscal_period=q['fiscal_period'],
+                adsh=q['adsh'],
+                revenues=metrics.get('Revenues'),
+                assets=metrics.get('Assets'),
+                ...
+            ))
+
+        # Calculate trends (QoQ, YoY)
+        trend_analysis = self._calculate_trends(quarterly_data)
+
+        return AgentResult(
+            task_id=task.task_id,
+            agent_id=self.agent_id,
+            status=TaskStatus.COMPLETED,
+            result_data={
+                'quarters': [q.to_dict() for q in quarterly_data],
+                'trend_analysis': trend_analysis,
+                'data_source': 'bulk_tables',
+                'num_quarters': len(quarterly_data)
+            },
+            ...
+        )
+```
+
+=== Step 2: Create APIFundamentalAgent
+
+**File:** `agents/api_fundamental_agent.py`
+
+```python
+class APIFundamentalAgent(InvestmentAgent):
+    """
+    Fundamental analysis using SEC CompanyFacts API
+
+    Data source: SEC CompanyFacts API (real-time)
+    Advantage: Latest filings, up-to-date
+    Limitation: Single quarter focus, slower
+    """
+
+    async def process(self, task: AgentTask) -> AgentResult:
+        symbol = task.context['symbol']
+        cik = task.context['cik']
+
+        # Use CompanyFacts extractor
+        extractor = get_sec_companyfacts_extractor()
+        financial_metrics = extractor.extract_financial_metrics(symbol)
+
+        if not financial_metrics:
+            raise ValueError(f"No API data for {symbol}")
+
+        # Extract fiscal period from metrics
+        fiscal_year = financial_metrics.get('fiscal_year')
+        fiscal_period = financial_metrics.get('fiscal_period')
+
+        return AgentResult(
+            task_id=task.task_id,
+            agent_id=self.agent_id,
+            status=TaskStatus.COMPLETED,
+            result_data={
+                'financial_metrics': financial_metrics,
+                'fiscal_year': fiscal_year,
+                'fiscal_period': fiscal_period,
+                'data_source': 'companyfacts_api'
+            },
+            ...
+        )
+```
+
+=== Step 3: Update Orchestrator Routing Logic
+
+**File:** `agents/orchestrator.py`
+
+```python
+def _select_fundamental_agent(self, symbol: str, cik: str) -> str:
+    """
+    Decide which fundamental agent to use based on data availability
+
+    Returns: 'database_fundamental' or 'api_fundamental'
+    """
+    from utils.sec_data_strategy import get_fiscal_period_strategy
+
+    strategy = get_fiscal_period_strategy()
+
+    # Check bulk table freshness
+    fy, fp, adsh = strategy.get_latest_fiscal_period(symbol, cik)
+
+    if fy and fp:
+        age_days = strategy._check_bulk_data_age(cik)
+
+        if age_days is not None and age_days < 90:
+            self.logger.info(
+                f"Using DatabaseFundamentalAgent for {symbol} "
+                f"(bulk data {age_days:.0f} days old)"
+            )
+            return 'database_fundamental'
+
+    # Fallback to API
+    self.logger.info(
+        f"Using APIFundamentalAgent for {symbol} "
+        f"(bulk data unavailable or stale)"
+    )
+    return 'api_fundamental'
+
+async def analyze(self, symbol: str, mode: AnalysisMode, **kwargs):
+    # ... existing code ...
+
+    # Dynamically select fundamental agent
+    fundamental_agent_type = self._select_fundamental_agent(symbol, cik)
+
+    # Build dependency graph with selected agent
+    agents_to_run = {
+        'technical': 'technical_agent',
+        'fundamental': fundamental_agent_type,  # Dynamic!
+        'market_context': 'market_context_agent',
+        'synthesis': 'synthesis_agent'
+    }
+
+    # ... rest of orchestration ...
+```
+
+=== Step 4: Archive Old Code
+
+**Move to archive:**
+
+```bash
+# Archive old monolithic fundamental agent
+mv agents/fundamental_agent.py archive/legacy_agents/fundamental_agent_monolithic.py
+
+# Archive unused SEC extractor paths
+mv utils/sec_companyfacts_extractor.py archive/legacy_utils/
+
+# Document what was archived
+cat > archive/ARCHIVE_LOG.md << 'EOF'
+# Archived Code - 2025-11-02
+
+## Fundamental Agent Refactoring
+
+### Archived:
+- agents/fundamental_agent.py → archive/legacy_agents/fundamental_agent_monolithic.py
+  Reason: Split into DatabaseFundamentalAgent + APIFundamentalAgent
+
+### Replaced By:
+- agents/database_fundamental_agent.py (bulk table driven)
+- agents/api_fundamental_agent.py (CompanyFacts API driven)
+- utils/sec_data_strategy.py (routing logic)
+
+### Why:
+- Separated concerns (DB vs API)
+- Cleaner code paths
+- Better caching strategy
+- Explicit ADSH threading
+EOF
+```
+
+== Benefits
+
+**Code Quality:**
+- ✅ Single Responsibility Principle (each agent one data source)
+- ✅ Explicit dependencies (DB agent needs bulk tables, API agent needs network)
+- ✅ Easier testing (mock database OR mock API, not both)
+- ✅ Clear caching strategy (different TTLs for DB vs API)
+
+**Performance:**
+- ✅ DB agent: <1 second (local database)
+- ✅ API agent: 2-5 seconds (network call)
+- ✅ Orchestrator chooses fastest available option
+
+**Multi-Quarter Analysis:**
+- ✅ DB agent natively supports 8 quarters
+- ✅ API agent focuses on latest quarter
+- ✅ No mixing of data sources (consistent structure)
+
+**Caching:**
+- ✅ DB agent: Cache per ADSH (precise invalidation)
+- ✅ API agent: Cache per symbol+period (simpler)
+- ✅ No confusion about data source
+
+== Migration Path
+
+**Phase 1:** Create new agents (parallel development)
+**Phase 2:** Update orchestrator routing
+**Phase 3:** Test with both agents
+**Phase 4:** Archive old agent
+**Phase 5:** Update documentation
+
+**Rollback:** Keep old agent in archive for 30 days
+
+---
+*Design Status:* Ready for implementation +
+*Estimated Effort:* 8-10 hours +
+*Risk:* Low (old agent archived, not deleted)

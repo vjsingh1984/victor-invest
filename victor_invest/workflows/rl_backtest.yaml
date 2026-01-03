@@ -1,0 +1,66 @@
+# RL Backtest Workflow
+# ====================
+# Historical backtesting for RL training data generation
+# Pure compute pipeline - no LLM calls
+
+workflows:
+  rl_backtest:
+    description: "Historical backtesting for RL training data generation"
+
+    metadata:
+      version: "1.0"
+      author: "victor_invest"
+      vertical: investment
+      expected_duration_seconds: 300
+      llm_calls: 0
+
+    nodes:
+      # =====================================================================
+      # Stage 1: Generate Lookback Dates
+      # =====================================================================
+      - id: generate_dates
+        type: compute
+        name: "Generate Lookback Dates"
+        handler: generate_lookback_dates
+        constraints:
+          llm_allowed: false
+          timeout: 10
+        output: lookback_dates
+        next: [process_dates]
+
+      # =====================================================================
+      # Stage 2: Process Backtest Dates
+      # =====================================================================
+      - id: process_dates
+        type: compute
+        name: "Process Backtest Dates"
+        handler: process_backtest_batch
+        constraints:
+          llm_allowed: false
+          timeout: 3600
+        input_mapping:
+          lookback_dates: lookback_dates
+        output: backtest_results
+        next: [save_results]
+
+      # =====================================================================
+      # Stage 3: Save Results
+      # =====================================================================
+      - id: save_results
+        type: compute
+        name: "Save Backtest Results"
+        handler: save_rl_predictions
+        constraints:
+          llm_allowed: false
+          timeout: 60
+        input_mapping:
+          backtest_results: backtest_results
+        output: saved_predictions
+        next: [complete]
+
+      - id: complete
+        type: transform
+        name: "Backtest Complete"
+        transform: |
+          workflow_status = "completed"
+          analysis_mode = "rl_backtest"

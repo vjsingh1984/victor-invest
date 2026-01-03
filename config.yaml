@@ -1,0 +1,2268 @@
+#
+# InvestiGator Configuration (Single Source of Truth)
+#
+# This file consolidates all configuration previously spread across:
+# - config.json
+# - src/investigator/config/config.py
+# - Environment variables
+#
+# Environment variable substitution supported with syntax: ${VAR_NAME:-default_value}
+# Example: password: ${DB_PASSWORD:-investigator}
+#
+
+# =============================================================================
+# Application Settings
+# =============================================================================
+application:
+  name: InvestiGator
+  version: 0.1.0
+  environment: development  # development | production
+  debug: false
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+database:
+  host: ${DB_HOST:-localhost}
+  port: 5432
+  database: sec_database
+  username: investigator
+  password: ${DB_PASSWORD:-investigator}  # Environment variable with default
+  pool_size: 10
+  max_overflow: 20
+
+# =============================================================================
+# SEC EDGAR API Configuration
+# =============================================================================
+sec:
+  user_agent: "InvestiGator/1.0 (research@example.com)"
+  base_url: "https://data.sec.gov/"
+  rate_limit: 10  # requests per second
+  cache_dir: data/sec_cache
+  ticker_cache_file: data/ticker_cik_map.txt
+  max_retries: 3
+  timeout: 30
+  max_periods_to_analyze: 8
+  require_submissions: false
+  include_amended_filings: true
+
+# =============================================================================
+# Ollama LLM Configuration
+# =============================================================================
+ollama:
+  base_url: http://localhost:11434
+  keep_alive: -1  # -1 = keep models loaded indefinitely
+  timeout: 1800
+  max_retries: 3
+  min_context_size: 4096
+  num_llm_threads: 1
+
+  # Multi-server pool configuration
+  pool_strategy: prefer_remote  # most_capacity | prefer_remote | round_robin
+
+  servers:
+    # M1 Max (localhost) - Primary server with most models
+    - url: http://localhost:11434
+      total_ram_gb: 64
+      usable_ram_gb: 46        # Unified memory: 46GB available for VRAM
+      metal: true
+      max_concurrent: 3
+      priority: 0              # Local = highest priority (lowest number)
+      description: "M1 Max MacBook Pro - llama3.3:70b, deepseek-r1:70b, qwen3:30b, etc."
+
+    # M4 Max #1 (${OLLAMA_HOST_M4:-localhost}) - Remote Apple Silicon
+    - url: http://${OLLAMA_HOST_M4:-localhost}:11434
+      total_ram_gb: 32
+      usable_ram_gb: 32        # Unified memory: full 32GB VRAM
+      metal: true
+      max_concurrent: 2
+      priority: 100            # Remote = lower priority
+      description: "M4 Max Mac - qwen3:30b, qwen2.5-coder:32b, gpt-oss:20b"
+
+    # Windows RTX 4000 Ada (${OLLAMA_HOST_WIN:-localhost}) - Dedicated GPU + shared
+    - url: http://${OLLAMA_HOST_WIN:-localhost}:11434
+      total_ram_gb: 84         # 20GB VRAM + 64GB system RAM
+      usable_ram_gb: 20        # Only 20GB dedicated VRAM is fast
+      metal: false             # CUDA, not Metal
+      max_concurrent: 2
+      priority: 50             # Medium priority - GPU is fast but smaller
+      description: "Windows RTX 4000 Ada - gpt-oss:120b, deepseek-r1:70b, llama3.3:70b"
+
+  # Model assignments for different analysis types
+  # NOTE: All models below are available on ALL 3 servers for optimal load balancing
+  models:
+    fundamental_analysis: qwen3:30b      # 18.6GB - Available: localhost, M4Max, Windows
+    quarterly_analysis: qwen3:30b        # 18.6GB - Available: localhost, M4Max, Windows
+    technical_analysis: qwen3:30b        # 18.6GB - Available: localhost, M4Max, Windows
+    market_context: qwen3:30b            # 18.6GB - Available: localhost, M4Max, Windows
+    summary: qwen3:30b                   # 18.6GB - Available: localhost, M4Max, Windows
+    comparison: qwen3:30b                # 18.6GB - Available: localhost, M4Max, Windows
+    decision: qwen3:30b                  # 18.6GB - Available: localhost, M4Max, Windows
+    comprehensive_analysis: qwen3:30b    # 18.6GB - Available: localhost, M4Max, Windows
+    synthesis: qwen3:30b                 # 18.6GB - Available: localhost, M4Max, Windows
+    risk_assessment: qwen3:30b           # 18.6GB - Available: localhost, M4Max, Windows
+    quick_analysis: deepseek-coder-v2:16b # 10GB - Available: localhost, M4Max, Windows (fast)
+
+  # Model specifications (VRAM, context, capabilities)
+  model_specs:
+    deepseek-r1:32b:
+      context_window: 32768
+      parameters: "32.8B"
+      memory_gb: 19.0
+      reasoning_score: 0.98
+      thinking_capability: true
+      default_num_predict: 6144
+      max_num_predict: 16384
+      architecture: qwen2
+      weights_vram_gb: 19.0
+      kv_cache_mb_per_1k_tokens: 384
+      kv_cache_overhead_pct: 0.15
+
+    qwen3:30b:
+      context_window: 262144
+      parameters: "30.5B"
+      memory_gb: 16.2
+      reasoning_score: 0.97
+      thinking_capability: true
+      default_num_predict: 4096
+      max_num_predict: 16384
+      architecture: qwen3moe
+      weights_vram_gb: 16.2
+      kv_cache_mb_per_1k_tokens: 256
+      kv_cache_overhead_pct: 0.15
+
+    qwen3:32b:
+      context_window: 40960
+      parameters: "32.8B"
+      memory_gb: 18
+      reasoning_score: 0.96
+      thinking_capability: true
+      default_num_predict: 4096
+      max_num_predict: 8192
+      architecture: qwen3
+      weights_vram_gb: 18
+      kv_cache_mb_per_1k_tokens: 256
+      kv_cache_overhead_pct: 0.15
+
+    llama3.3:70b:
+      context_window: 131072
+      parameters: "70.6B"
+      memory_gb: 37.8
+      reasoning_score: 0.99
+      thinking_capability: true
+      default_num_predict: 4096
+      max_num_predict: 16384
+      architecture: llama
+      weights_vram_gb: 37.8
+      kv_cache_mb_per_1k_tokens: 256
+      kv_cache_overhead_pct: 0.15
+
+    llama3.1:8b:
+      context_window: 131072
+      parameters: "8.0B"
+      memory_gb: 4.5
+      reasoning_score: 0.92
+      thinking_capability: false
+      default_num_predict: 2048
+      max_num_predict: 8192
+      architecture: llama
+      weights_vram_gb: 4.5
+      kv_cache_mb_per_1k_tokens: 256
+      kv_cache_overhead_pct: 0.15
+
+  # Token limits per analysis type
+  num_predict:
+    fundamental_analysis: 4096
+    quarterly_analysis: 4096
+    technical_analysis: 6144
+    market_context: 4096
+    summary: 2048
+    comparison: 4096
+    decision: 6144
+    comprehensive_analysis: 4096
+    synthesis: 8192
+    risk_assessment: 4096
+    quick_analysis: 2048
+
+  # TOON format (Token-Oriented Object Notation)
+  use_toon_format: false
+  toon_agents:
+    technical_analysis: true
+    fundamental_analysis: true
+    synthesis: true
+    market_context: false
+    valuation: false
+
+# =============================================================================
+# Cache Control Configuration
+# =============================================================================
+cache_control:
+  # Global cache behavior
+  read_from_cache: true
+  write_to_cache: true
+  force_refresh: false
+  force_refresh_symbols: null
+
+  # Storage backends
+  storage:
+    - disk
+    - rdbms
+
+  # Enabled cache types
+  types:
+    - sec_response
+    - llm_response
+    - technical_data
+    - submission_data
+    - company_facts
+    - quarterly_metrics
+    - market_context
+
+  # Disk structure configuration
+  disk_structure:
+    use_symbol_directories: true
+    compression:
+      enabled: true
+      algorithm: gzip
+      level: 9
+      apply_to_all: true
+      file_extensions:
+        - .json
+        - .txt
+        - .parquet
+        - .csv
+        - .log
+
+    base_paths:
+      sec_cache: data/sec_cache
+      llm_cache: data/llm_cache
+      technical_cache: data/technical_cache
+      market_context_cache: data/market_context_cache
+
+    directory_structure:
+      sec_cache: "{base_path}/{cache_type}/{symbol}/"
+      llm_cache: "{base_path}/{symbol}/"
+      technical_cache: "{base_path}/{symbol}/"
+      market_context_cache: "{base_path}/"
+
+  # Industry metrics cache configuration
+  industry_metrics:
+    storage_backend: parquet  # parquet | postgresql (parquet is default, zero dependencies)
+    parquet_path: data/industry_metrics_cache
+    compression: gzip
+    ttl_days: 7  # Default time-to-live for cached metrics (null = no expiry)
+
+# =============================================================================
+# Analysis Configuration
+# =============================================================================
+analysis:
+  fundamental_weight: 0.6
+  technical_weight: 0.4
+  min_score_for_buy: 7.0
+  max_score_for_sell: 4.0
+  lookback_days: 365
+  min_volume: 1000000
+  max_prompt_tokens: 32768
+
+# =============================================================================
+# Orchestrator Configuration
+# =============================================================================
+orchestrator:
+  max_concurrent_analyses: 5
+  max_concurrent_agents: 10
+  task_dependency_max_retries: 100
+  task_dependency_backoff_seconds: 0.5
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+monitoring:
+  enabled: true
+  export_interval: 60
+  metrics_port: 9090
+
+# =============================================================================
+# Email Notifications (Optional)
+# =============================================================================
+email:
+  enabled: false
+  smtp_server: smtp.gmail.com
+  smtp_port: 587
+  use_tls: true
+  username: ""
+  password: ""
+  from_address: investigator@example.com
+  recipients: []
+
+# =============================================================================
+# Tracking Symbols
+# =============================================================================
+tracking:
+  symbols:
+    - AAPL
+    - MSFT
+    - GOOGL
+    - AMZN
+    - TSLA
+    - NVDA
+    - META
+    - NFLX
+    - V
+    - MA
+
+# =============================================================================
+# Vector Database (Optional)
+# =============================================================================
+vector_db:
+  enabled: false
+  db_path: data/vector_db
+  embedding_model: all-MiniLM-L6-v2
+
+# =============================================================================
+# Valuation Configuration
+# =============================================================================
+valuation:
+  sector_multiples_path: config/sector_multiples.json
+  sector_multiples_freshness_days: 7
+  sector_multiples_delta_threshold: 0.15
+  liquidity_floor_usd: 5000000
+  ggm_payout_threshold_pct: 40.0
+
+  # =============================================================================
+  # Sector Multiples (Single Source of Truth)
+  # =============================================================================
+  # These are used by rl_backtest.py, valuation.py, and all valuation consumers
+  # Previously hardcoded in multiple locations; now centralized here
+  sector_multiples:
+    # P/E multiples by sector (see pe_multiples.sector_defaults for primary P/E config)
+    # These are fallback values when sector median not available
+    pe:
+      Technology: 28
+      Healthcare: 22
+      Financials: 12
+      Consumer Cyclical: 20
+      Consumer Discretionary: 20
+      Consumer Defensive: 22
+      Consumer Staples: 22
+      Industrials: 18
+      Energy: 12
+      Materials: 15
+      Real Estate: 35
+      Utilities: 18
+      Communication Services: 20
+      Default: 18
+
+    # P/S multiples by sector
+    ps:
+      Technology: 6
+      Healthcare: 4
+      Financials: 3
+      Consumer Cyclical: 1.5
+      Consumer Discretionary: 1.5
+      Consumer Defensive: 2
+      Consumer Staples: 2
+      Industrials: 1.5
+      Energy: 1
+      Materials: 1.2
+      Real Estate: 8
+      Utilities: 2
+      Communication Services: 3
+      Default: 2
+
+    # P/B multiples by sector
+    pb:
+      Technology: 5
+      Healthcare: 4
+      Financials: 1.2
+      Consumer Cyclical: 3
+      Consumer Discretionary: 3
+      Consumer Defensive: 4
+      Consumer Staples: 4
+      Industrials: 3
+      Energy: 1.5
+      Materials: 2
+      Real Estate: 1.5
+      Utilities: 1.8
+      Communication Services: 3
+      Default: 2.5
+
+    # EV/EBITDA multiples by sector
+    ev_ebitda:
+      Technology: 18
+      Healthcare: 14
+      Financials: 8
+      Consumer Cyclical: 12
+      Consumer Discretionary: 12
+      Consumer Defensive: 14
+      Consumer Staples: 14
+      Industrials: 10
+      Energy: 6
+      Materials: 8
+      Real Estate: 18
+      Utilities: 10
+      Communication Services: 10
+      Default: 10
+
+  # =============================================================================
+  # CAPM Parameters (Single Source of Truth)
+  # =============================================================================
+  # Used for cost of equity calculations across all valuation paths
+  capm:
+    risk_free_rate: 0.04          # 4% - 10-year Treasury proxy
+    market_equity_premium: 0.05   # 5% - Historical equity risk premium
+
+  # =============================================================================
+  # GGM (Gordon Growth Model) Defaults
+  # =============================================================================
+  # Used when dividend-based valuation is applicable
+  ggm_defaults:
+    growth_rate: 0.03             # 3% default perpetual growth
+    cost_of_equity: 0.08          # 8% default cost of equity
+    min_payout_ratio: 0.20        # 20% minimum payout ratio for GGM applicability
+
+  # =============================================================================
+  # Growth Assumptions
+  # =============================================================================
+  # Default growth rate assumptions used across valuation models
+  growth_assumptions:
+    forward_eps_growth_pct: 0.10  # 10% default forward EPS growth
+
+  # =============================================================================
+  # Fallback Calculations
+  # =============================================================================
+  # Used when primary calculations fail or data is missing
+  fallbacks:
+    dcf_simple_multiplier: 12     # 12x FCF as simple DCF fallback
+    ebitda_da_approximation_pct: 0.05  # 5% of assets as D&A proxy when missing
+
+  # Deterministic Processing - Replace LLM calls with rule-based computation
+  # This reduces token costs and improves response times
+  deterministic:
+    enabled: true                    # Master switch for deterministic processing
+    valuation_synthesis: true        # Replace valuation synthesis LLM with rules
+    competitive_analysis: true       # Replace competitive position LLM with Porter's Five Forces rules
+    conflict_resolution: true        # Replace conflict reconciliation LLM with rules
+    insight_extraction: true         # Replace key insight extraction LLM with rules
+    thesis_generation: true          # Replace investment thesis LLM with templates
+
+  # Fading DCF thresholds
+  fading_dcf_thresholds:
+    fcf_growth_pct: 15.0
+    revenue_growth_pct: 10.0
+    rule_of_40_score: 40.0
+
+  # Sector normalization mapping
+  sector_normalization:
+    Technology: [Technology, Information Technology, Tech]
+    Financials: [Financials, Financial Services, Finance]
+    Banks: [Banks, Banking, Commercial Banks, Diversified Banks]
+    Healthcare: [Healthcare, Health Care, Pharmaceuticals]
+    Energy: [Energy, Oil & Gas]
+    Materials: [Materials, Basic Materials]
+    Industrials: [Industrials, Industrial]
+    Consumer Cyclical: [Consumer Cyclical, Consumer Discretionary]
+    Consumer Defensive: [Consumer Defensive, Consumer Staples]
+    Real Estate: [Real Estate, REITs]
+    Utilities: [Utilities, Utility]
+    Communication Services: [Communication Services, Telecommunications]
+
+  # Tier detection thresholds
+  # NOTE: payout_ratio values are in ratio format (0.0-1.0), e.g., 0.40 = 40%
+  tier_thresholds:
+    dividend_aristocrat:
+      min_payout_ratio: 0.40  # Ratio format: 0.40 = 40%
+      max_revenue_growth_pct: 5.0
+      sub_tier_growth_cutoff: 5.0
+      description: "Companies with payout ≥40% are dividend-focused"
+
+    high_growth:
+      min_rule_of_40: 40.0
+      min_revenue_growth_pct: 15.0
+      hyper_growth_rule_of_40: 60.0
+      description: "High-growth tech/SaaS companies"
+
+    growth_hybrid:
+      min_payout_ratio: 0.20  # Ratio format: 0.20 = 20%
+      max_payout_ratio: 0.40  # Ratio format: 0.40 = 40%
+      min_rule_of_40: 25.0
+      min_revenue_growth_pct: 8.0
+      description: "Growth companies that pay moderate dividends"
+
+    mature_fcf_machine:
+      min_fcf_margin_pct: 20.0
+      max_revenue_growth_pct: 8.0
+      max_payout_ratio: 20.0
+      description: "Mature companies with exceptional FCF generation"
+
+    cyclical:
+      sectors: [Energy, Materials, Basic Materials]
+      description: "Commodity-driven cyclical companies"
+
+    # P0-2: Semiconductor cyclical tier - designed for boom/bust semiconductor cycle
+    # Backtest analysis showed semiconductors achieve 0.50-0.70 avg reward with sector-specific modeling
+    semiconductor_cyclical:
+      industries:
+        - "Semiconductors"
+        - "Semiconductor Equipment"
+        - "Semiconductors & Semiconductor Equipment"
+        - "Semiconductor Equipment & Materials"
+      # Cycle-adjusted valuation parameters
+      parameters:
+        peak_margin_discount: 0.20      # 20% discount when at cycle peak margins
+        trough_margin_premium: 0.15     # 15% premium when at cycle trough
+        terminal_growth: 0.025          # 2.5% - semiconductor industry growth
+        terminal_margin: 0.25           # 25% mid-cycle margin
+        inventory_to_sales_threshold: 0.15  # >15% inventory/sales = cycle warning
+      description: "Semiconductors with inventory-driven cycle dynamics"
+
+    financial_services:
+      sectors: [Financials, Financial Services, Banks]
+      sub_categories:
+        traditional_banks: [Banks, Commercial Banks, Regional Banks]
+        asset_managers: [Asset Management, Investment Banking, Insurance]
+      description: "Financial services companies"
+
+    # V2: SaaS growth tier thresholds
+    saas_growth:
+      industries:
+        - "Software - Application"
+        - "Software - Infrastructure"
+        - "Information Technology Services"
+        - "Internet Content & Information"
+        - "Software"
+        - "Internet Software & Services"
+        - "EDP Services"                    # Electronic Data Processing (e.g., ZS, CRWD)
+        - "Packaged Software"
+        - "Data Processing & Outsourced Services"
+      rule_of_40_hyper_growth: 60
+      rule_of_40_strong: 40
+
+    # Auto Manufacturing tier thresholds
+    # Addresses: 0.254 avg reward with 199% error rate - worst performing major industry
+    auto_manufacturing:
+      # Industry name patterns to match (case-insensitive)
+      industries:
+        - "Auto Manufacturing"
+        - "Automobile Manufacturers"
+        - "Motor Vehicles"
+        - "Auto Manufacturers"
+        - "Automotive"
+        - "Auto - Manufacturers"
+        - "Automobiles"
+      # EV transition premium thresholds (based on EV revenue percentage)
+      ev_transition:
+        ev_leader_threshold: 0.50      # >50% EV revenue = EV leader
+        transitioning_threshold: 0.25   # 25-50% = transitioning
+        emerging_threshold: 0.10        # 10-25% = emerging EV
+        ev_leader_premium: 0.20         # 20% valuation premium for EV leaders
+        transitioning_premium: 0.10     # 10% premium for transitioning
+        emerging_premium: 0.05          # 5% premium for emerging
+      # Capex burden detection
+      capex_burden:
+        high_intensity_threshold: 1.5   # Capex/Depreciation > 1.5x = high capital intensity
+        warning_threshold: 2.0          # Capex/Depreciation > 2.0x = warning flag
+      # Terminal growth constraints (industry barely grows)
+      terminal_growth: 0.02             # 2% terminal growth (vs 3% default)
+      # Terminal margin range (much lower than tech)
+      terminal_margin_range:
+        min: 0.06                        # 6% minimum terminal margin
+        max: 0.08                        # 8% maximum terminal margin
+      description: "Auto manufacturers with cyclical earnings and high capex requirements"
+
+  # Base tier weights for valuation models
+  tier_base_weights:
+    pre_profit_high_growth:
+      ps: 60
+      dcf: 30
+      ev_ebitda: 10
+      pe: 0
+      pb: 0
+      ggm: 0
+
+    pre_profit_negative_ebitda:
+      ps: 100
+      dcf: 0
+      ev_ebitda: 0
+      pe: 0
+      pb: 0
+      ggm: 0
+
+    pre_profit_positive_ebitda:
+      # BACKTEST UPDATE 2025-12-30: Negative rewards (-0.085), 0% win rate
+      # PS-heavy approach failing; add EV/EBITDA weight since EBITDA is positive
+      ps: 50            # Reduced: Over-reliance on PS was failing
+      ev_ebitda: 40     # Increased: EBITDA positive means EV/EBITDA applicable
+      dcf: 5            # Added: Some DCF for FCF-positive cases
+      pe: 5             # Added: May have positive EPS in some quarters
+      pb: 0
+      ggm: 0
+
+    dividend_aristocrat_pure:
+      ggm: 60
+      dcf: 20
+      pe: 15
+      ev_ebitda: 5
+      ps: 0
+      pb: 0
+
+    dividend_aristocrat_growth:
+      # BACKTEST UPDATE 2025-12-31: EV/EBITDA had 20.6% error (lowest)
+      ev_ebitda: 35     # Increased: Best accuracy in backtest
+      dcf: 30           # Maintained
+      ggm: 20           # Reduced
+      pe: 15            # Maintained
+      ps: 0
+      pb: 0
+
+    # High Dividend Payer tiers - for companies with 40%+ payout but NOT true aristocrats
+    # True Dividend Aristocrats require 25+ years of consecutive dividend increases
+    # These companies have high payouts but shorter track records (like ORCL with 11 years)
+    # Use more balanced weights with less GGM emphasis since dividend history is shorter
+    high_dividend_payer_mature:
+      # Mature high-payout companies (low growth, stable dividends)
+      # BACKTEST UPDATE 2025-12-31: P/S had 37.9% error (lowest)
+      ps: 35            # Increased: Best accuracy in backtest
+      pe: 30            # Slightly reduced
+      dcf: 20           # Reduced
+      ggm: 10           # Reduced
+      ev_ebitda: 5
+      pb: 0
+
+    high_dividend_payer_growth:
+      # Growing high-payout companies (revenue growth > 5%)
+      dcf: 35
+      pe: 30
+      ggm: 20
+      ev_ebitda: 15
+      ps: 0
+      pb: 0
+
+    high_growth_hyper:
+      # BACKTEST UPDATE 2025-12-31: Reward -0.387 (worst), need rebalancing
+      ps: 40            # Primary: Revenue growth key for hypergrowth
+      ev_ebitda: 30     # Increased: More stable metric
+      dcf: 20           # Reduced: FCF often negative for hypergrowth
+      pe: 10            # Reduced
+      pb: 0
+      ggm: 0
+
+    high_growth_strong:
+      # BACKTEST UPDATE 2025-12-31: GGM had 59.8% error (lowest), reward -0.272
+      dcf: 35           # Reduced
+      ggm: 25           # Added: Best accuracy in backtest
+      ps: 20            # Reduced
+      pe: 15            # Reduced
+      ev_ebitda: 5
+      pb: 0
+
+    # V1: Traditional bank tier weights (P/B primary for asset-heavy banks)
+    # BACKTEST UPDATE 2025-12-30: Good reward (0.427) but 101.7% avg error
+    # Error comes from extreme valuations; increase PE for earnings focus
+    financial_traditional_bank:
+      pe: 35            # Increased: Earnings more stable metric for banks
+      pb: 30            # Slightly reduced but still important for banks
+      dcf: 20           # Maintained: DCF works for stable banks
+      ev_ebitda: 10     # Reduced: Less relevant for financials
+      ggm: 5            # Maintained: Dividend component
+      ps: 0
+
+    # V2: SaaS growth tiers based on Rule of 40
+    saas_hyper_growth:
+      ps: 35
+      ev_ebitda: 30
+      dcf: 25
+      pe: 10
+      pb: 0
+      ggm: 0
+    saas_growth_strong:
+      ps: 30
+      dcf: 30
+      ev_ebitda: 25
+      pe: 15
+      pb: 0
+      ggm: 0
+    saas_maturing:
+      # BACKTEST UPDATE 2025-12-31: EV/EBITDA had 48.2% error (lowest)
+      ev_ebitda: 40     # Increased: Best accuracy in backtest
+      dcf: 30           # Reduced
+      pe: 20            # Maintained
+      ps: 10            # Reduced
+      pb: 0
+      ggm: 0
+
+    financial_asset_manager:
+      # BACKTEST UPDATE 2025-12-31: Reward -0.312, EV/EBITDA had 52.3% error (lowest)
+      ev_ebitda: 40     # Added: Best accuracy in backtest
+      pe: 35            # Reduced
+      pb: 15            # Reduced
+      dcf: 10           # Reduced
+      ps: 0
+      ggm: 0
+
+    # Insurance company tiers - use P/BV as primary valuation
+    # Insurance companies have unique cash flow characteristics (float, reserves)
+    # that make DCF less applicable. Book value is the standard metric.
+    insurance_high_quality:
+      # High-quality insurers (ROE >= 12%): P/BV 1.2-1.5x
+      # BACKTEST UPDATE 2025-12-31: DCF had 19.9% error (lowest)
+      dcf: 40           # Increased: Best accuracy in backtest
+      pb: 35            # Reduced but still important for insurers
+      pe: 20            # Maintained
+      ev_ebitda: 5      # Small weight
+      ps: 0
+      ggm: 0
+
+    insurance_average:
+      # Average insurers (ROE 8-12%): P/BV 0.9-1.2x
+      dcf: 35           # Increased based on backtest findings
+      pb: 40            # Slightly reduced
+      pe: 20            # Maintained
+      ev_ebitda: 5
+      ps: 0
+      ggm: 0
+
+    insurance_challenged:
+      # Challenged insurers (ROE < 8%): P/BV 0.7-0.9x
+      # BACKTEST UPDATE 2025-12-31: DCF had 14.2% error (lowest of all tiers!)
+      dcf: 50           # Significantly increased: Best accuracy
+      pb: 30            # Reduced
+      pe: 15            # Maintained
+      ev_ebitda: 5
+      ps: 0
+      ggm: 0
+
+    # REIT tiers - FFO-based valuation (P1-C)
+    # REITs require special valuation: P/E is misleading due to depreciation
+    # FFO (Funds From Operations) is the standard metric for REITs
+    # Property type determines multiple ranges and growth expectations
+    reit_premium_growth:
+      # High-growth property types: data centers, cell towers, industrial/logistics
+      # Trade at 20-26x FFO due to secular growth tailwinds
+      ev_ebitda: 40    # Proxy for FFO-based valuation
+      pe: 25           # Secondary (use P/FFO interpretation)
+      pb: 20           # NAV component
+      dcf: 15          # Limited due to depreciation distortions
+      ps: 0
+      ggm: 0
+
+    reit_core:
+      # Core property types: residential, healthcare, net lease, self-storage
+      # Trade at 14-20x FFO with moderate growth
+      ev_ebitda: 35    # Proxy for FFO-based valuation
+      pe: 30           # P/FFO interpretation
+      pb: 25           # NAV component
+      dcf: 10          # Limited applicability
+      ps: 0
+      ggm: 0
+
+    reit_value:
+      # Value/challenged property types: office, retail/malls
+      # Trade at 8-15x FFO with structural headwinds
+      pb: 40           # NAV-focused (liquidation value matters)
+      ev_ebitda: 30    # Proxy for FFO
+      pe: 20           # Reduced weight due to distortions
+      dcf: 10          # Limited applicability
+      ps: 0
+      ggm: 0
+
+    cyclical_commodity:
+      ev_ebitda: 40
+      dcf: 30
+      pe: 15
+      pb: 15
+      ps: 0
+      ggm: 0
+
+    # P0-2: Semiconductor cyclical tier - accounts for boom/bust cycles
+    # Semiconductors have unique characteristics: high capital intensity, cyclical margins,
+    # inventory-driven cycles, and strong mean reversion in valuations.
+    # BACKTEST UPDATE 2025-12-30: REVERTED - Reducing DCF made performance WORSE
+    # DCF provides stabilizing anchor even when raw reward looks low
+    semiconductor_cyclical:
+      ev_ebitda: 40     # Primary - normalized for cycles
+      dcf: 25           # REVERTED: DCF provides stability anchor for cyclicals
+      pe: 25            # Balanced with DCF
+      pb: 10            # Tangible assets
+      ps: 0
+      ggm: 0
+
+    cyclical_integrated:
+      ev_ebitda: 35
+      dcf: 35
+      pe: 20
+      pb: 10
+      ps: 0
+      ggm: 0
+
+    # Defense Contractor tier - backlog-adjusted valuation
+    # Defense contractors have unique characteristics:
+    # - Multi-year government contract visibility (backlog)
+    # - Stable margins due to cost-plus contracts
+    # - Lower growth but high cash flow predictability
+    # BACKTEST UPDATE 2025-12-30: Low reward (0.188) despite 100% win rate
+    # DCF may be over-weighted; PE more reliable for stable government contractors
+    defense_contractor:
+      # BACKTEST UPDATE 2025-12-31: P/S had 26.4% error (lowest)
+      ps: 35            # Increased: Best accuracy in backtest
+      pe: 30            # Slightly reduced
+      ev_ebitda: 25     # Maintained: Good for comparables
+      dcf: 10           # Reduced significantly
+      pb: 0
+      ggm: 0
+
+    # Auto Manufacturing EV Leader tier (TSLA, RIVN, LCID, NIO)
+    # EV leaders have unique characteristics that break traditional valuation:
+    # - Volatile/negative FCF due to massive CapEx (Gigafactories, expansion)
+    # - High revenue growth but unpredictable earnings
+    # - Valued on market potential and revenue trajectory, not current profitability
+    # BACKTEST ANALYSIS 2025-12-31: Tier had 0.047 avg reward (worst tier)
+    # Root cause: DCF producing negative values (-$6.81 for TSLA) due to negative FCF
+    # Solution: Revenue-based valuation (P/S primary), minimal DCF
+    auto_manufacturing_ev_leader:
+      ps: 45            # Primary: Revenue growth is the key driver for EV pure-plays
+      ev_ebitda: 30     # Secondary: When EBITDA positive, provides grounding
+      pe: 15            # Tertiary: Volatile earnings, use cautiously
+      pb: 10            # Some asset value for manufacturing base
+      dcf: 0            # EXCLUDED: Negative/volatile FCF makes DCF unreliable
+      ggm: 0            # No dividends for growth companies
+
+    # Auto Manufacturing Transitioning (F, GM moving to EV)
+    # Traditional automakers transitioning to EV have different characteristics:
+    # - More stable (though declining) ICE revenue
+    # - Growing EV revenue but still minority
+    # - More predictable FCF from legacy business
+    auto_manufacturing_transitioning:
+      ev_ebitda: 35     # Primary: EBITDA more stable than pure EV plays
+      pe: 30            # Earnings from legacy business more reliable
+      dcf: 20           # FCF from legacy business is predictable
+      ps: 10            # Some revenue-based component
+      pb: 5             # Asset value
+      ggm: 0
+
+    # Auto Manufacturing Traditional (Toyota, Honda - ICE-focused)
+    auto_manufacturing_traditional:
+      pe: 35            # Primary: Stable earnings from ICE
+      ev_ebitda: 30     # Standard industrial valuation
+      dcf: 25           # Predictable FCF
+      pb: 10            # Asset-heavy manufacturing
+      ps: 0
+      ggm: 0
+
+    growth_hybrid_tech:
+      dcf: 35
+      pe: 30
+      ev_ebitda: 20
+      ps: 10
+      ggm: 5
+      pb: 0
+
+    growth_hybrid_industrial:
+      # BACKTEST UPDATE 2025-12-31: Reward -0.435 (worst tier), GGM had 27.3% error
+      ggm: 35           # Increased: Best accuracy in backtest
+      ev_ebitda: 30     # Increased: More stable for industrials
+      dcf: 20           # Reduced
+      pe: 15            # Reduced
+      pb: 0
+      ps: 0
+
+    mature_fcf_tech:
+      dcf: 50
+      pe: 30
+      ev_ebitda: 15
+      ps: 5
+      pb: 0
+      ggm: 0
+
+    mature_fcf_industrial:
+      dcf: 45
+      pe: 25
+      ev_ebitda: 15
+      pb: 15
+      ps: 0
+      ggm: 0
+
+    # Auto Manufacturing tiers - Special handling for automotive industry
+    # Auto manufacturing has unique characteristics:
+    # - Massive cyclicality (earnings swing wildly with economic cycles)
+    # - High capex requirements (factories, tooling, R&D)
+    # - EV transition uncertainty (legacy vs EV investment)
+    # EV/EBITDA preferred as capital-intensive standard, P/B for tangible assets
+    auto_manufacturing_traditional:
+      # Traditional ICE-focused manufacturers (low EV %)
+      ev_ebitda: 40
+      pb: 30
+      pe: 20
+      dcf: 10
+      ps: 0
+      ggm: 0
+
+    auto_manufacturing_transitioning:
+      # Manufacturers actively transitioning to EV (10-50% EV revenue)
+      ev_ebitda: 35
+      pb: 25
+      pe: 20
+      dcf: 15
+      ps: 5
+      ggm: 0
+
+    balanced_default:
+      dcf: 30
+      pe: 25
+      ev_ebitda: 20
+      ps: 15
+      pb: 10
+      ggm: 0
+
+  # Industry-specific weight adjustments
+  industry_specific_weights:
+    "Software - Application":
+      weight_adjustments:
+        ps: "+10%"
+        dcf: "-10%"
+      reason: "SaaS companies - P/S more reliable than DCF due to subscription model"
+
+    "Software - Infrastructure":
+      weight_adjustments:
+        ps: "+10%"
+        dcf: "-10%"
+
+    Biotechnology:
+      tier_override: pre_profit
+      weight_adjustments:
+        ps: "100%"
+      reason: "Often pre-revenue with only pipeline value"
+
+    REITs:
+      tier_override: dividend_aristocrat
+      weight_adjustments:
+        ggm: "+15%"
+        pb: "+10%"
+        dcf: "-25%"
+      reason: "REITs required to pay 90%+ of income as dividends, P/B important for property value"
+
+    "Regional Banks":
+      tier_override: financial_services
+      weight_adjustments:
+        pb: "+10%"
+        pe: "-10%"
+      reason: "P/B more reliable for regional banks than money-center banks"
+
+    Semiconductors:
+      weight_adjustments:
+        dcf: "+10%"
+        pe: "-10%"
+      reason: "Cyclical earnings make P/E less reliable, DCF with through-cycle assumptions better"
+
+    "Electric Utilities":
+      weight_adjustments:
+        ggm: "+10%"
+        pb: "+5%"
+        ps: "-15%"
+      reason: "Regulated dividend payers with significant asset base"
+
+    # V3: Telecom equipment reclassification
+    "Telecommunications Equipment":
+      tier_override: high_growth_strong
+      reason: "Telecom equipment follows technology valuation patterns"
+    "Computer Communications Equipment":
+      tier_override: high_growth_strong
+      reason: "Network equipment follows technology valuation patterns"
+
+  # Model applicability rules
+  # NOTE: payout_ratio thresholds are in ratio format (0.0-1.0), e.g., 0.40 = 40%
+  model_applicability:
+    ggm:
+      required_fields: [dividends, net_income]
+      required_positive: [dividends, net_income]
+      min_payout_ratio: 0.40  # Ratio format: 0.40 = 40%
+      description: "Gordon Growth Model requires positive dividends and earnings"
+
+    dcf:
+      required_fields: [free_cash_flow]
+      min_quarters_data: 4
+      description: "DCF requires at least 4 quarters of FCF data"
+
+    pe:
+      required_fields: [net_income]
+      required_positive: [net_income]
+      description: "P/E requires positive earnings"
+
+    ps:
+      required_fields: [revenue]
+      required_positive: [revenue]
+      description: "P/S requires positive revenue"
+
+    pb:
+      required_fields: [book_value]
+      required_positive: [book_value]
+      description: "P/B requires positive book value"
+
+    ev_ebitda:
+      required_fields: [ebitda]
+      required_positive: [ebitda]
+      description: "EV/EBITDA requires positive EBITDA"
+
+  # Data quality thresholds
+  data_quality_thresholds:
+    excellent:
+      min_quarters_data: 12
+      max_missing_quarters: 0
+      sector_median_available: true
+      weight_adjustment: 0
+      description: "Full data, no adjustments needed"
+
+    good:
+      min_quarters_data: 8
+      max_missing_quarters: 1
+      sector_median_available: true
+      weight_adjustment: 0
+      description: "Minor gaps, no adjustment"
+
+    fair:
+      min_quarters_data: 4
+      max_missing_quarters: 2
+      sector_median_available: false
+      weight_adjustment: -10
+      description: "Some gaps, -10% relative weight"
+
+    poor:
+      min_quarters_data: 2
+      max_missing_quarters: 4
+      sector_median_available: false
+      weight_adjustment: -25
+      description: "Significant gaps, -25% relative weight"
+
+    insufficient:
+      min_quarters_data: 0
+      max_missing_quarters: 100
+      weight_adjustment: -100
+      description: "Exclude model (0% weight)"
+
+  # Outlier detection
+  outlier_detection:
+    extreme_multiple_threshold: 3.0
+    weight_reduction_pct: -50
+    description: "If fair value >3x or <0.33x current price, reduce weight by 50%"
+
+  # Model fallback weights
+  model_fallback:
+    default:
+      weights:
+        dcf: 0.6
+        ev_ebitda: 0.2
+        ps: 0.1
+        pe: 0.1
+
+    financials:
+      weights:
+        pb: 0.5
+        pe: 0.3
+        ev_ebitda: 0.2
+
+  # =============================================================================
+  # Market Context Multipliers (Dynamic Weight Adjustments)
+  # =============================================================================
+  # Apply market-aware multipliers to tier-based weights
+  # Cumulative effect: weight × trend_mult × sentiment_mult × risk_mult × quality_mult
+  market_context_multipliers:
+
+    # Technical trend adjustments
+    technical_trend:
+      strong_uptrend:
+        dcf: 1.05        # Growth models get slight boost
+        ggm: 1.05
+        pe: 1.03
+        ps: 1.05
+        pb: 0.95         # Value models reduced
+        ev_ebitda: 0.95
+
+      uptrend:
+        dcf: 1.03
+        ggm: 1.03
+        pe: 1.02
+        ps: 1.03
+        pb: 0.98
+        ev_ebitda: 0.98
+
+      sideways:
+        dcf: 1.00        # Neutral - no adjustments
+        ggm: 1.00
+        pe: 1.00
+        ps: 1.00
+        pb: 1.00
+        ev_ebitda: 1.00
+
+      downtrend:
+        dcf: 0.97        # Reduce growth models
+        ggm: 0.97
+        pe: 0.98
+        ps: 0.95
+        pb: 1.05         # Increase defensive models
+        ev_ebitda: 1.03
+
+      strong_downtrend:
+        dcf: 0.90        # Significant reduction in growth
+        ggm: 0.90
+        pe: 0.95
+        ps: 0.85         # Most speculative reduced most
+        pb: 1.10         # Defensive positioning
+        ev_ebitda: 1.08
+
+    # Market sentiment adjustments
+    market_sentiment:
+      very_bullish:
+        dcf: 0.95        # Be cautious with euphoria
+        ggm: 0.95
+        pe: 0.90         # Multiples often inflated
+        ps: 0.85
+        pb: 1.10         # Ground to fundamentals
+        ev_ebitda: 1.05
+
+      bullish:
+        dcf: 0.98
+        ggm: 0.98
+        pe: 0.95
+        ps: 0.92
+        pb: 1.05
+        ev_ebitda: 1.02
+
+      neutral:
+        dcf: 1.00
+        ggm: 1.00
+        pe: 1.00
+        ps: 1.00
+        pb: 1.00
+        ev_ebitda: 1.00
+
+      bearish:
+        dcf: 0.95
+        ggm: 0.92
+        pe: 1.03         # Historical earnings more reliable
+        ps: 0.90
+        pb: 1.08         # Defensive
+        ev_ebitda: 1.05
+
+      very_bearish:
+        dcf: 0.90        # Reduce long-term assumptions
+        ggm: 0.85
+        pe: 1.05
+        ps: 0.80         # Revenue multiples collapse
+        pb: 1.15         # Book value anchor
+        ev_ebitda: 1.10
+
+    # Risk level adjustments
+    risk_level:
+      very_low:
+        dcf: 1.10        # Can trust projections
+        ggm: 1.05
+        pe: 1.00
+        ps: 1.05
+        pb: 0.95
+        ev_ebitda: 1.00
+
+      low:
+        dcf: 1.05
+        ggm: 1.03
+        pe: 1.00
+        ps: 1.02
+        pb: 0.98
+        ev_ebitda: 1.00
+
+      medium:
+        dcf: 1.00
+        ggm: 1.00
+        pe: 1.00
+        ps: 1.00
+        pb: 1.00
+        ev_ebitda: 1.00
+
+      high:
+        dcf: 0.92        # Uncertainty in projections
+        ggm: 0.95
+        pe: 1.00
+        ps: 0.88
+        pb: 1.12         # Book value more stable
+        ev_ebitda: 1.08
+
+      very_high:
+        dcf: 0.85
+        ggm: 0.90
+        pe: 1.00
+        ps: 0.75         # Most volatile
+        pb: 1.20         # Most stable
+        ev_ebitda: 1.10
+
+    # Quality tier adjustments
+    quality_tier:
+      exceptional:
+        dcf: 1.10        # High quality sustains growth
+        ggm: 1.10
+        pe: 1.05
+        ps: 1.05
+        pb: 1.00
+        ev_ebitda: 1.00
+
+      high:
+        dcf: 1.05
+        ggm: 1.05
+        pe: 1.02
+        ps: 1.02
+        pb: 1.00
+        ev_ebitda: 1.00
+
+      average:
+        dcf: 1.00
+        ggm: 1.00
+        pe: 1.00
+        ps: 1.00
+        pb: 1.00
+        ev_ebitda: 1.00
+
+      below_average:
+        dcf: 0.93
+        ggm: 0.88
+        pe: 0.95
+        ps: 0.95
+        pb: 1.05
+        ev_ebitda: 1.00
+
+      poor:
+        dcf: 0.85        # Growth assumptions suspect
+        ggm: 0.75        # Dividend cuts likely
+        pe: 0.90
+        ps: 0.90
+        pb: 1.10         # Book value more relevant
+        ev_ebitda: 1.00
+
+# =============================================================================
+# P/E Multiple Defaults (Config-Based Fallback)
+# =============================================================================
+# Used when market-derived P/E multiples (sector median, growth-adjusted) are unavailable
+# Priority: 1) Market data (sector_median_pe, growth_adjusted_pe)
+#           2) Industry override (most granular)
+#           3) Sector default (broader)
+#           4) Global default (universal fallback)
+# Source: Historical P/E ranges for S&P 500 sectors (2020-2024 averages)
+pe_multiples:
+  # Sector-level defaults (used when industry-specific not available)
+  sector_defaults:
+    Technology: 28.0                   # Software, hardware, semiconductors - innovation premium
+    Communication Services: 22.0       # Media, telecom, streaming platforms
+    Healthcare: 20.0                   # Pharmaceuticals, biotech, equipment - R&D discount
+    Consumer Discretionary: 20.0       # Retail, restaurants, leisure - cyclical
+    Consumer Staples: 22.0             # Food, beverage, household products - stability premium
+    Financials: 12.0                   # Banks, insurance, asset managers - book value focus
+    Industrials: 18.0                  # Aerospace, machinery, transportation
+    Materials: 16.0                    # Chemicals, metals, paper - commodity cyclicality
+    Energy: 14.0                       # Oil & gas, renewables - commodity volatility
+    Utilities: 19.0                    # Electric, gas, water - regulated stability
+    Real Estate: 24.0                  # REITs, real estate services - FFO-based valuation
+
+  # Industry-specific overrides (higher priority than sector)
+  # Only add industries that deviate significantly from sector defaults
+  # P0-3: Updated based on backtest analysis showing sector-specific modeling correlates with accuracy
+  industry_overrides:
+    # Technology sub-industries
+    "Software - Application": 35.0     # SaaS premium (CRM, ADBE, ZS: 30-50x)
+    "Software - Infrastructure": 32.0  # Cloud infrastructure (MSFT, ORCL: 28-38x)
+    # P0-3: Semiconductors lowered from 30x to 18x - cyclical earnings make historical 28x tech default unreliable
+    # Backtest shows 18x performs better for through-cycle valuation
+    Semiconductors: 18.0               # Cyclical earnings - not 28x tech default (NVDA, AMD, INTC)
+    "Semiconductor Equipment": 18.0    # Same as semiconductors - equipment is cyclical
+    "Semiconductors & Semiconductor Equipment": 18.0  # Normalized industry name
+    "Computer Hardware": 25.0          # Apple, Dell: 25-30x
+    "Information Technology Services": 22.0  # IT consulting, outsourcing
+
+    # Healthcare sub-industries
+    Biotechnology: 18.0                # High R&D, pipeline risk
+    "Medical Devices": 25.0            # Equipment manufacturers
+    "Drug Manufacturers - General": 18.0  # Big pharma
+    # P0-3: Pharmaceuticals lowered from 20x healthcare default to 14x - patent cliff risk
+    # Backtest showed 14x better captures pipeline expiry risk
+    Pharmaceuticals: 14.0              # Patent cliff risk (PFE, MRK, BMY)
+    "Other Pharmaceuticals": 14.0      # Same as pharmaceuticals
+
+    # Financials sub-industries
+    "Banks - Regional": 11.0           # Regional banks trade at discount to money centers
+    "Asset Management": 15.0           # Asset managers, exchanges
+    Insurance: 12.0                    # Property & casualty, life insurance
+
+    # Consumer sub-industries
+    "Internet Retail": 30.0            # E-commerce platforms (AMZN: 40-50x)
+    "Specialty Retail": 18.0           # Specialty retailers
+    Restaurants: 22.0                  # QSR, casual dining chains
+    # P0-3: Auto Manufacturing added at 8x - not 20x consumer discretionary default
+    # Backtest showed 199% error rate with generic defaults; 8x reflects cyclical nature
+    "Auto Manufacturing": 8.0          # Cyclical earnings, high capex (F, GM, RIVN)
+    "Automobile Manufacturers": 8.0    # Alternative industry name
+    "Motor Vehicles": 8.0              # Alternative industry name
+    "Auto Manufacturers": 8.0          # Alternative industry name
+
+    # Other notable industries
+    REITs: 24.0                        # Use FFO-based P/E equivalent
+    "Electric Utilities": 20.0         # Regulated utilities
+    "Oil & Gas E&P": 12.0              # Exploration & production
+    # P0-3: Defense raised from default to 16x - stable backlog provides visibility
+    # Backtest showed defense contractors deserve premium vs generic industrials (18x)
+    "Aerospace & Defense": 16.0        # Backlog stability, lower than prior 22x (LMT, RTX, NOC, GD)
+    Defense: 16.0                      # Alternative industry name
+    "Defense Contractors": 16.0        # Alternative industry name
+
+  # Fallback when sector unknown or unavailable
+  default: 20.0                        # Market average (S&P 500 historical P/E ~18-22)
+
+# =============================================================================
+# DCF Valuation Configuration
+# =============================================================================
+dcf_valuation:
+  # Sector override for misclassified companies
+  # Used to correct database sector classification errors
+  # Source: Russell 1000 sector analysis
+  sector_override:
+    # Tech Platforms (e-commerce, fintech, streaming)
+    AMZN: Technology  # Amazon - Cloud (AWS) is primary business
+    ABNB: Technology  # Airbnb - Platform company
+    BKNG: Technology  # Booking Holdings - Online travel platform
+    DASH: Technology  # DoorDash - Food delivery platform
+    ETSY: Technology  # Etsy - Online marketplace platform
+    EBAY: Technology  # eBay - E-commerce marketplace
+    PYPL: Technology  # PayPal - Payment processing platform
+    SNX: Technology   # TD Synnex - IT distribution
+
+    # Networking/Computer Equipment
+    CSCO: Technology  # Cisco - Computer/networking equipment
+    CIEN: Technology  # Ciena - Networking equipment
+
+    # Gaming/Electronics (digital transformation)
+    GME: Technology   # GameStop - Gaming retail (digital transformation)
+
+    # Media/Entertainment -> Communication Services
+    CMCSA: Communication Services  # Comcast - Cable/media
+    DIS: Communication Services    # Disney - Media/entertainment
+    NFLX: Communication Services   # Netflix - Streaming media
+    FOX: Communication Services    # Fox Corporation
+    FOXA: Communication Services   # Fox Corporation Class A
+    NWSA: Communication Services   # News Corp
+    PARA: Communication Services   # Paramount Global
+
+    # Payment Networks (traditional) -> Financials
+    MA: Financials    # Mastercard - Payment network
+
+    # Auto Manufacturers -> Consumer Discretionary
+    TSLA: Consumer Discretionary  # Tesla - Auto manufacturer
+
+    # Other corrections
+    SONY: Consumer Discretionary  # Sony - Consumer electronics
+    RGLD: Materials   # Royal Gold - Gold royalty company
+    TRP: Energy       # TC Energy - Pipelines (not utilities)
+    AVY: Materials    # Avery Dennison - Packaging/labels
+    CASY: Consumer Staples  # Casey's - Convenience stores
+
+  # Sector-based parameters
+  # Base terminal growth rates are set at 2-3% to allow Rule of 40 adjustments up to 3.5% ceiling
+  sector_based_parameters:
+    Technology:
+      terminal_growth_rate: 0.030
+      projection_years: 5
+      rationale: "High innovation, shorter predictability horizon. Base 3.0% allows Rule of 40 adjustment up to 3.5%"
+
+    Communication Services:
+      terminal_growth_rate: 0.030
+      projection_years: 5
+      rationale: "Rapid evolution, medium-term visibility. Base 3.0% allows Rule of 40 adjustment up to 3.5%"
+
+    Consumer Discretionary:
+      terminal_growth_rate: 0.028
+      projection_years: 7
+      rationale: "Cyclical, moderate predictability. Base 2.8% allows Rule of 40 adjustment up to 3.5%"
+
+    Consumer Staples:
+      terminal_growth_rate: 0.028
+      projection_years: 10
+      rationale: "Stable demand, high predictability"
+
+    Healthcare:
+      terminal_growth_rate: 0.030
+      projection_years: 7
+      rationale: "Innovation-driven, aging demographics support growth. Base 3.0% allows Rule of 40 adjustment up to 3.5%"
+
+    Financials:
+      terminal_growth_rate: 0.03
+      projection_years: 7
+      rationale: "Economic cycle dependent, moderate visibility"
+
+    Industrials:
+      terminal_growth_rate: 0.03
+      projection_years: 7
+      rationale: "Economic cycle aligned, moderate predictability"
+
+    Materials:
+      terminal_growth_rate: 0.028
+      projection_years: 7
+      rationale: "Commodity cycle dependent"
+
+    Energy:
+      terminal_growth_rate: 0.025
+      projection_years: 7
+      rationale: "Long-cycle capital projects (7-10yr payback) balanced against energy transition risks"
+
+    Utilities:
+      terminal_growth_rate: 0.025
+      projection_years: 10
+      rationale: "Regulated, stable cash flows, high predictability"
+
+    Real Estate:
+      terminal_growth_rate: 0.027
+      projection_years: 10
+      rationale: "Long-term leases, stable income, inflation-linked"
+
+    Default:
+      terminal_growth_rate: 0.03
+      projection_years: 5
+      rationale: "5 years is more realistic for most sectors"
+
+  # Default parameters
+  default_parameters:
+    terminal_growth_rate: 0.03
+    projection_years: 5
+    max_terminal_growth_rate: 0.030  # CRITICAL FIX: Reduced from 4.0% to 3.0% (Fix 3)
+    min_terminal_growth_rate: 0.025  # CRITICAL FIX: Raised from 2.0% to 2.5% (Fix 3)
+    max_projection_years: 10
+    min_projection_years: 5
+
+  # WACC parameters
+  wacc_parameters:
+    default_equity_risk_premium: 0.055
+    default_cost_of_debt: 0.055  # Market-implied default when interest expense not reported
+    risk_free_rate_source: FRED_DGS10
+    beta_source: yfinance
+
+  # FCF growth parameters
+  fcf_growth_parameters:
+    min_quarters_for_calculation: 6
+    max_historical_growth_rate: 0.25
+    min_historical_growth_rate: -0.1
+    fallback_growth_rate: 0.05
+
+  # FCF sector premium mapping
+  # Formula: FCF_GROWTH = TTM_REVENUE_GROWTH + SECTOR_PREMIUM
+  # Sector premiums reflect structural advantages (pricing power, unit economics, scalability)
+  fcf_sector_premium:
+    saas: 0.03
+    cloud_security: 0.03
+    software: 0.03
+    cybersecurity: 0.03
+    technology: 0.03
+    semiconductors: 0.02
+    hardware: 0.02
+    industrials: 0.01
+    manufacturing: 0.01
+    retail: 0.00
+    consumer_staples: 0.00
+    energy: 0.00
+    utilities: 0.00
+    financials: 0.00
+    default: 0.02
+
+  # Validation bounds for FCF growth formula
+  fcf_growth_validation:
+    revenue_growth_min: -0.05  # -5%
+    revenue_growth_max: 0.50   # 50%
+    fcf_growth_min: -0.05      # -5%
+    fcf_growth_max: 0.35       # 35%
+
+  # SEC format defaults - used when only annual (FY) data is available
+  # These are fallback revenue growth estimates when YoY calculation is not possible
+  sec_format_defaults:
+    sector_revenue_growth:
+      Technology: 12.0
+      Healthcare: 8.0
+      Financials: 5.0
+      Consumer Cyclical: 6.0
+      Consumer Discretionary: 6.0
+      Consumer Defensive: 4.0
+      Consumer Staples: 4.0
+      Communication Services: 8.0
+      Industrials: 5.0
+      Energy: 3.0
+      Utilities: 2.0
+      Real Estate: 4.0
+      Basic Materials: 4.0
+      Materials: 4.0
+      Default: 5.0
+
+  # FCF growth caps by sector
+  fcf_growth_caps_by_sector:
+    Technology:
+      min_growth: -0.05
+      max_growth: 0.30
+      industry_median_growth: 0.08
+      rationale: "Technology sector: Max 30% for high-growth outliers (NVDA, emerging AI), but most converge to 8% median"
+      median_rationale: "Tech industry_median_growth = 8% is the Year 5 CONVERGENCE TARGET for Fading DCF, not a ceiling. Represents sustainable long-term rate for mix of mega-caps (4-6%), large-caps (8-12%), mid-caps (10-15%). High-growth outliers (NVDA 30%+) can exceed this initially but fade toward it. Size-based adjustments in ValuationFrameworkPlanner: mega_cap_tech fades to 4%, mature_platform to 6%, mid_stage_tech to 9%."
+
+    Communication Services:
+      min_growth: -0.05
+      max_growth: 0.25
+      industry_median_growth: 0.25
+      rationale: "Network effects support growth"
+      median_rationale: "Comm Services median ~25%"
+
+    Healthcare:
+      min_growth: -0.05
+      max_growth: 0.25
+      industry_median_growth: 0.2
+      rationale: "Aging demographics support growth"
+      median_rationale: "Healthcare median ~20%"
+
+    Consumer Discretionary:
+      min_growth: -0.1
+      max_growth: 0.2
+      industry_median_growth: 0.15
+      rationale: "Cyclical nature allows sharper declines"
+      median_rationale: "Consumer Disc median ~15%"
+
+    Consumer Staples:
+      min_growth: -0.05
+      max_growth: 0.1
+      industry_median_growth: 0.08
+      rationale: "Stable demand limits both declines and growth"
+      median_rationale: "Consumer Staples median ~8%"
+
+    Financials:
+      min_growth: -0.1
+      max_growth: 0.2
+      industry_median_growth: 0.15
+      rationale: "Economic cycle sensitivity"
+      median_rationale: "Financials median ~15%"
+
+    Industrials:
+      min_growth: -0.1
+      max_growth: 0.15
+      industry_median_growth: 0.12
+      rationale: "Capital intensive, cycle dependent"
+      median_rationale: "Industrials median ~12%"
+
+    Materials:
+      min_growth: -0.15
+      max_growth: 0.2
+      industry_median_growth: 0.12
+      rationale: "Commodity volatility"
+      median_rationale: "Materials median ~12%"
+
+    Energy:
+      min_growth: -0.15
+      max_growth: 0.25
+      industry_median_growth: 0.15
+      rationale: "Commodity price swings"
+      median_rationale: "Energy median ~15%"
+
+    Utilities:
+      min_growth: -0.05
+      max_growth: 0.08
+      industry_median_growth: 0.06
+      rationale: "Regulated, predictable"
+      median_rationale: "Utilities median ~6%"
+
+    Real Estate:
+      min_growth: -0.08
+      max_growth: 0.12
+      industry_median_growth: 0.1
+      rationale: "Interest rate sensitive"
+      median_rationale: "Real Estate median ~10%"
+
+    Default:
+      min_growth: -0.1
+      max_growth: 0.25
+      industry_median_growth: 0.15
+      rationale: "Balanced defaults"
+      median_rationale: "Default median ~15%"
+
+  # Terminal FCF Margin Configuration
+  # Granular terminal margin targets based on sector, size, and company stage
+  # Used to validate DCF projections don't assume unrealistic terminal margins
+  terminal_fcf_margin:
+    # Market cap size thresholds (in billions)
+    size_thresholds:
+      mega_cap: 500  # >$500B
+      large_cap: 50   # $50B-$500B
+      mid_cap: 10     # $10B-$50B
+      small_cap: 2    # $2B-$10B
+
+    # Sector-specific terminal margins by size and stage
+    Technology:
+      # Mega-cap tech (>$500B): AAPL, MSFT, GOOGL, META, NVDA
+      mega_cap:
+        mature: 0.35          # 35% - Proven scale, operating leverage
+        growth: 0.32          # 32% - Still investing in growth
+        hyper_growth: 0.28    # 28% - Heavy R&D investment
+        rationale: "Mega-cap tech achieves 35-40% margins at scale (AAPL 30%, MSFT 42%, GOOGL 28%)"
+
+      # Large-cap tech ($50B-$500B): CRM, ADBE, ORCL, INTU
+      large_cap:
+        mature: 0.32          # 32% - Established platforms
+        growth: 0.28          # 28% - Scaling phase
+        hyper_growth: 0.25    # 25% - Investment phase
+        rationale: "Large-cap tech 28-35% margins (CRM 31%, ADBE 34%, ORCL 40%)"
+
+      # Mid-cap tech ($10B-$50B): ZS, CRWD, DDOG, SNOW, NET
+      mid_cap:
+        mature: 0.30          # 30% - Proven business model
+        growth: 0.28          # 28% - Current leaders like ZS (30.2%)
+        hyper_growth: 0.22    # 22% - Still burning cash for growth
+        rationale: "Mid-cap SaaS 25-32% at maturity (ZS 30%, CRWD 23%, DDOG 20%, SNOW 3%)"
+
+      # Small-cap tech ($2B-$10B): Emerging SaaS
+      small_cap:
+        mature: 0.28          # 28% - Scaled efficiently
+        growth: 0.25          # 25% - Proving unit economics
+        hyper_growth: 0.18    # 18% - Path to profitability
+        rationale: "Small-cap SaaS target 25-30% at scale, but many still sub-20%"
+
+      default: 0.28           # Conservative default for tech
+
+    Communication Services:
+      mega_cap:
+        mature: 0.38
+        growth: 0.35
+        hyper_growth: 0.30
+      large_cap:
+        mature: 0.35
+        growth: 0.32
+        hyper_growth: 0.28
+      mid_cap:
+        mature: 0.32
+        growth: 0.28
+        hyper_growth: 0.24
+      small_cap:
+        mature: 0.28
+        growth: 0.25
+        hyper_growth: 0.20
+      default: 0.30
+      rationale: "Network effects drive high margins at scale"
+
+    Healthcare:
+      mega_cap:
+        mature: 0.30
+        growth: 0.28
+        hyper_growth: 0.25
+      large_cap:
+        mature: 0.28
+        growth: 0.25
+        hyper_growth: 0.22
+      mid_cap:
+        mature: 0.25
+        growth: 0.22
+        hyper_growth: 0.18
+      small_cap:
+        mature: 0.22
+        growth: 0.18
+        hyper_growth: 0.15
+      default: 0.25
+      rationale: "R&D intensity limits margins, but mega-cap pharma achieves 25-35%"
+
+    Consumer Discretionary:
+      mega_cap:
+        mature: 0.22
+        growth: 0.20
+        hyper_growth: 0.18
+      large_cap:
+        mature: 0.20
+        growth: 0.18
+        hyper_growth: 0.15
+      mid_cap:
+        mature: 0.18
+        growth: 0.15
+        hyper_growth: 0.12
+      small_cap:
+        mature: 0.15
+        growth: 0.12
+        hyper_growth: 0.10
+      default: 0.18
+      rationale: "Competitive retail environment limits margins"
+
+    Consumer Staples:
+      mega_cap:
+        mature: 0.20
+        growth: 0.18
+        hyper_growth: 0.15
+      large_cap:
+        mature: 0.18
+        growth: 0.16
+        hyper_growth: 0.14
+      mid_cap:
+        mature: 0.16
+        growth: 0.14
+        hyper_growth: 0.12
+      small_cap:
+        mature: 0.14
+        growth: 0.12
+        hyper_growth: 0.10
+      default: 0.16
+      rationale: "Stable demand but commodity input costs"
+
+    Financials:
+      mega_cap:
+        mature: 0.25
+        growth: 0.22
+        hyper_growth: 0.20
+      large_cap:
+        mature: 0.22
+        growth: 0.20
+        hyper_growth: 0.18
+      mid_cap:
+        mature: 0.20
+        growth: 0.18
+        hyper_growth: 0.15
+      small_cap:
+        mature: 0.18
+        growth: 0.15
+        hyper_growth: 0.12
+      default: 0.20
+      rationale: "Banks/insurance achieve 20-25% ROA efficiency"
+
+    Industrials:
+      mega_cap:
+        mature: 0.18
+        growth: 0.16
+        hyper_growth: 0.14
+      large_cap:
+        mature: 0.16
+        growth: 0.14
+        hyper_growth: 0.12
+      mid_cap:
+        mature: 0.14
+        growth: 0.12
+        hyper_growth: 0.10
+      small_cap:
+        mature: 0.12
+        growth: 0.10
+        hyper_growth: 0.08
+      default: 0.14
+      rationale: "Capital intensity limits margins"
+
+    Materials:
+      mega_cap:
+        mature: 0.16
+        growth: 0.14
+        hyper_growth: 0.12
+      large_cap:
+        mature: 0.14
+        growth: 0.12
+        hyper_growth: 0.10
+      mid_cap:
+        mature: 0.12
+        growth: 0.10
+        hyper_growth: 0.08
+      small_cap:
+        mature: 0.10
+        growth: 0.08
+        hyper_growth: 0.06
+      default: 0.12
+      rationale: "Commodity exposure limits pricing power"
+
+    Energy:
+      mega_cap:
+        mature: 0.20
+        growth: 0.18
+        hyper_growth: 0.16
+      large_cap:
+        mature: 0.18
+        growth: 0.16
+        hyper_growth: 0.14
+      mid_cap:
+        mature: 0.16
+        growth: 0.14
+        hyper_growth: 0.12
+      small_cap:
+        mature: 0.14
+        growth: 0.12
+        hyper_growth: 0.10
+      default: 0.16
+      rationale: "Cyclical commodity business"
+
+    Utilities:
+      mega_cap:
+        mature: 0.18
+        growth: 0.16
+        hyper_growth: 0.14
+      large_cap:
+        mature: 0.16
+        growth: 0.14
+        hyper_growth: 0.12
+      mid_cap:
+        mature: 0.14
+        growth: 0.12
+        hyper_growth: 0.10
+      small_cap:
+        mature: 0.12
+        growth: 0.10
+        hyper_growth: 0.08
+      default: 0.14
+      rationale: "Regulated returns limit upside"
+
+    Real Estate:
+      mega_cap:
+        mature: 0.25
+        growth: 0.22
+        hyper_growth: 0.20
+      large_cap:
+        mature: 0.22
+        growth: 0.20
+        hyper_growth: 0.18
+      mid_cap:
+        mature: 0.20
+        growth: 0.18
+        hyper_growth: 0.16
+      small_cap:
+        mature: 0.18
+        growth: 0.16
+        hyper_growth: 0.14
+      default: 0.20
+      rationale: "REITs achieve 20-30% FCF margins (FFO-based)"
+
+    # Company stage classification rules
+    stage_classification:
+      # Hyper-growth: Rule of 40 >50, FCF margin <15%, revenue growth >30%
+      hyper_growth:
+        rule_of_40_min: 50
+        fcf_margin_max: 0.15
+        revenue_growth_min: 0.30
+        description: "Prioritizing growth over profitability"
+
+      # Growth: Rule of 40 40-50, FCF margin 15-25%, revenue growth 20-40%
+      growth:
+        rule_of_40_min: 40
+        rule_of_40_max: 50
+        fcf_margin_min: 0.15
+        fcf_margin_max: 0.25
+        revenue_growth_min: 0.20
+        revenue_growth_max: 0.40
+        description: "Balancing growth and profitability"
+
+      # Mature: Rule of 40 >40, FCF margin >25%, revenue growth <20%
+      mature:
+        rule_of_40_min: 40
+        fcf_margin_min: 0.25
+        revenue_growth_max: 0.20
+        description: "Maximizing profitability at scale"
+
+    # Default fallback
+    default: 0.20  # Conservative 20% if no sector match
+
+  # Rule of 40 configuration
+  rule_of_40:
+    enabled: true
+    calculation_method: ttm
+    quarters_for_calculation: 4
+    profit_margin_types:
+      - fcf_margin
+      - operating_margin
+
+    thresholds:
+      excellent: 50.0
+      good: 40.0
+      acceptable: 30.0
+      poor: 20.0
+
+    dcf_adjustments:
+      excellent:
+        terminal_growth_adjustment: 0.005
+        description: "Add 0.5% to terminal growth"
+      good:
+        terminal_growth_adjustment: 0.0
+        description: "Use sector default"
+      acceptable:
+        terminal_growth_adjustment: -0.0025
+        description: "Reduce by 0.25%"
+      poor:
+        terminal_growth_adjustment: -0.005
+        description: "Reduce by 0.5%"
+
+    multiple_ranges:
+      excellent:
+        min_ps: 12.0
+        max_ps: 20.0
+        description: "Premium valuation"
+      good:
+        min_ps: 8.0
+        max_ps: 12.0
+        description: "Market valuation"
+      acceptable:
+        min_ps: 5.0
+        max_ps: 8.0
+        description: "Fair valuation"
+      poor:
+        min_ps: 2.0
+        max_ps: 5.0
+        description: "Discounted valuation"
+      default:
+        min_ps: 4.0
+        max_ps: 6.0
+        description: "Fallback range"
+
+    ps_integration:
+      min_classification: good
+      weights:
+        dcf: 0.6
+        ps: 0.4
+
+  # =============================================================================
+  # Multiplier Bounds System (M4)
+  # =============================================================================
+  # Prevents weight collapse from cumulative market context multipliers
+  multiplier_bounds:
+    enabled: true
+    cumulative_floor: 0.50      # Never below 50% of base weight
+    cumulative_ceiling: 1.50    # Never above 150% of base weight
+    per_model_floors:
+      dcf: 5                    # Minimum 5% weight for DCF
+      pe: 5                     # Minimum 5% weight for P/E
+      ps: 5                     # Minimum 5% weight for P/S
+      pb: 0                     # P/B can go to zero
+      ev_ebitda: 5              # Minimum 5% weight for EV/EBITDA
+      ggm: 0                    # GGM can go to zero
+    warning_threshold: 0.70     # Log warning if below 70% of base
+
+  # =============================================================================
+  # P/E Extremeness Thresholds (M5)
+  # =============================================================================
+  # Sector-aware P/E thresholds for classification
+  pe_extremeness_thresholds:
+    default:
+      extreme: 200              # P/E > 200x is extreme
+      high: 100                 # P/E 100-200x is high
+      moderate: 50              # P/E 50-100x is moderate-high
+      normal: 25                # P/E 25-50x is normal
+    Technology:
+      extreme: 300              # Tech companies can sustain higher multiples
+      high: 150
+      moderate: 75
+      normal: 35
+    "Software - Application":
+      extreme: 400              # SaaS companies can have very high multiples
+      high: 200
+      moderate: 100
+      normal: 50
+    "Software - Infrastructure":
+      extreme: 350
+      high: 175
+      moderate: 85
+      normal: 45
+    Financials:
+      extreme: 50               # Financials rarely exceed 50x
+      high: 30
+      moderate: 20
+      normal: 12
+    "Banks - Regional":
+      extreme: 40
+      high: 25
+      moderate: 18
+      normal: 10
+    Utilities:
+      extreme: 40
+      high: 30
+      moderate: 22
+      normal: 18
+
+  # =============================================================================
+  # Profitability Classification (M5)
+  # =============================================================================
+  # Multi-indicator chain for classifying profitability
+  profitability_classification:
+    indicator_priority:
+      - net_income
+      - operating_income
+      - ebitda
+      - free_cash_flow
+      - gross_profit
+    thresholds:
+      profitable:
+        net_margin_min: 0.05      # 5% net margin
+        operating_margin_min: 0.10 # 10% operating margin
+      marginally_profitable:
+        net_margin_min: 0.0       # Just above breakeven
+        net_margin_max: 0.05
+      loss_making:
+        net_margin_max: 0.0       # Negative net margin
+      pre_revenue:
+        revenue_max: 1000000      # <$1M revenue
+    stages:
+      - name: "pre_revenue"
+        ps_weight: 100
+        description: "No meaningful revenue"
+      - name: "pre_profit_negative_fcf"
+        ps_weight: 100
+        description: "Revenue but burning cash"
+      - name: "pre_profit_positive_fcf"
+        ps_weight: 70
+        ev_ebitda_weight: 30
+        description: "Revenue with positive FCF but net loss"
+      - name: "early_profitable"
+        dcf_weight: 50
+        pe_weight: 30
+        ps_weight: 20
+        description: "Recently turned profitable"
+      - name: "mature_profitable"
+        dcf_weight: 40
+        pe_weight: 35
+        ev_ebitda_weight: 25
+        description: "Established profitability"
+
+  # =============================================================================
+  # Model Agreement Scoring (M6)
+  # =============================================================================
+  # Handles divergence between valuation models
+  model_agreement:
+    enabled: true
+    divergence_threshold: 0.35      # CV > 35% triggers divergence flag
+    high_agreement_threshold: 0.15  # CV < 15% is high agreement
+    confidence_adjustments:
+      divergence_penalty: -0.15     # Reduce confidence by 15% on divergence
+      high_agreement_bonus: 0.10    # Increase confidence by 10% on agreement
+    outlier_detection:
+      enabled: true
+      zscore_threshold: 2.0         # Models > 2 sigma from mean are outliers
+      outlier_weight_penalty: 0.50  # Reduce outlier model weight by 50%
+    min_models_for_agreement: 3     # Need at least 3 models to calculate agreement
+
+  # =============================================================================
+  # Weight Audit Trail (M4)
+  # =============================================================================
+  # Full audit trail of weight evolution
+  audit_trail:
+    enabled: true
+    log_level: INFO                 # DEBUG for verbose, INFO for summary
+    capture_steps:
+      - base_weights
+      - industry_override
+      - company_adjustment
+      - market_context
+      - applicability_filter
+      - data_quality
+      - bounds_enforcement
+      - normalization
+    store_snapshots: true           # Store before/after at each step
+    retention_days: 30              # Keep audit logs for 30 days
+
+  # =============================================================================
+  # Damodaran 3-Stage DCF Configuration (M7)
+  # =============================================================================
+  damodaran_dcf:
+    enabled: true
+    stages:
+      high_growth:
+        default_years: 5
+        max_years: 10
+      transition:
+        default_years: 5
+        max_years: 7
+      terminal:
+        growth_rate: 0.025          # Default 2.5% terminal growth
+        max_growth_rate: 0.035      # Cap at 3.5%
+        min_growth_rate: 0.020      # Floor at 2.0%
+    monte_carlo:
+      enabled: false                # Disabled by default for performance
+      iterations: 1000              # Number of simulations when enabled
+      confidence_intervals:
+        - 10
+        - 25
+        - 50
+        - 75
+        - 90
+    revenue_bridge:
+      enabled: true                 # For negative FCF companies
+      target_fcf_margin_default: 0.15  # Assume 15% terminal FCF margin
+      years_to_profitability_max: 10
+    industry_betas:
+      # Damodaran industry betas (January 2025)
+      "Software (System & Application)": 1.08
+      "Semiconductor": 1.32
+      "Computer Hardware": 1.15
+      "Biotechnology": 1.18
+      "Drug (Pharmaceutical)": 0.91
+      "Banks (Regional)": 0.59
+      "Banks (Money Center)": 0.97
+      "Insurance (Property/Casualty)": 0.71
+      "Real Estate (Development)": 1.01
+      "Retail (General)": 1.08
+      "Electric Utility (Central)": 0.42
+      "Oil/Gas (Integrated)": 0.91
+      "Aerospace/Defense": 0.97
+      default: 1.0
+
+  # =============================================================================
+  # SaaS Metrics Valuation (M7)
+  # =============================================================================
+  saas_metrics:
+    enabled: true
+    growth_tiers:
+      hyper_growth:
+        min_growth: 0.40            # >40% growth
+        base_ps_multiple: 15.0
+      growth:
+        min_growth: 0.20            # 20-40% growth
+        max_growth: 0.40
+        base_ps_multiple: 7.0
+      moderate:
+        min_growth: 0.10            # 10-20% growth
+        max_growth: 0.20
+        base_ps_multiple: 5.0
+      slow:
+        max_growth: 0.10            # <10% growth
+        base_ps_multiple: 3.0
+    metric_adjustments:
+      nrr:                          # Net Revenue Retention
+        excellent:
+          threshold: 1.30           # NRR > 130%
+          adjustment: 0.30          # +30%
+        good:
+          threshold: 1.15           # NRR 115-130%
+          adjustment: 0.15
+        average:
+          threshold: 1.00           # NRR 100-115%
+          adjustment: 0.0
+        below_average:
+          threshold: 0.90           # NRR 90-100%
+          adjustment: -0.15
+        poor:
+          adjustment: -0.30         # NRR < 90%
+      ltv_cac:                      # LTV/CAC Ratio
+        excellent:
+          threshold: 5.0            # LTV/CAC > 5x
+          adjustment: 0.25
+        good:
+          threshold: 3.0            # 3-5x
+          adjustment: 0.10
+        average:
+          threshold: 2.0            # 2-3x
+          adjustment: 0.0
+        poor:
+          adjustment: -0.20         # < 2x
+      gross_margin:
+        excellent:
+          threshold: 0.80           # >80% gross margin
+          adjustment: 0.10
+        good:
+          threshold: 0.70           # 70-80%
+          adjustment: 0.05
+        average:
+          threshold: 0.60           # 60-70%
+          adjustment: 0.0
+        poor:
+          adjustment: -0.10         # <60%
+      rule_of_40:                   # Revenue Growth + FCF Margin
+        excellent:
+          threshold: 60             # >60 Rule of 40
+          adjustment: 0.20
+        good:
+          threshold: 40             # 40-60
+          adjustment: 0.0
+        fair:
+          threshold: 30             # 30-40
+          adjustment: -0.10
+        poor:
+          adjustment: -0.20         # <30
+    total_adjustment_cap: 1.00      # Max 100% cumulative adjustment
+    confidence_base: 0.7            # Base confidence for SaaS model
+    confidence_per_metric: 0.05     # +5% confidence per available metric
+
+# =============================================================================
+# Reinforcement Learning Configuration
+# =============================================================================
+# RL-based adaptive model weighting that learns optimal weights from outcomes
+rl:
+  # Master switch for RL-based weighting
+  enabled: false  # Start disabled, enable after training
+
+  # Policy configuration
+  policy:
+    type: "hybrid"  # contextual_bandit | hybrid
+    model_path: "data/rl_models/policy.pkl"
+    normalizer_path: "data/rl_models/normalizer.pkl"
+    checkpoint_dir: "data/rl_models/checkpoints"
+
+    # Hybrid policy settings (combines rule-based with RL adjustments)
+    hybrid:
+      max_adjustment: 0.30  # Max ±30% deviation from base weights
+      learning_rate: 0.01
+
+    # Contextual bandit settings (Thompson Sampling)
+    contextual_bandit:
+      n_actions: 15           # Number of tier classifications
+      prior_variance: 1.0     # Prior uncertainty
+      exploration_weight: 0.1 # Exploration-exploitation trade-off
+
+  # Outcome tracking (records predictions for future reward calculation)
+  outcome_tracking:
+    enabled: true             # Track outcomes even when RL disabled
+    lookback_windows:         # Days to wait before calculating reward
+      - 30
+      - 90
+      - 365
+    update_frequency: "daily" # Cron schedule for outcome updates
+
+    # Reward calculation weights
+    reward_weights:
+      accuracy_30d: 0.2       # 20% weight on 30-day accuracy
+      accuracy_90d: 0.6       # 60% weight on 90-day accuracy
+      direction_bonus: 0.2    # 20% weight on direction prediction
+
+  # Training configuration
+  training:
+    enabled: true             # Allow policy training
+    min_experiences: 100      # Minimum samples before training
+    max_experiences: 10000    # Maximum samples per training batch
+    batch_size: 32
+    epochs: 10
+    early_stopping_patience: 3
+    train_ratio: 0.70         # 70% training data
+    val_ratio: 0.15           # 15% validation data
+
+    # Incremental training
+    incremental:
+      enabled: true
+      new_experiences_limit: 100  # Max new experiences per update
+      update_frequency: "weekly"
+
+  # A/B testing configuration
+  ab_testing:
+    enabled: false            # A/B test RL vs baseline
+    rl_traffic_pct: 0.20      # 20% RL, 80% baseline initially
+    min_samples_per_group: 50 # Min samples for significance
+    confidence_level: 0.95    # Statistical significance threshold
+
+  # Feature extraction and normalization
+  features:
+    normalizer_path: "data/rl_models/normalizer.pkl"
+    categorical_encoding: "one_hot"  # one_hot | ordinal
+
+    # Feature groups to include
+    include_groups:
+      - company_fundamentals   # PE, PS, PB, margins
+      - growth_metrics         # Revenue growth, FCF growth
+      - quality_indicators     # Rule of 40, profitability
+      - market_context         # Trend, sentiment, volatility
+      - data_quality           # Data completeness scores
+      - sector_industry        # GICS classification
+
+    # Feature normalization method
+    normalization: "zscore"   # zscore | minmax
+
+  # Monitoring and metrics
+  monitoring:
+    enabled: true
+    metrics_log_path: "data/rl_models/metrics.json"
+
+    # Dashboard refresh frequency
+    refresh_frequency: "daily"
+
+    # Alerts
+    alerts:
+      reward_degradation_threshold: -0.10  # Alert if avg reward drops >10%
+      min_samples_for_alert: 50
+
+  # Model fallback behavior
+  fallback:
+    use_baseline_on_error: true     # Fall back to rule-based on RL error
+    use_baseline_on_cold_start: true # Use rules until RL is trained
+    min_policy_confidence: 0.5      # Min confidence to use RL prediction

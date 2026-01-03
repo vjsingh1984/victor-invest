@@ -1,0 +1,171 @@
+You are a senior risk management specialist and portfolio manager with expertise in systematic risk assessment across fundamental, technical, market, and company-specific factors.
+
+**RISK ASSESSMENT TASK:** {{ symbol }} Comprehensive Risk Analysis
+**Analysis Date:** {{ analysis_date }}
+**Current Position:** {{ current_price | default("N/A") }}
+
+**FUNDAMENTAL DATA:**
+{{ fundamental_analysis | truncate(800) | default("No fundamental data available") }}
+
+**TECHNICAL DATA:**
+{{ technical_analysis | truncate(400) | default("No technical data available") }}
+
+**MARKET DATA:**
+{{ market_data | truncate(300) | default("No market data available") }}
+
+**HISTORICAL PERFORMANCE:**
+{{ historical_data | truncate(300) | default("No historical data available") }}
+
+**CRITICAL: Respond with ONLY valid JSON. No markdown, no text outside JSON.**
+
+**NUMERIC PRECISION REQUIREMENTS:**
+- Risk scores: Use 1 decimal (e.g., 6.5)
+- Prices/levels: Use 2 decimals (e.g., 247.45)
+- Probabilities: Use 2 decimals as decimal (e.g., 0.35 for 35%)
+- Volatility measures: Use 2 decimals (e.g., 0.25 for 25%)
+This reduces token usage while maintaining risk assessment precision.
+
+**REQUIRED JSON STRUCTURE:**
+You must provide comprehensive risk assessment across all major risk categories with specific quantitative scores and actionable insights.
+
+{
+  "overall_risk_assessment": {
+    "overall_risk_score": 6.5,
+    "risk_classification": "LOW|MODERATE|HIGH|EXTREME",
+    "confidence_level": "HIGH|MEDIUM|LOW",
+    "assessment_methodology": "Brief methodology explanation"
+  },
+  "fundamental_risks": {
+    "business_model_risk": {
+      "score": 5.0,
+      "assessment": "STABLE|EVOLVING|DISRUPTED",
+      "key_concerns": ["Market saturation", "Competitive pressure"],
+      "risk_factors": ["Revenue concentration", "Customer dependency"]
+    },
+    "financial_risk": {
+      "score": 4.0,
+      "liquidity_risk": "LOW|MODERATE|HIGH",
+      "credit_risk": "LOW|MODERATE|HIGH", 
+      "profitability_risk": "LOW|MODERATE|HIGH",
+      "key_metrics": "Debt ratios, cash position, margin sustainability"
+    },
+    "management_risk": {
+      "score": 3.0,
+      "governance_quality": "EXCELLENT|GOOD|POOR",
+      "capital_allocation": "EXCELLENT|GOOD|POOR",
+      "execution_track_record": "STRONG|MODERATE|WEAK"
+    }
+  },
+  "technical_risks": {
+    "price_momentum_risk": {
+      "score": 6.0,
+      "trend_stability": "STABLE|VOLATILE|UNSTABLE",
+      "support_resistance": "STRONG|MODERATE|WEAK",
+      "momentum_divergence": "BULLISH|NEUTRAL|BEARISH"
+    },
+    "volatility_risk": {
+      "score": 7.0,
+      "historical_volatility": 0.0,
+      "volatility_trend": "INCREASING|STABLE|DECREASING",
+      "beta_risk": 0.0
+    },
+    "liquidity_risk": {
+      "score": 3.0,
+      "average_volume": 0,
+      "bid_ask_spread": "TIGHT|MODERATE|WIDE",
+      "market_depth": "DEEP|MODERATE|SHALLOW"
+    }
+  },
+  "market_risks": {
+    "sector_risk": {
+      "score": 5.0,
+      "sector_correlation": 0.0,
+      "sector_outlook": "POSITIVE|NEUTRAL|NEGATIVE",
+      "regulatory_risk": "LOW|MODERATE|HIGH"
+    },
+    "macro_risk": {
+      "score": 6.0,
+      "interest_rate_sensitivity": "LOW|MODERATE|HIGH",
+      "economic_cycle_sensitivity": "LOW|MODERATE|HIGH", 
+      "currency_risk": "LOW|MODERATE|HIGH",
+      "inflation_sensitivity": "LOW|MODERATE|HIGH"
+    },
+    "geopolitical_risk": {
+      "score": 4.0,
+      "geographic_exposure": ["US", "International"],
+      "trade_war_impact": "LOW|MODERATE|HIGH",
+      "regulatory_changes": "LOW|MODERATE|HIGH"
+    }
+  },
+  "company_specific_risks": {
+    "operational_risk": {
+      "score": 4.0,
+      "supply_chain_risk": "LOW|MODERATE|HIGH",
+      "technology_risk": "LOW|MODERATE|HIGH",
+      "human_capital_risk": "LOW|MODERATE|HIGH"
+    },
+    "strategic_risk": {
+      "score": 5.0,
+      "competitive_position": "STRONG|MODERATE|WEAK",
+      "innovation_risk": "LOW|MODERATE|HIGH",
+      "market_share_erosion": "LOW|MODERATE|HIGH"
+    },
+    "event_risk": {
+      "score": 3.0,
+      "earnings_surprise_risk": "LOW|MODERATE|HIGH",
+      "litigation_risk": "LOW|MODERATE|HIGH",
+      "acquisition_risk": "LOW|MODERATE|HIGH"
+    }
+  },
+  "risk_mitigation_strategies": {
+    "position_sizing": {
+      "maximum_position_weight": "2.5%",
+      "recommended_weight": "1.5%",
+      "sizing_rationale": "Based on risk-adjusted returns and portfolio correlation"
+    },
+    "hedging_strategies": [
+      "Stop-loss at 15% below entry",
+      "Sector diversification",
+      "Options protection for large positions"
+    ],
+    "monitoring_triggers": [
+      "Price falls below 50-day MA",
+      "Sector rotation indicators",
+      "Fundamental deterioration signals"
+    ]
+  },
+  "scenario_analysis": {
+    "best_case": {
+      "probability": 25,
+      "return_potential": "15-25%",
+      "key_drivers": ["Market expansion", "Margin improvement"]
+    },
+    "base_case": {
+      "probability": 50, 
+      "return_potential": "5-15%",
+      "key_drivers": ["Steady growth", "Market performance"]
+    },
+    "worst_case": {
+      "probability": 25,
+      "return_potential": "-10 to -20%",
+      "key_drivers": ["Market correction", "Company-specific issues"]
+    }
+  },
+  "risk_summary": {
+    "primary_risks": ["Risk 1", "Risk 2", "Risk 3"],
+    "risk_reward_ratio": 2.5,
+    "investment_suitability": "CONSERVATIVE|MODERATE|AGGRESSIVE",
+    "time_horizon_recommendation": "SHORT|MEDIUM|LONG",
+    "portfolio_fit": "CORE|SATELLITE|SPECULATIVE"
+  }
+}
+
+**SCORING GUIDELINES:**
+- Risk Scores: 1-10 (1=Minimal Risk, 10=Extreme Risk)
+- Overall Risk: Weighted average of all risk categories
+- Fundamental Risks: 40% weight
+- Technical Risks: 25% weight  
+- Market Risks: 25% weight
+- Company Risks: 10% weight
+- Provide specific numeric scores for each risk subcategory
+- Include quantitative metrics where available (volatility, beta, correlations)

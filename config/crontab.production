@@ -1,0 +1,37 @@
+# Victor Invest - Scheduled Data Collection Jobs
+# Generated: 2026-01-02T15:57:56.253299
+#
+# Install with: crontab <filename>
+# View with: crontab -l
+
+# Environment
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+PYTHONPATH=/Users/vijaysingh/code/victor-invest/src:/Users/vijaysingh/code/victor-invest
+
+# Jobs
+# minute hour day month weekday command
+
+# collect_treasury_data: Collect Treasury yield curve data
+0 18 * * 1-5 cd /Users/vijaysingh/code/victor-invest && /usr/local/bin/python3 /Users/vijaysingh/code/victor-invest/scripts/scheduled/collect_treasury_data.py >> /Users/vijaysingh/code/victor-invest/logs/collect_treasury_data.log 2>&1
+
+# refresh_macro_indicators: Refresh FRED macroeconomic indicators
+0 9 * * 1-5 cd /Users/vijaysingh/code/victor-invest && /usr/local/bin/python3 /Users/vijaysingh/code/victor-invest/scripts/scheduled/refresh_macro_indicators.py >> /Users/vijaysingh/code/victor-invest/logs/refresh_macro_indicators.log 2>&1
+
+# collect_insider_transactions: Collect SEC Form 4 insider transactions
+0 8,12,16,20 * * 1-5 cd /Users/vijaysingh/code/victor-invest && /usr/local/bin/python3 /Users/vijaysingh/code/victor-invest/scripts/scheduled/collect_insider_transactions.py >> /Users/vijaysingh/code/victor-invest/logs/collect_insider_transactions.log 2>&1
+
+# collect_13f_filings: Check for new SEC Form 13F filings
+0 7 * * 1-5 cd /Users/vijaysingh/code/victor-invest && /usr/local/bin/python3 /Users/vijaysingh/code/victor-invest/scripts/scheduled/collect_13f_filings.py >> /Users/vijaysingh/code/victor-invest/logs/collect_13f_filings.log 2>&1
+
+# collect_short_interest: Collect FINRA short interest data
+0 10 1,15 * * cd /Users/vijaysingh/code/victor-invest && /usr/local/bin/python3 /Users/vijaysingh/code/victor-invest/scripts/scheduled/collect_short_interest.py >> /Users/vijaysingh/code/victor-invest/logs/collect_short_interest.log 2>&1
+
+# update_market_regime: Update market regime classification
+30 18 * * 1-5 cd /Users/vijaysingh/code/victor-invest && /usr/local/bin/python3 /Users/vijaysingh/code/victor-invest/scripts/scheduled/update_market_regime.py >> /Users/vijaysingh/code/victor-invest/logs/update_market_regime.log 2>&1
+
+# calculate_credit_risk: Calculate credit risk scores for all symbols
+0 20 * * 0 cd /Users/vijaysingh/code/victor-invest && /usr/local/bin/python3 /Users/vijaysingh/code/victor-invest/scripts/scheduled/calculate_credit_risk.py >> /Users/vijaysingh/code/victor-invest/logs/calculate_credit_risk.log 2>&1
+
+# Log cleanup (keep last 7 days)
+0 3 * * * find /Users/vijaysingh/code/victor-invest/logs -name '*.log' -mtime +7 -delete

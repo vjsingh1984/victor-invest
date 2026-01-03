@@ -1,0 +1,3461 @@
+{
+  "analysis_date": "2025-11-04T15:59:18.109947",
+  "summary": {
+    "ytd_consistent": 0,
+    "point_in_time": 18,
+    "mixed": 1,
+    "no_data": 1
+  },
+  "stocks": [
+    {
+      "symbol": "AAPL",
+      "cik": "0000320193",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 95359000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 85777000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 90753000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 81797000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000320193-25-000057",
+          "cik": "0000320193",
+          "symbol": "AAPL",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q2",
+          "form": "10-Q",
+          "filed": "2025-05-02",
+          "period_end": "2025-03-31",
+          "company_name": "APPLE INC",
+          "Revenue": {
+            "value": 95359000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 53887000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 2,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 50492000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 331233000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 264437000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": -6363000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 6011000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 2,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000320193-25-000008",
+          "cik": "0000320193",
+          "symbol": "AAPL",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-01-31",
+          "period_end": "2024-12-31",
+          "company_name": "APPLE INC",
+          "Revenue": {
+            "value": 124300000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 29935000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 66025000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 344085000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 277327000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 66758000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 2940000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000320193-24-000123",
+          "cik": "0000320193",
+          "symbol": "AAPL",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2024-11-01",
+          "period_end": "2024-09-30",
+          "company_name": "APPLE INC",
+          "Revenue": {
+            "value": 391035000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 118254000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 210352000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 4,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 364980000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 308030000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 56950000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 9447000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "MSFT",
+      "cik": "0000789019",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 70066000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 69632000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 61858000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 62020000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000950170-25-061046",
+          "cik": "0000789019",
+          "symbol": "MSFT",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2025-04-30",
+          "period_end": "2025-03-31",
+          "company_name": "MICROSOFT CORP",
+          "Revenue": {
+            "value": 70066000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": null,
+          "COGS": {
+            "value": 21919000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 562624000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 240733000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 321891000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 16745000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000950170-25-010491",
+          "cik": "0000789019",
+          "symbol": "MSFT",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q2",
+          "form": "10-Q",
+          "filed": "2025-01-29",
+          "period_end": "2024-12-31",
+          "company_name": "MICROSOFT CORP",
+          "Revenue": {
+            "value": 69632000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 22291000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 21799000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 533898000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 231203000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 302695000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 15804000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000950170-24-118967",
+          "cik": "0000789019",
+          "symbol": "MSFT",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2024-10-30",
+          "period_end": "2024-09-30",
+          "company_name": "MICROSOFT CORP",
+          "Revenue": {
+            "value": 65585000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 34180000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 20099000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 523013000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 235290000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 287723000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 14923000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "GOOGL",
+      "cik": "0001652044",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 88268000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 84742000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 76693000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 74604000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001652044-25-000043",
+          "cik": "0001652044",
+          "symbol": "GOOGL",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-04-25",
+          "period_end": "2025-03-31",
+          "company_name": "ALPHABET INC.",
+          "Revenue": {
+            "value": 90234000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 36150000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 475374000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 130107000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 345267000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 17197000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001652044-25-000014",
+          "cik": "0001652044",
+          "symbol": "GOOGL",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-05",
+          "period_end": "2024-12-31",
+          "company_name": "ALPHABET INC.",
+          "Revenue": {
+            "value": 350018000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 125299000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 146306000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 450256000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 125172000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 325084000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 52535000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001652044-24-000118",
+          "cik": "0001652044",
+          "symbol": "GOOGL",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-10-30",
+          "period_end": "2024-09-30",
+          "company_name": "ALPHABET INC.",
+          "Revenue": {
+            "value": 88268000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 86186000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 36474000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 430266000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 116147000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 314119000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 38259000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "AMZN",
+      "cik": "0001018724",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 158877000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 147977000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 143083000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 134383000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001018724-25-000036",
+          "cik": "0001018724",
+          "symbol": "AMZN",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-02",
+          "period_end": "2025-03-31",
+          "company_name": "AMAZON COM INC",
+          "Revenue": {
+            "value": 155667000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 17015000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 643256000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 305867000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0001018724-25-000004",
+          "cik": "0001018724",
+          "symbol": "AMZN",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-07",
+          "period_end": "2024-12-31",
+          "company_name": "AMAZON COM INC",
+          "Revenue": {
+            "value": 637959000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 115877000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 326288000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 624894000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 285970000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0001018724-24-000161",
+          "cik": "0001018724",
+          "symbol": "AMZN",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-11-01",
+          "period_end": "2024-09-30",
+          "company_name": "AMAZON COM INC",
+          "Revenue": {
+            "value": 158877000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 25971000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 80977000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 584626000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 259151000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": null
+        }
+      ]
+    },
+    {
+      "symbol": "NVDA",
+      "cik": "0001045810",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 35082000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 30040000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 18120000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 13507000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001045810-25-000116",
+          "cik": "0001045810",
+          "symbol": "NVDA",
+          "fiscal_year": 2026,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-28",
+          "period_end": "2025-04-30",
+          "company_name": "NVIDIA CORP",
+          "Revenue": {
+            "value": 44062000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 27414000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 17394000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 125254000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 41411000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 83843000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0001045810-25-000023",
+          "cik": "0001045810",
+          "symbol": "NVDA",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-26",
+          "period_end": "2025-01-31",
+          "company_name": "NVIDIA CORP",
+          "Revenue": {
+            "value": 130497000000.0,
+            "tag": "Revenues",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 64089000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 32639000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 111601000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 32274000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 79327000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0001045810-24-000316",
+          "cik": "0001045810",
+          "symbol": "NVDA",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-11-20",
+          "period_end": "2024-10-31",
+          "company_name": "NVIDIA CORP",
+          "Revenue": {
+            "value": 35082000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 47460000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 8926000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 96013000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 30114000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 65899000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        }
+      ]
+    },
+    {
+      "symbol": "META",
+      "cik": "0001326801",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 40589000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 39071000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 34146000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 31999000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001326801-25-000054",
+          "cik": "0001326801",
+          "symbol": "META",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-01",
+          "period_end": "2025-03-31",
+          "company_name": "META PLATFORMS, INC.",
+          "Revenue": {
+            "value": 41902000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 24026000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 7572000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 280213000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 95184000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 185029000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 12941000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001326801-25-000017",
+          "cik": "0001326801",
+          "symbol": "META",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-01-30",
+          "period_end": "2024-12-31",
+          "company_name": "META PLATFORMS, INC.",
+          "Revenue": {
+            "value": 164501000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 91328000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 30161000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 276054000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 93417000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 182637000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 37256000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001326801-24-000081",
+          "cik": "0001326801",
+          "symbol": "META",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-10-31",
+          "period_end": "2024-09-30",
+          "company_name": "META PLATFORMS, INC.",
+          "Revenue": {
+            "value": 40589000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 63340000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 7375000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 256408000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 91879000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 164529000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 22831000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "TSLA",
+      "cik": "0001318605",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 25182000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 25500000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 23350000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 282000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001628280-25-018911",
+          "cik": "0001318605",
+          "symbol": "TSLA",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-04-23",
+          "period_end": "2025-03-31",
+          "company_name": "TESLA, INC.",
+          "Revenue": {
+            "value": 19335000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": null,
+          "COGS": {
+            "value": 16182000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 125111000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 49693000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 74653000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 1492000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001628280-25-003063",
+          "cik": "0001318605",
+          "symbol": "TSLA",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-01-30",
+          "period_end": "2024-12-31",
+          "company_name": "TESLA, INC.",
+          "Revenue": {
+            "value": 97690000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 14923000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 80240000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 122070000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 48390000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 72913000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 11339000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001628280-24-043486",
+          "cik": "0001318605",
+          "symbol": "TSLA",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-10-24",
+          "period_end": "2024-09-30",
+          "company_name": "TESLA, INC.",
+          "Revenue": {
+            "value": 25182000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 10109000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 20185000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 119852000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 49142000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 69931000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 8556000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "LLY",
+      "cik": "0000059478",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 11439100000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 11302800000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 9498600000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 8312100000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000059478-25-000132",
+          "cik": "0000059478",
+          "symbol": "LLY",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-01",
+          "period_end": "2025-03-31",
+          "company_name": "ELI LILLY & CO",
+          "Revenue": {
+            "value": 12728500000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 1665600000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 2224200000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 89388800000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 15764800000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0000059478-25-000067",
+          "cik": "0000059478",
+          "symbol": "LLY",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-19",
+          "period_end": "2024-12-31",
+          "company_name": "ELI LILLY & CO",
+          "Revenue": {
+            "value": 45042700000.0,
+            "tag": "Revenues",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 8817900000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 8418300000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 78714900000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 14192100000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0000059478-24-000245",
+          "cik": "0000059478",
+          "symbol": "LLY",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-10-30",
+          "period_end": "2024-09-30",
+          "company_name": "ELI LILLY & CO",
+          "Revenue": {
+            "value": 11439100000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 6344100000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 2170800000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 75606900000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 14240000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": null
+        }
+      ]
+    },
+    {
+      "symbol": "AVGO",
+      "cik": "0001730168",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 15004000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 13072000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 12487000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 8876000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001730168-25-000064",
+          "cik": "0001730168",
+          "symbol": "AVGO",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q2",
+          "form": "10-Q",
+          "filed": "2025-06-11",
+          "period_end": "2025-04-30",
+          "company_name": "BROADCOM INC.",
+          "Revenue": {
+            "value": 15004000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 12668000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 2,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 4807000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 164630000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 95044000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 69586000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 244000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 2,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001730168-25-000021",
+          "cik": "0001730168",
+          "symbol": "AVGO",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-03-12",
+          "period_end": "2025-01-31",
+          "company_name": "BROADCOM INC.",
+          "Revenue": {
+            "value": 14916000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 6113000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 4771000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 165358000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 95569000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 69789000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 100000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001730168-24-000139",
+          "cik": "0001730168",
+          "symbol": "AVGO",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2024-12-20",
+          "period_end": "2024-10-31",
+          "company_name": "BROADCOM INC.",
+          "Revenue": {
+            "value": 51574000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 19962000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 19065000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 4,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 165645000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 97967000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 67678000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 548000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "JPM",
+      "cik": "0000019617",
+      "quarters_found": 8,
+      "q2_pattern": null,
+      "q3_pattern": null,
+      "is_consistent_ytd": true,
+      "details": [],
+      "sample_quarters": [
+        {
+          "adsh": "0000019617-25-000421",
+          "cik": "0000019617",
+          "symbol": "JPM",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-01",
+          "period_end": "2025-03-31",
+          "company_name": "JPMORGAN CHASE & CO",
+          "Revenue": null,
+          "OperatingCashFlow": {
+            "value": -251839000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 4357856000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 4006436000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 351420000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0000019617-25-000270",
+          "cik": "0000019617",
+          "symbol": "JPM",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-14",
+          "period_end": "2024-12-31",
+          "company_name": "JPMORGAN CHASE & CO",
+          "Revenue": null,
+          "OperatingCashFlow": {
+            "value": -42012000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 4002814000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 3658056000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 344758000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0000019617-24-000611",
+          "cik": "0000019617",
+          "symbol": "JPM",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-10-30",
+          "period_end": "2024-09-30",
+          "company_name": "JPMORGAN CHASE & CO",
+          "Revenue": null,
+          "OperatingCashFlow": {
+            "value": -189770000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 4210048000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 3864212000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 345836000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": null
+        }
+      ]
+    },
+    {
+      "symbol": "V",
+      "cik": "0001403161",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 5783000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 8900000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 8775000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 8123000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001403161-25-000037",
+          "cik": "0001403161",
+          "symbol": "V",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q2",
+          "form": "10-Q",
+          "filed": "2025-04-30",
+          "period_end": "2025-03-31",
+          "company_name": "VISA INC.",
+          "Revenue": {
+            "value": 5783000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 10091000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 2,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 92853000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 54823000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 99000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0001403161-25-000017",
+          "cik": "0001403161",
+          "symbol": "V",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-01-31",
+          "period_end": "2024-12-31",
+          "company_name": "VISA INC.",
+          "Revenue": {
+            "value": 9510000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 5396000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 91888000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 53592000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 38296000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0001403161-24-000058",
+          "cik": "0001403161",
+          "symbol": "V",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2024-11-13",
+          "period_end": "2024-09-30",
+          "company_name": "VISA INC.",
+          "Revenue": {
+            "value": 35926000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 19950000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 94511000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 55374000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 39137000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": null
+        }
+      ]
+    },
+    {
+      "symbol": "UNH",
+      "cik": "0000731766",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 84000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 62000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 61000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 51000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000731766-25-000131",
+          "cik": "0000731766",
+          "symbol": "UNH",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-07",
+          "period_end": "2025-03-31",
+          "company_name": "UNITEDHEALTH GROUP INC",
+          "Revenue": {
+            "value": 65000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 5456000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 12390000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 309790000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 204621000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": -1832000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 898000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000731766-25-000063",
+          "cik": "0000731766",
+          "symbol": "UNH",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-27",
+          "period_end": "2024-12-31",
+          "company_name": "UNITEDHEALTH GROUP INC",
+          "Revenue": {
+            "value": 277000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 24204000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 46694000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 298278000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 195687000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 98268000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 3499000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000731766-24-000323",
+          "cik": "0000731766",
+          "symbol": "UNH",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-11-04",
+          "period_end": "2024-09-30",
+          "company_name": "UNITEDHEALTH GROUP INC",
+          "Revenue": {
+            "value": 84000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 21835000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 11834000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 299309000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 194854000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 99881000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 2587000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "XOM",
+      "cik": "0000034088",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 90016000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 93060000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 90760000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 82914000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000034088-25-000024",
+          "cik": "0000034088",
+          "symbol": "XOM",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-05",
+          "period_end": "2025-03-31",
+          "company_name": "EXXON MOBIL CORP",
+          "Revenue": {
+            "value": 83130000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 12953000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 451908000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 182102000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 262720000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 5898000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000034088-25-000010",
+          "cik": "0000034088",
+          "symbol": "XOM",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-19",
+          "period_end": "2024-12-31",
+          "company_name": "EXXON MOBIL CORP",
+          "Revenue": {
+            "value": 349585000000.0,
+            "tag": "Revenues",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 55022000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 453475000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 182869000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 263705000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 24306000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000034088-24-000068",
+          "cik": "0000034088",
+          "symbol": "XOM",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-11-04",
+          "period_end": "2024-09-30",
+          "company_name": "EXXON MOBIL CORP",
+          "Revenue": {
+            "value": 90016000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 42793000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 461916000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 185516000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 268592000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 17469000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "WMT",
+      "cik": "0000104169",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 168003000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 167767000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 159439000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 160280000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000104169-25-000090",
+          "cik": "0000104169",
+          "symbol": "WMT",
+          "fiscal_year": 2026,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-06-06",
+          "period_end": "2025-04-30",
+          "company_name": "WALMART INC.",
+          "Revenue": {
+            "value": 163981000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 5411000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 124303000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 16752000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 83793000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 4986000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000104169-25-000021",
+          "cik": "0000104169",
+          "symbol": "WMT",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-03-14",
+          "period_end": "2025-01-31",
+          "company_name": "WALMART INC.",
+          "Revenue": {
+            "value": 674538000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 36443000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 511753000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 260823000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 91013000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 23783000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000104169-24-000178",
+          "cik": "0000104169",
+          "symbol": "WMT",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-12-06",
+          "period_end": "2024-10-31",
+          "company_name": "WALMART INC.",
+          "Revenue": {
+            "value": 168003000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 22918000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 127340000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 263399000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Liabilities": null,
+          "Equity": {
+            "value": 88108000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 16696000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "MA",
+      "cik": "0001141391",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 7369000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 6961000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 6533000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 6269000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0001141391-25-000090",
+          "cik": "0001141391",
+          "symbol": "MA",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-01",
+          "period_end": "2025-03-31",
+          "company_name": "MASTERCARD INC",
+          "Revenue": {
+            "value": 7250000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 2380000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 48470000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 41774000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 6671000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 159000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001141391-25-000011",
+          "cik": "0001141391",
+          "symbol": "MA",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-12",
+          "period_end": "2024-12-31",
+          "company_name": "MASTERCARD INC",
+          "Revenue": {
+            "value": 28167000000.0,
+            "tag": "Revenues",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 14780000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 48081000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 41566000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 6485000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 474000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0001141391-24-000202",
+          "cik": "0001141391",
+          "symbol": "MA",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-10-31",
+          "period_end": "2024-09-30",
+          "company_name": "MASTERCARD INC",
+          "Revenue": {
+            "value": 7369000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 9946000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": null,
+          "Assets": {
+            "value": 47237000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 39739000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 7440000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 379000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "JNJ",
+      "cik": "0000200406",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 22471000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 22447000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 21351000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 25530000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000200406-25-000119",
+          "cik": "0000200406",
+          "symbol": "JNJ",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-04-23",
+          "period_end": "2025-03-31",
+          "company_name": "JOHNSON & JOHNSON",
+          "Revenue": {
+            "value": 21893000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 4174000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 7357000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 193671000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 115562000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 78109000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 795000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000200406-25-000038",
+          "cik": "0000200406",
+          "symbol": "JNJ",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-02-13",
+          "period_end": "2024-12-31",
+          "company_name": "JOHNSON & JOHNSON",
+          "Revenue": {
+            "value": 88821000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 24266000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 27471000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 180104000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 108614000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 71490000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 4424000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 4,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000200406-24-000096",
+          "cik": "0000200406",
+          "symbol": "JNJ",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-10-23",
+          "period_end": "2024-09-30",
+          "company_name": "JOHNSON & JOHNSON",
+          "Revenue": {
+            "value": 22471000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 17283000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 6963000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 178287000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 108129000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 70158000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 2812000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "PG",
+      "cik": "0000080424",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 3490000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 21882000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 20195000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 21441000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000080424-25-000037",
+          "cik": "0000080424",
+          "symbol": "PG",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2025-04-24",
+          "period_end": "2025-03-31",
+          "company_name": "PROCTER & GAMBLE CO",
+          "Revenue": {
+            "value": 3490000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 12832000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 9694000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 122984000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 70439000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 52545000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 2777000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2025-03-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000080424-25-000013",
+          "cik": "0000080424",
+          "symbol": "PG",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q2",
+          "form": "10-Q",
+          "filed": "2025-01-22",
+          "period_end": "2024-12-31",
+          "company_name": "PROCTER & GAMBLE CO",
+          "Revenue": {
+            "value": 21882000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 9127000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 2,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 10418000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 122639000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 71195000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 51443000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 1918000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 2,
+            "ddate": "2024-12-31 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000080424-24-000113",
+          "cik": "0000080424",
+          "symbol": "PG",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2024-10-18",
+          "period_end": "2024-09-30",
+          "company_name": "PROCTER & GAMBLE CO",
+          "Revenue": {
+            "value": 21737000000.0,
+            "tag": "Revenues",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 4302000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 10421000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 126482000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 74341000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 52141000000.0,
+            "tag": "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "qtrs": 0,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 993000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2024-09-30 00:00:00+00:00"
+          }
+        }
+      ]
+    },
+    {
+      "symbol": "HD",
+      "cik": "0000354950",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 40217000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 43175000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 37710000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2023-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 42916000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000354950-25-000165",
+          "cik": "0000354950",
+          "symbol": "HD",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2025-05-28",
+          "period_end": "2025-04-30",
+          "company_name": "HOME DEPOT, INC.",
+          "Revenue": {
+            "value": 39856000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 4325000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 26397000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 99157000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 91202000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": -1003000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0000354950-25-000085",
+          "cik": "0000354950",
+          "symbol": "HD",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "form": "10-K",
+          "filed": "2025-03-21",
+          "period_end": "2025-01-31",
+          "company_name": "HOME DEPOT, INC.",
+          "Revenue": {
+            "value": 159514000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 19810000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 106206000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 4,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 96119000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 89479000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 6640000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-01-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        },
+        {
+          "adsh": "0000354950-24-000240",
+          "cik": "0000354950",
+          "symbol": "HD",
+          "fiscal_year": 2024,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2024-11-19",
+          "period_end": "2024-10-31",
+          "company_name": "HOME DEPOT, INC.",
+          "Revenue": {
+            "value": 40217000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 15139000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 26792000000.0,
+            "tag": "CostOfRevenue",
+            "qtrs": 1,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 97264000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 91478000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 5786000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-10-31 00:00:00+00:00"
+          },
+          "CapEx": null
+        }
+      ]
+    },
+    {
+      "symbol": "COST",
+      "cik": "0000909832",
+      "quarters_found": 8,
+      "q2_pattern": "Point-in-time",
+      "q3_pattern": "Point-in-time",
+      "is_consistent_ytd": false,
+      "details": [
+        {
+          "period": "2025-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 25149000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2025-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 63723000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q3",
+          "revenue_qtrs": 1,
+          "revenue_value": 58515000000.0,
+          "pattern": "Point-in-time"
+        },
+        {
+          "period": "2024-Q2",
+          "revenue_qtrs": 1,
+          "revenue_value": 58442000000.0,
+          "pattern": "Point-in-time"
+        }
+      ],
+      "sample_quarters": [
+        {
+          "adsh": "0000909832-25-000033",
+          "cik": "0000909832",
+          "symbol": "COST",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q3",
+          "form": "10-Q",
+          "filed": "2025-06-05",
+          "period_end": "2025-04-30",
+          "company_name": "COSTCO WHOLESALE CORP /NEW",
+          "Revenue": {
+            "value": 25149000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 9468000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 3,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 54996000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 75482000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 48357000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": -1915000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 3532000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 3,
+            "ddate": "2025-04-30 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000909832-25-000015",
+          "cik": "0000909832",
+          "symbol": "COST",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q2",
+          "form": "10-Q",
+          "filed": "2025-03-13",
+          "period_end": "2025-02-28",
+          "company_name": "COSTCO WHOLESALE CORP /NEW",
+          "Revenue": {
+            "value": 63723000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2025-02-28 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 6008000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 2,
+            "ddate": "2025-02-28 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 55744000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2025-02-28 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 73224000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2025-02-28 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 47647000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2025-02-28 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 25577000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2025-02-28 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 2401000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 2,
+            "ddate": "2025-02-28 00:00:00+00:00"
+          }
+        },
+        {
+          "adsh": "0000909832-24-000079",
+          "cik": "0000909832",
+          "symbol": "COST",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "form": "10-Q",
+          "filed": "2024-12-19",
+          "period_end": "2024-11-30",
+          "company_name": "COSTCO WHOLESALE CORP /NEW",
+          "Revenue": {
+            "value": 62151000000.0,
+            "tag": "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "qtrs": 1,
+            "ddate": "2024-11-30 00:00:00+00:00"
+          },
+          "OperatingCashFlow": {
+            "value": 3260000000.0,
+            "tag": "NetCashProvidedByUsedInOperatingActivities",
+            "qtrs": 1,
+            "ddate": "2024-11-30 00:00:00+00:00"
+          },
+          "COGS": {
+            "value": 54109000000.0,
+            "tag": "CostOfGoodsAndServicesSold",
+            "qtrs": 1,
+            "ddate": "2024-11-30 00:00:00+00:00"
+          },
+          "Assets": {
+            "value": 73386000000.0,
+            "tag": "Assets",
+            "qtrs": 0,
+            "ddate": "2024-11-30 00:00:00+00:00"
+          },
+          "Liabilities": {
+            "value": 48935000000.0,
+            "tag": "Liabilities",
+            "qtrs": 0,
+            "ddate": "2024-11-30 00:00:00+00:00"
+          },
+          "Equity": {
+            "value": 24451000000.0,
+            "tag": "StockholdersEquity",
+            "qtrs": 0,
+            "ddate": "2024-11-30 00:00:00+00:00"
+          },
+          "CapEx": {
+            "value": 1264000000.0,
+            "tag": "PaymentsToAcquirePropertyPlantAndEquipment",
+            "qtrs": 1,
+            "ddate": "2024-11-30 00:00:00+00:00"
+          }
+        }
+      ]
+    }
+  ]
+}

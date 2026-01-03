@@ -1,0 +1,158 @@
+# Single Stock Analysis Workflow
+#
+# Primary pipeline for analyzing individual stocks via investigator_v2.sh
+# Uses compute handlers for LLM-free valuation processing.
+#
+# Usage:
+#   executor.execute("single_stock_analysis", {"symbol": "AAPL"})
+
+workflows:
+  single_stock_analysis:
+    description: "Complete single stock analysis pipeline"
+
+    metadata:
+      vertical: investment
+      category: valuation
+      complexity: high
+
+    nodes:
+      # Stage 1: Fetch metadata (sector, industry, beta)
+      - id: fetch_metadata
+        type: compute
+        handler: metadata_fetch
+        inputs:
+          symbol: $ctx.symbol
+        output: symbol_metadata
+        next: [fetch_prices, fetch_sec_data]
+
+      # Stage 2a: Fetch price data (parallel with SEC data)
+      - id: fetch_prices
+        type: compute
+        handler: price_data_fetch
+        inputs:
+          symbol: $ctx.symbol
+          target_date: $ctx.analysis_date
+          lookback_days: 365
+        output: price_data
+        next: [determine_weights]
+
+      # Stage 2b: Fetch SEC financial data (parallel with prices)
+      - id: fetch_sec_data
+        type: compute
+        handler: sec_data_extract
+        inputs:
+          symbol: $ctx.symbol
+          num_quarters: 12
+          as_of_date: $ctx.analysis_date
+        output: financial_data
+        next: [determine_weights]
+
+      # Stage 3: Determine model weights (RL or rule-based)
+      - id: determine_weights
+        type: compute
+        handler: rl_weight_decision
+        inputs:
+          symbol: $ctx.symbol
+          financials: $ctx.financial_data.ttm_data
+          ratios: $ctx.financial_data.ratios
+          policy_path: data/rl_models/active_policy.pkl
+        output: weight_decision
+        next: [run_valuation]
+
+      # Stage 4: Run multi-model valuation
+      - id: run_valuation
+        type: compute
+        handler: valuation_compute
+        inputs:
+          symbol: $ctx.symbol
+          financials: $ctx.financial_data.ttm_data
+          ratios: $ctx.financial_data.ratios
+          as_of_date: $ctx.analysis_date
+        output: valuation_results
+        next: [sector_valuation]
+
+      # Stage 5: Apply sector-specific adjustments
+      - id: sector_valuation
+        type: compute
+        handler: sector_valuation
+        inputs:
+          symbol: $ctx.symbol
+          financials: $ctx.financial_data.ttm_data
+          current_price: $ctx.price_data.current_price
+        output: sector_result
+        next: [technical_analysis]
+
+      # Stage 6: Technical analysis
+      - id: technical_analysis
+        type: compute
+        handler: technical_analysis
+        inputs:
+          symbol: $ctx.symbol
+          analysis_date: $ctx.analysis_date
+          fair_value: $ctx.valuation_results.blended_fair_value
+          lookback_days: 365
+        output: technical_features
+        next: [track_outcome]
+
+      # Stage 7: Track prediction for RL training
+      - id: track_outcome
+        type: compute
+        handler: outcome_tracking
+        inputs:
+          symbol: $ctx.symbol
+          blended_fair_value: $ctx.valuation_results.blended_fair_value
+          current_price: $ctx.price_data.current_price
+          model_weights: $ctx.weight_decision.weights
+          model_fair_values: $ctx.valuation_results.results
+          tier: $ctx.weight_decision.tier
+        output: tracking_result
+        next: []  # Terminal node
+
+  # Quick analysis variant (skip technical and tracking)
+  quick_stock_analysis:
+    description: "Rapid stock analysis without technical indicators"
+
+    metadata:
+      vertical: investment
+      category: valuation
+      complexity: medium
+
+    nodes:
+      - id: fetch_metadata
+        type: compute
+        handler: metadata_fetch
+        inputs:
+          symbol: $ctx.symbol
+        output: symbol_metadata
+        next: [fetch_prices, fetch_sec_data]
+
+      - id: fetch_prices
+        type: compute
+        handler: price_data_fetch
+        inputs:
+          symbol: $ctx.symbol
+          target_date: $ctx.analysis_date
+          lookback_days: 90
+        output: price_data
+        next: [run_valuation]
+
+      - id: fetch_sec_data
+        type: compute
+        handler: sec_data_extract
+        inputs:
+          symbol: $ctx.symbol
+          num_quarters: 8
+          as_of_date: $ctx.analysis_date
+        output: financial_data
+        next: [run_valuation]
+
+      - id: run_valuation
+        type: compute
+        handler: valuation_compute
+        inputs:
+          symbol: $ctx.symbol
+          financials: $ctx.financial_data.ttm_data
+          ratios: $ctx.financial_data.ratios
+          as_of_date: $ctx.analysis_date
+        output: valuation_results
+        next: []  # Terminal

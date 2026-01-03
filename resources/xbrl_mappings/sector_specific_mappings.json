@@ -1,0 +1,380 @@
+{
+  "_metadata": {
+    "description": "Sector-specific XBRL tag mappings and exclusions for canonical key extraction",
+    "version": "1.0.0",
+    "created": "2025-11-10",
+    "priority_order": "industry_specific > sector_specific > global_fallback"
+  },
+
+  "Financials": {
+    "description": "Banks, Insurance, Investment Management, REITs",
+
+    "tag_mappings": {
+      "revenues": {
+        "_description": "For banks: interest income; for insurance: premiums; for others: revenues",
+        "Banks": [
+          "InterestIncomeOperating",
+          "InterestAndDividendIncomeOperating",
+          "InterestAndFeeIncome",
+          "Revenues"
+        ],
+        "Insurance": [
+          "PremiumsEarnedNet",
+          "NetPremiumsWritten",
+          "PremiumsWrittenNet",
+          "Revenues"
+        ],
+        "Investment Management": [
+          "RevenuesNetOfInterestExpense",
+          "InvestmentIncomeInterest",
+          "Revenues"
+        ],
+        "_default": [
+          "Revenues",
+          "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ]
+      },
+
+      "cost_of_revenue": {
+        "_description": "For banks: interest expense; for insurance: claims; not applicable for most financials",
+        "Banks": [
+          "InterestExpense",
+          "InterestExpenseDebt",
+          "InterestExpenseDeposits"
+        ],
+        "Insurance": [
+          "PolicyholderBenefitsAndClaimsIncurredNet",
+          "LiabilityForClaimsAndClaimsAdjustmentExpense",
+          "BenefitsLossesAndExpenses"
+        ],
+        "_default": []
+      },
+
+      "operating_expenses": {
+        "_description": "For banks: non-interest expense; for insurance: underwriting expenses",
+        "Banks": [
+          "NoninterestExpense",
+          "OperatingExpenses"
+        ],
+        "Insurance": [
+          "OtherUnderwritingExpensesIncurred",
+          "PolicyAcquisitionCosts",
+          "OperatingExpenses"
+        ],
+        "_default": [
+          "OperatingExpenses",
+          "OperatingCostsAndExpenses"
+        ]
+      },
+
+      "net_income": [
+        "NetIncomeLoss",
+        "ProfitLoss",
+        "IncomeLossFromContinuingOperations"
+      ],
+
+      "total_assets": [
+        "Assets",
+        "AssetsNet"
+      ],
+
+      "total_liabilities": [
+        "Liabilities",
+        "LiabilitiesNoncurrent",
+        "LiabilitiesCurrent"
+      ],
+
+      "stockholders_equity": [
+        "StockholdersEquity",
+        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+      ]
+    },
+
+    "excluded_metrics": [
+      "inventory",
+      "cost_of_goods_sold",
+      "gross_profit",
+      "gross_margin"
+    ],
+
+    "excluded_ratios": {
+      "current_ratio": {
+        "reason": "Banks and insurance companies don't classify assets as current/non-current due to regulatory accounting standards",
+        "alternative_metrics": ["tangible_book_value_per_share", "return_on_equity", "book_value_growth"]
+      },
+      "quick_ratio": {
+        "reason": "Same as current_ratio - not applicable to financial services",
+        "alternative_metrics": ["tier_1_capital_ratio", "return_on_assets"]
+      },
+      "inventory_turnover": {
+        "reason": "Financial services don't carry inventory",
+        "alternative_metrics": []
+      }
+    },
+
+    "sector_specific_metrics": {
+      "Banks": [
+        "AllowanceForLoanAndLeaseLosses",
+        "LoansAndLeasesReceivableNetReportedAmount",
+        "InterestIncomeLoans"
+      ],
+      "Insurance": [
+        "LiabilityForUnpaidClaimsAndClaimsAdjustmentExpense",
+        "DeferredPolicyAcquisitionCosts",
+        "ReinsuranceRecoverables"
+      ]
+    }
+  },
+
+  "Energy": {
+    "description": "Oil & Gas Exploration, Production, Refining, Services",
+
+    "tag_mappings": {
+      "revenues": [
+        "RevenueOilAndGasServices",
+        "OilAndGasRevenue",
+        "SalesRevenueNet",
+        "Revenues"
+      ],
+
+      "cost_of_revenue": [
+        "CostOfOilAndGasOperations",
+        "OilAndGasProductionCost",
+        "CostOfRevenue",
+        "CostOfGoodsAndServicesSold"
+      ],
+
+      "operating_expenses": [
+        "ExplorationExpense",
+        "GeneralAndAdministrativeExpense",
+        "OperatingExpenses"
+      ],
+
+      "property_plant_equipment": [
+        "OilAndGasPropertySuccessfulEffortMethod",
+        "PropertyPlantAndEquipmentNet",
+        "OilAndGasPropertyFullCostMethodNet"
+      ]
+    },
+
+    "excluded_metrics": [],
+
+    "excluded_ratios": {
+      "gross_margin": {
+        "reason": "Energy companies often don't separate revenue and COGS clearly due to commodity pricing",
+        "alternative_metrics": ["operating_margin", "ebitda_margin"]
+      }
+    },
+
+    "sector_specific_metrics": {
+      "_default": [
+        "ProvedOilAndGasReserves",
+        "DepletionOfOilAndGasProperties"
+      ]
+    }
+  },
+
+  "Real Estate": {
+    "description": "REITs, Real Estate Management, Development",
+
+    "tag_mappings": {
+      "revenues": [
+        "RealEstateRevenueNet",
+        "OperatingLeasesIncomeStatementLeaseRevenue",
+        "Revenues"
+      ],
+
+      "cost_of_revenue": [
+        "RealEstateTaxExpense",
+        "DirectCostsOfLeasedAndRentedPropertyOrEquipment",
+        "CostOfRevenue"
+      ],
+
+      "property_plant_equipment": [
+        "RealEstateInvestmentPropertyNet",
+        "RealEstateInvestmentPropertyAtCost",
+        "PropertyPlantAndEquipmentNet"
+      ]
+    },
+
+    "excluded_metrics": [
+      "inventory",
+      "accounts_receivable"
+    ],
+
+    "excluded_ratios": {
+      "inventory_turnover": {
+        "reason": "REITs don't carry inventory - property is the business",
+        "alternative_metrics": ["funds_from_operations", "net_asset_value"]
+      },
+      "accounts_receivable_turnover": {
+        "reason": "Rent is typically collected in advance",
+        "alternative_metrics": ["occupancy_rate", "rental_yield"]
+      }
+    },
+
+    "sector_specific_metrics": {
+      "_default": [
+        "RealEstateProperties",
+        "FundsFromOperations"
+      ]
+    }
+  },
+
+  "Healthcare": {
+    "description": "Pharmaceuticals, Biotechnology, Healthcare Services, Medical Devices",
+
+    "tag_mappings": {
+      "revenues": [
+        "HealthCareOrganizationRevenue",
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "Revenues"
+      ],
+
+      "cost_of_revenue": [
+        "CostOfGoodsAndServicesSold",
+        "CostOfRevenue"
+      ],
+
+      "research_and_development": [
+        "ResearchAndDevelopmentExpense",
+        "ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost"
+      ],
+
+      "operating_expenses": [
+        "SellingGeneralAndAdministrativeExpense",
+        "OperatingExpenses"
+      ]
+    },
+
+    "excluded_metrics": [],
+
+    "excluded_ratios": {},
+
+    "sector_specific_metrics": {
+      "Pharmaceuticals": [
+        "ResearchAndDevelopmentExpense",
+        "IntangibleAssetsNetExcludingGoodwill"
+      ],
+      "Biotechnology": [
+        "ResearchAndDevelopmentExpense",
+        "CollaborationAgreementRevenue"
+      ]
+    }
+  },
+
+  "Technology": {
+    "description": "Software, Hardware, Semiconductors, IT Services",
+
+    "tag_mappings": {
+      "revenues": [
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "Revenues",
+        "SalesRevenueNet"
+      ],
+
+      "cost_of_revenue": [
+        "CostOfRevenue",
+        "CostOfGoodsAndServicesSold"
+      ],
+
+      "research_and_development": [
+        "ResearchAndDevelopmentExpense",
+        "ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost"
+      ],
+
+      "operating_expenses": [
+        "SellingGeneralAndAdministrativeExpense",
+        "OperatingExpenses"
+      ]
+    },
+
+    "excluded_metrics": [],
+
+    "excluded_ratios": {},
+
+    "sector_specific_metrics": {
+      "Software": [
+        "DeferredRevenue",
+        "CapitalizedComputerSoftwareNet"
+      ]
+    }
+  },
+
+  "_global": {
+    "description": "Fallback mappings for all sectors not explicitly defined",
+
+    "tag_mappings": {
+      "revenues": [
+        "Revenues",
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "SalesRevenueNet"
+      ],
+
+      "cost_of_revenue": [
+        "CostOfRevenue",
+        "CostOfGoodsAndServicesSold",
+        "CostOfGoodsSold"
+      ],
+
+      "gross_profit": [
+        "GrossProfit"
+      ],
+
+      "operating_expenses": [
+        "OperatingExpenses",
+        "OperatingCostsAndExpenses"
+      ],
+
+      "operating_income": [
+        "OperatingIncomeLoss",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"
+      ],
+
+      "net_income": [
+        "NetIncomeLoss",
+        "ProfitLoss",
+        "IncomeLossFromContinuingOperations"
+      ],
+
+      "total_assets": [
+        "Assets"
+      ],
+
+      "current_assets": [
+        "AssetsCurrent"
+      ],
+
+      "total_liabilities": [
+        "Liabilities"
+      ],
+
+      "current_liabilities": [
+        "LiabilitiesCurrent"
+      ],
+
+      "stockholders_equity": [
+        "StockholdersEquity",
+        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+      ],
+
+      "cash_and_equivalents": [
+        "CashAndCashEquivalentsAtCarryingValue",
+        "Cash"
+      ],
+
+      "operating_cash_flow": [
+        "NetCashProvidedByUsedInOperatingActivities"
+      ],
+
+      "capital_expenditures": [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "CapitalExpenditureDiscontinuedOperations"
+      ],
+
+      "free_cash_flow": [
+        "FreeCashFlow"
+      ]
+    }
+  }
+}

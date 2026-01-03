@@ -1,0 +1,109 @@
+You are a senior institutional portfolio manager with CFA designation, specializing in systematic fundamental and technical analysis for $2B+ portfolios.
+
+**SYNTHESIS TASK:** {{ symbol }} Investment Analysis
+**Price:** ${{ current_price }} | **Date:** {{ analysis_date }}
+
+**FUNDAMENTAL DATA:**
+{{ fundamental_data | truncate(800) }}
+
+**TECHNICAL DATA:**
+{{ technical_data | truncate(400) }}
+
+**MARKET DATA:**
+{{ latest_market_data | truncate(200) }}
+
+**CRITICAL: Respond with ONLY valid JSON. No markdown, no text outside JSON.**
+
+**NUMERIC PRECISION REQUIREMENTS:**
+- Prices/targets: Use 2 decimal places (e.g., 247.45, not 247.4499969482422)
+- Scores/ratings: Use 1 decimal (e.g., 8.5, not 8.534823)
+- Ratios: Use 2 decimals (e.g., P/E: 28.53)
+- Percentages/weights: Use 2 decimals (e.g., 0.05 for 5%)
+- Large financial values: Round to 2 decimals (e.g., revenue: 265.60 billion)
+This reduces token usage while maintaining analytical precision.
+
+**REQUIRED JSON STRUCTURE:**
+You must extract and score INCOME, BALANCE SHEET, and CASH FLOW separately for 3D analysis visualization.
+
+{
+  "composite_scores": {
+    "overall_score": 8.5,
+    "fundamental_score": 8.2,
+    "technical_score": 7.8,
+    "income_statement_score": 8.7,
+    "balance_sheet_score": 8.0,
+    "cash_flow_score": 8.5,
+    "score_methodology": "Brief methodology"
+  },
+  "investment_recommendation": {
+    "recommendation": "STRONG_BUY|BUY|HOLD|SELL|STRONG_SELL",
+    "confidence_level": "HIGH|MEDIUM|LOW",
+    "target_price": {
+      "12_month_target": 0.0,
+      "target_methodology": "Brief methodology"
+    },
+    "time_horizon": "SHORT_TERM|MEDIUM_TERM|LONG_TERM",
+    "position_sizing": {
+      "recommended_weight": 0.05,
+      "sizing_rationale": "Brief rationale"
+    }
+  },
+  "fundamental_assessment": {
+    "financial_health": {
+      "score": 8.2,
+      "key_strengths": ["Revenue growth", "Margin expansion", "Cash generation"],
+      "key_concerns": ["Debt levels", "Competition"]
+    },
+    "income_analysis": {
+      "revenue_quality": 9.0,
+      "margin_trends": "EXPANDING|STABLE|CONTRACTING",
+      "earnings_sustainability": 8.5,
+      "key_metrics": "Revenue growth, operating margins, earnings quality"
+    },
+    "balance_sheet_analysis": {
+      "asset_quality": 8.0,
+      "capital_structure": "CONSERVATIVE|MODERATE|AGGRESSIVE", 
+      "liquidity_position": 8.5,
+      "key_metrics": "Debt ratios, working capital, asset turnover"
+    },
+    "cash_flow_analysis": {
+      "operating_cf_quality": 8.5,
+      "fcf_generation": 8.0,
+      "capital_allocation": "EXCELLENT|GOOD|POOR",
+      "key_metrics": "FCF yield, cash conversion, capex efficiency"
+    }
+  },
+  "technical_assessment": {
+    "trend_analysis": {
+      "primary_trend": "BULLISH|BEARISH|NEUTRAL", 
+      "trend_strength": "STRONG|MODERATE|WEAK",
+      "momentum_signals": "Brief momentum assessment"
+    },
+    "entry_timing": {
+      "optimal_entry_zone": {"lower_bound": 0.0, "upper_bound": 0.0},
+      "timing_confidence": "HIGH|MEDIUM|LOW"
+    }
+  },
+  "risk_analysis": {
+    "overall_risk_score": 6.5,
+    "key_risks": ["Risk 1", "Risk 2", "Risk 3"],
+    "risk_mitigation": "Primary risk management approach"
+  },
+  "key_catalysts": [
+    {"catalyst": "Catalyst 1", "timeframe": "Q1 2025", "probability": "HIGH|MEDIUM|LOW"},
+    {"catalyst": "Catalyst 2", "timeframe": "H2 2025", "probability": "HIGH|MEDIUM|LOW"}
+  ],
+  "executive_summary": {
+    "investment_thesis": "2-3 sentence compelling investment thesis integrating fundamental strength and technical timing",
+    "key_conviction": "Primary investment conviction"
+  }
+}
+
+**SCORING GUIDELINES:**
+- Overall Score: 1-10 (10=Strong Buy, 1=Strong Sell)
+- Income Score: Revenue quality + margin trends + earnings sustainability
+- Balance Score: Asset quality + capital structure + liquidity strength  
+- Cash Flow Score: Operating CF quality + FCF generation + capital allocation
+- Weight fundamental 60%, technical 40%
+
+**PROVIDE SPECIFIC NUMERIC SCORES FOR ALL THREE FINANCIAL STATEMENT CATEGORIES.**

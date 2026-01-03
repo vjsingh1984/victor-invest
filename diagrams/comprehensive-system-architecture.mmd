@@ -1,0 +1,136 @@
+graph TB
+    subgraph "External Data Sources"
+        SEC[SEC EDGAR API<br/>10-K/10-Q Filings<br/>Company Facts<br/>Frame API]
+        YAHOO[Yahoo Finance API<br/>Price Data<br/>Market Data<br/>Options Data]
+        OLLAMA[Ollama Local LLM<br/>Multiple Models<br/>Apple Silicon<br/>GPU Acceleration]
+    end
+
+    subgraph "Entry Layer"
+        SHELL[investigator.sh<br/>Main Orchestrator<br/>Bash Script<br/>CLI Interface]
+        CONFIG[config.py<br/>Configuration Management<br/>Environment Variables<br/>Validation]
+    end
+
+    subgraph "Analysis Pipeline"
+        SEC_MOD[sec_fundamental.py<br/>SEC Filing Analysis<br/>XBRL Processing<br/>Financial Metrics<br/>LLM Analysis]
+        TECH_MOD[yahoo_technical.py<br/>Technical Analysis<br/>Price Indicators<br/>Chart Patterns<br/>Volume Analysis]
+        SYNTH_MOD[synthesizer.py<br/>AI Synthesis<br/>Investment Scoring<br/>Report Generation<br/>Recommendations]
+    end
+
+    subgraph "Pattern Layer"
+        SEC_FAC[SEC Facade<br/>patterns/sec/sec_facade.py<br/>Unified SEC Interface]
+        LLM_FAC[LLM Facade<br/>patterns/llm/llm_facade.py<br/>AI Model Management]
+        PEER_FAC[Peer Analysis<br/>patterns/analysis/peer_comparison.py<br/>Comparative Analytics]
+        
+        subgraph "Strategies"
+            SEC_STRAT[SEC Strategies<br/>Analysis Algorithms<br/>Data Processing]
+            LLM_STRAT[LLM Strategies<br/>Model Selection<br/>Context Management]
+        end
+        
+        subgraph "Interfaces"
+            CORE_INT[Core Interfaces<br/>patterns/core/interfaces.py<br/>419 lines of contracts]
+        end
+    end
+
+    subgraph "Cache System"
+        CACHE_MGR[Cache Manager<br/>Priority-based Routing<br/>Multi-backend Support<br/>TTL Management]
+        
+        subgraph "Cache Handlers"
+            FILE_CACHE[File Cache Handler<br/>Priority: 20<br/>JSON/gzip Storage<br/>Fast Access]
+            PARQUET_CACHE[Parquet Cache Handler<br/>Priority: 15<br/>Columnar Storage<br/>Time Series Data]
+            RDBMS_CACHE[RDBMS Cache Handler<br/>Priority: 10<br/>PostgreSQL JSONB<br/>Complex Queries]
+            VECTOR_CACHE[Vector Cache Handler<br/>Priority: 5<br/>Semantic Search<br/>Embeddings]
+        end
+    end
+
+    subgraph "Data Layer"
+        DB_MGR[Database Manager<br/>utils/db.py<br/>SQLAlchemy ORM<br/>Connection Pooling]
+        
+        subgraph "Database Tables"
+            LLM_TBL[(llm_responses<br/>AI Analysis Results<br/>Structured JSON)]
+            SEC_TBL[(sec_companyfacts<br/>Financial Data<br/>XBRL Parsed)]
+            TECH_TBL[(technical_indicators<br/>Market Data<br/>Time Series)]
+            PEER_TBL[(peer_metrics<br/>Comparative Data<br/>Russell 1000)]
+        end
+    end
+
+    subgraph "Utility Layer"
+        API_CLIENT[API Client<br/>HTTP Client<br/>Rate Limiting<br/>Error Handling]
+        REPORT_GEN[Report Generator<br/>PDF Creation<br/>Chart Generation<br/>Email Delivery]
+        DATA_PROC[Data Processors<br/>Financial Calculations<br/>Technical Indicators<br/>Risk Metrics]
+        VECTOR_DB[Vector Database<br/>Semantic Search<br/>Document Similarity<br/>Event Analysis]
+    end
+
+    subgraph "Output Layer"
+        REPORTS[PDF Reports<br/>Investment Analysis<br/>Executive Summary<br/>Charts & Metrics]
+        EMAIL[Email Delivery<br/>Weekly Reports<br/>SMTP/TLS<br/>Notification System]
+        LOGS[Structured Logging<br/>Analysis Tracking<br/>Performance Metrics<br/>Error Reporting]
+    end
+
+    %% Data Flow Connections
+    SEC --> SEC_MOD
+    YAHOO --> TECH_MOD
+    OLLAMA --> LLM_FAC
+    
+    SHELL --> CONFIG
+    SHELL --> SEC_MOD
+    SHELL --> TECH_MOD
+    SHELL --> SYNTH_MOD
+    
+    CONFIG --> SEC_MOD
+    CONFIG --> TECH_MOD
+    CONFIG --> SYNTH_MOD
+    
+    SEC_MOD --> SEC_FAC
+    TECH_MOD --> LLM_FAC
+    SYNTH_MOD --> PEER_FAC
+    
+    SEC_FAC --> SEC_STRAT
+    LLM_FAC --> LLM_STRAT
+    SEC_STRAT --> CORE_INT
+    LLM_STRAT --> CORE_INT
+    
+    SEC_MOD --> CACHE_MGR
+    TECH_MOD --> CACHE_MGR
+    SYNTH_MOD --> CACHE_MGR
+    
+    CACHE_MGR --> FILE_CACHE
+    CACHE_MGR --> PARQUET_CACHE
+    CACHE_MGR --> RDBMS_CACHE
+    CACHE_MGR --> VECTOR_CACHE
+    
+    RDBMS_CACHE --> DB_MGR
+    DB_MGR --> LLM_TBL
+    DB_MGR --> SEC_TBL
+    DB_MGR --> TECH_TBL
+    DB_MGR --> PEER_TBL
+    
+    SEC_MOD --> API_CLIENT
+    TECH_MOD --> API_CLIENT
+    SYNTH_MOD --> REPORT_GEN
+    TECH_MOD --> DATA_PROC
+    SEC_MOD --> VECTOR_DB
+    
+    SYNTH_MOD --> REPORTS
+    SYNTH_MOD --> EMAIL
+    SEC_MOD --> LOGS
+    TECH_MOD --> LOGS
+    SYNTH_MOD --> LOGS
+
+    %% Styling
+    classDef external fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef entry fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef analysis fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef pattern fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef cache fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef data fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    classDef utility fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef output fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+
+    class SEC,YAHOO,OLLAMA external
+    class SHELL,CONFIG entry
+    class SEC_MOD,TECH_MOD,SYNTH_MOD analysis
+    class SEC_FAC,LLM_FAC,PEER_FAC,SEC_STRAT,LLM_STRAT,CORE_INT pattern
+    class CACHE_MGR,FILE_CACHE,PARQUET_CACHE,RDBMS_CACHE,VECTOR_CACHE cache
+    class DB_MGR,LLM_TBL,SEC_TBL,TECH_TBL,PEER_TBL data
+    class API_CLIENT,REPORT_GEN,DATA_PROC,VECTOR_DB utility
+    class REPORTS,EMAIL,LOGS output

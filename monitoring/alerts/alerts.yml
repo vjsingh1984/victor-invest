@@ -1,0 +1,240 @@
+# Prometheus Alert Rules for InvestiGator
+
+groups:
+  - name: investigator_api
+    interval: 30s
+    rules:
+      # API Health Alerts
+      - alert: APIDown
+        expr: up{job="investigator-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "InvestiGator API is down"
+          description: "InvestiGator API has been down for more than 1 minute."
+
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile API latency is above 2 seconds for 5 minutes."
+
+      - alert: HighAPIErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is above 5% for 5 minutes."
+
+  - name: investigator_agents
+    interval: 30s
+    rules:
+      # Agent Health Alerts
+      - alert: AgentDown
+        expr: investigator_agent_health{status="unhealthy"} == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: agents
+        annotations:
+          summary: "Agent {{ $labels.agent_id }} is unhealthy"
+          description: "Agent {{ $labels.agent_id }} has been unhealthy for more than 2 minutes."
+
+      - alert: HighAgentTaskFailureRate
+        expr: rate(investigator_agent_tasks_failed_total[5m]) / rate(investigator_agent_tasks_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: agents
+        annotations:
+          summary: "High task failure rate for agent {{ $labels.agent_id }}"
+          description: "Agent {{ $labels.agent_id }} has >10% task failure rate for 5 minutes."
+
+      - alert: AgentTaskQueueBacklog
+        expr: investigator_task_queue_size > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: agents
+        annotations:
+          summary: "Large task queue backlog"
+          description: "Task queue has more than 100 pending tasks for 10 minutes."
+
+  - name: investigator_resources
+    interval: 30s
+    rules:
+      # Resource Alerts
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 90% for 5 minutes."
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for 5 minutes."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Low disk space"
+          description: "Less than 10% disk space available."
+
+  - name: investigator_database
+    interval: 30s
+    rules:
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute."
+
+      - alert: HighDatabaseConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is above 80% for 5 minutes."
+
+      - alert: SlowDatabaseQueries
+        expr: rate(pg_stat_statements_mean_exec_time[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query execution time is above 1 second for 5 minutes."
+
+  - name: investigator_cache
+    interval: 30s
+    rules:
+      # Cache Alerts
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute."
+
+      - alert: LowCacheHitRate
+        expr: investigator_cache_hit_rate < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is below 70% for 10 minutes."
+
+      - alert: HighCacheEvictions
+        expr: rate(redis_evicted_keys_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High cache eviction rate"
+          description: "Redis is evicting more than 100 keys per second."
+
+  - name: investigator_llm
+    interval: 30s
+    rules:
+      # LLM/Ollama Alerts
+      - alert: OllamaDown
+        expr: up{job="ollama"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: llm
+        annotations:
+          summary: "Ollama is down"
+          description: "Ollama LLM service has been down for more than 2 minutes."
+
+      - alert: HighLLMLatency
+        expr: histogram_quantile(0.95, rate(ollama_request_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "High LLM response latency"
+          description: "95th percentile LLM response time is above 30 seconds."
+
+      - alert: LLMModelNotLoaded
+        expr: ollama_loaded_models_count == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "No LLM models loaded"
+          description: "Ollama has no models loaded for 5 minutes."
+
+  - name: investigator_business
+    interval: 1m
+    rules:
+      # Business Metrics Alerts
+      - alert: NoAnalysisCompleted
+        expr: increase(investigator_analysis_completed_total[1h]) == 0
+        for: 1h
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "No analysis completed in the last hour"
+          description: "No stock analysis has been completed in the last hour."
+
+      - alert: HighAnalysisFailureRate
+        expr: rate(investigator_analysis_failed_total[1h]) / rate(investigator_analysis_total[1h]) > 0.2
+        for: 30m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "High analysis failure rate"
+          description: "More than 20% of analyses are failing."
+
+      - alert: LongRunningAnalysis
+        expr: investigator_analysis_duration_seconds > 600
+        for: 10m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Long running analysis detected"
+          description: "Analysis for {{ $labels.symbol }} has been running for more than 10 minutes."

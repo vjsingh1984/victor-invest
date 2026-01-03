@@ -1,0 +1,244 @@
+# Victor-Invest Data Collection Scheduler Configuration
+#
+# This file configures the scheduled data collection jobs for the trading platform.
+# Jobs can be run via cron, systemd timers, or the built-in scheduler runner.
+#
+# Schedule Format:
+#   cron: Standard cron expression (minute hour day month weekday)
+#   interval: Run every N minutes/hours
+#   at: Run at specific time (HH:MM in specified timezone)
+#
+# All times are in US/Eastern timezone unless otherwise specified.
+
+scheduler:
+  timezone: "US/Eastern"
+  log_level: "INFO"
+  log_file: "logs/scheduler.log"
+  max_retries: 3
+  retry_delay_seconds: 300
+  notification_email: null  # Set to receive failure notifications
+
+jobs:
+  # Treasury Yield Curve Data - Daily at 6PM ET (after market close)
+  # Source: Treasury Fiscal Data API
+  # Updates: Daily yield curve, spreads, inversion detection
+  collect_treasury_data:
+    enabled: true
+    script: "scripts/scheduled/collect_treasury_data.py"
+    schedule:
+      type: "cron"
+      cron: "0 18 * * 1-5"  # 6PM ET, Monday-Friday
+    description: "Collect Treasury yield curve data"
+    timeout_minutes: 10
+    dependencies: []
+    on_failure: "continue"  # continue, stop, retry
+
+  # FRED Macro Indicators - Daily at 9AM ET (before market open)
+  # Source: FRED API
+  # Updates: VIX, GDP, unemployment, inflation, credit spreads
+  refresh_macro_indicators:
+    enabled: true
+    script: "scripts/scheduled/refresh_macro_indicators.py"
+    schedule:
+      type: "cron"
+      cron: "0 9 * * 1-5"  # 9AM ET, Monday-Friday
+    description: "Refresh FRED macroeconomic indicators"
+    timeout_minutes: 15
+    dependencies: []
+    on_failure: "retry"
+
+  # Insider Trading Transactions - Every 4 hours during market hours
+  # Source: SEC EDGAR Form 3/4/5
+  # Updates: Recent insider buys/sells, sentiment scores
+  collect_insider_transactions:
+    enabled: true
+    script: "scripts/scheduled/collect_insider_transactions.py"
+    schedule:
+      type: "cron"
+      cron: "0 8,12,16,20 * * 1-5"  # 8AM, 12PM, 4PM, 8PM ET, Monday-Friday
+    description: "Collect SEC Form 4 insider transactions"
+    timeout_minutes: 30
+    dependencies: []
+    on_failure: "continue"
+    parameters:
+      lookback_hours: 6
+      symbols: "sp500"  # sp500, russell1000, or comma-separated list
+
+  # Institutional Holdings (13F) - Daily at 7AM ET
+  # Source: SEC EDGAR Form 13F
+  # Updates: Quarterly filings, ownership changes
+  # Note: 13F filings are quarterly, but we check daily for new filings
+  collect_13f_filings:
+    enabled: true
+    script: "scripts/scheduled/collect_13f_filings.py"
+    schedule:
+      type: "cron"
+      cron: "0 7 * * 1-5"  # 7AM ET, Monday-Friday
+    description: "Check for new SEC Form 13F filings"
+    timeout_minutes: 45
+    dependencies: []
+    on_failure: "continue"
+    parameters:
+      lookback_days: 1
+      top_institutions: 100
+
+  # Short Interest Data - Bi-monthly (1st and 15th)
+  # Source: FINRA API
+  # Updates: Short interest, days to cover, squeeze risk
+  collect_short_interest:
+    enabled: true
+    script: "scripts/scheduled/collect_short_interest.py"
+    schedule:
+      type: "cron"
+      cron: "0 10 1,15 * *"  # 10AM ET on 1st and 15th of each month
+    description: "Collect FINRA short interest data"
+    timeout_minutes: 60
+    dependencies: []
+    on_failure: "retry"
+    parameters:
+      symbols: "sp500"
+
+  # Market Regime Update - Daily at 6:30PM ET
+  # Aggregates: Treasury, FRED, VIX data into regime classification
+  update_market_regime:
+    enabled: true
+    script: "scripts/scheduled/update_market_regime.py"
+    schedule:
+      type: "cron"
+      cron: "30 18 * * 1-5"  # 6:30PM ET, Monday-Friday
+    description: "Update market regime classification"
+    timeout_minutes: 5
+    dependencies:
+      - "collect_treasury_data"
+      - "refresh_macro_indicators"
+    on_failure: "continue"
+
+  # Credit Risk Scores - Weekly on Sunday at 8PM ET
+  # Calculates: Altman Z, Beneish M, Piotroski F for all tracked symbols
+  calculate_credit_risk:
+    enabled: true
+    script: "scripts/scheduled/calculate_credit_risk.py"
+    schedule:
+      type: "cron"
+      cron: "0 20 * * 0"  # 8PM ET on Sunday
+    description: "Calculate credit risk scores for all symbols"
+    timeout_minutes: 120
+    dependencies: []
+    on_failure: "continue"
+    parameters:
+      symbols: "sp500"
+
+  # ============================================================================
+  # ML/RL Training Data Collectors
+  # ============================================================================
+
+  # Analyst Estimates - Daily at 7AM ET
+  # Source: Finnhub API (requires FINNHUB_API_KEY env var)
+  # Updates: EPS estimates, revenue estimates, price targets, recommendations
+  collect_analyst_estimates:
+    enabled: true
+    script: "scripts/scheduled/collect_analyst_estimates.py"
+    schedule:
+      type: "cron"
+      cron: "0 7 * * 1-5"  # 7AM ET, Monday-Friday
+    description: "Collect analyst estimates and price targets"
+    timeout_minutes: 60
+    dependencies: []
+    on_failure: "continue"
+    parameters:
+      symbols: "sp500"
+
+  # News Sentiment - Daily at 8AM ET
+  # Source: Finnhub API (requires FINNHUB_API_KEY env var)
+  # Updates: Daily sentiment scores, buzz metrics, sector comparisons
+  collect_news_sentiment:
+    enabled: true
+    script: "scripts/scheduled/collect_news_sentiment.py"
+    schedule:
+      type: "cron"
+      cron: "0 8 * * 1-5"  # 8AM ET, Monday-Friday
+    description: "Collect news sentiment data"
+    timeout_minutes: 60
+    dependencies: []
+    on_failure: "continue"
+    parameters:
+      lookback_days: 7
+
+  # Fama-French Factors - Daily at 6AM ET
+  # Source: Kenneth French Data Library (free, no API key required)
+  # Updates: 5-factor model returns, momentum factor
+  collect_fama_french_factors:
+    enabled: true
+    script: "scripts/scheduled/collect_fama_french_factors.py"
+    schedule:
+      type: "cron"
+      cron: "0 6 * * 1-5"  # 6AM ET, Monday-Friday
+    description: "Collect Fama-French factor data"
+    timeout_minutes: 10
+    dependencies: []
+    on_failure: "retry"
+    parameters:
+      years: 5
+
+  # Dividend History - Daily at 6AM ET
+  # Source: Finnhub API (requires FINNHUB_API_KEY env var)
+  # Updates: Dividend history, shareholder yield, streak tracking
+  collect_dividends:
+    enabled: true
+    script: "scripts/scheduled/collect_dividends.py"
+    schedule:
+      type: "cron"
+      cron: "0 6 * * 1-5"  # 6AM ET, Monday-Friday
+    description: "Collect dividend history data"
+    timeout_minutes: 60
+    dependencies: []
+    on_failure: "continue"
+    parameters:
+      years: 5
+      symbols: "sp500"
+
+  # Earnings Quality - Weekly on Sunday at 6AM ET
+  # Source: Calculated from SEC data (no external API)
+  # Updates: Accrual metrics, cash conversion, quality scores
+  calculate_earnings_quality:
+    enabled: true
+    script: "scripts/scheduled/calculate_earnings_quality.py"
+    schedule:
+      type: "cron"
+      cron: "0 6 * * 0"  # 6AM ET on Sunday
+    description: "Calculate earnings quality metrics"
+    timeout_minutes: 120
+    dependencies: []
+    on_failure: "continue"
+    parameters:
+      symbols: "sp500"
+
+# Cron expressions for reference:
+# ┌───────────── minute (0 - 59)
+# │ ┌───────────── hour (0 - 23)
+# │ │ ┌───────────── day of month (1 - 31)
+# │ │ │ ┌───────────── month (1 - 12)
+# │ │ │ │ ┌───────────── day of week (0 - 6) (Sunday = 0)
+# │ │ │ │ │
+# * * * * *
+
+# Example crontab entries (generate with: python scripts/scheduled/generate_crontab.py):
+#
+# # Victor-Invest Scheduled Data Collection
+# SHELL=/bin/bash
+# PYTHONPATH=/path/to/victor-invest/src:/path/to/victor-invest
+#
+# # Treasury Data - Daily 6PM ET
+# 0 18 * * 1-5 cd /path/to/victor-invest && python scripts/scheduled/collect_treasury_data.py >> logs/treasury.log 2>&1
+#
+# # Macro Indicators - Daily 9AM ET
+# 0 9 * * 1-5 cd /path/to/victor-invest && python scripts/scheduled/refresh_macro_indicators.py >> logs/macro.log 2>&1
+#
+# # Insider Transactions - Every 4 hours
+# 0 8,12,16,20 * * 1-5 cd /path/to/victor-invest && python scripts/scheduled/collect_insider_transactions.py >> logs/insider.log 2>&1
+#
+# # 13F Filings - Daily 7AM ET
+# 0 7 * * 1-5 cd /path/to/victor-invest && python scripts/scheduled/collect_13f_filings.py >> logs/13f.log 2>&1
+#
+# # Short Interest - 1st and 15th at 10AM ET
+# 0 10 1,15 * * cd /path/to/victor-invest && python scripts/scheduled/collect_short_interest.py >> logs/short.log 2>&1
