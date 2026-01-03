@@ -258,7 +258,7 @@ class InsiderTransactionFetcher:
     SEC_BASE_URL = "https://www.sec.gov"
     SEC_DATA_URL = "https://data.sec.gov"
     # SEC requires: AppName/Version (email) - see https://www.sec.gov/os/accessing-edgar-data
-    USER_AGENT = "Victor-Invest/1.0 (singhvjd@gmail.com)"
+    USER_AGENT = "Victor-Invest/1.0 (user@example.com)"
 
     def __init__(self, rate_limit: float = 0.1):
         """Initialize fetcher with rate limiting.

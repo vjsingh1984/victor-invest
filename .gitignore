@@ -95,6 +95,18 @@ docs/.doctrees/
 # Model files (large)
 *.gguf
 *.bin
+*.safetensors
+*.onnx
+*.pt
+*.pth
+pytorch_model*
+model.safetensors
+
+# Local downloaded models (BGE, sentence-transformers, etc.)
+local_models/
+models/
+.cache/huggingface/
+.cache/torch/
 
 # Parquet files
 *.parquet

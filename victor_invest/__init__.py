@@ -40,7 +40,7 @@ Example:
 
 __version__ = "0.1.0"
 __author__ = "Vijaykumar Singh"
-__email__ = "singhvjd@gmail.com"
+__email__ = "user@example.com"
 __license__ = "Apache-2.0"
 
 # Use lazy imports to avoid import errors when victor package has issues

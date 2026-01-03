@@ -944,7 +944,7 @@ class Config:
     def _default_sec(self) -> Dict:
         """Default SEC configuration"""
         return {
-            "user_agent": "InvestiGator/1.0 (singhvjd@gmail.com)",
+            "user_agent": "InvestiGator/1.0 (user@example.com)",
             "base_url": "https://data.sec.gov",
             "rate_limit": 10,
             "cache_dir": "./data/sec_cache",
@@ -1933,7 +1933,7 @@ class Config:
                 },
             },
             "sec": {
-                "user_agent": "InvestiGator/1.0 (singhvjd@gmail.com)",
+                "user_agent": "InvestiGator/1.0 (user@example.com)",
                 "base_url": "https://data.sec.gov",
                 "rate_limit": 10,
                 "cache_dir": "./data/sec_cache",

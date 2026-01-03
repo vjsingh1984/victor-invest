@@ -3,14 +3,17 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "investigator"
-version = "0.1.0"
-description = "Institutional-grade investment research combining SEC fundamentals, technical indicators, and LLM synthesis"
-readme = {file = "README.adoc", content-type = "text/plain"}
+name = "victor-invest"
+version = "1.0.0"
+description = "AI-powered investment analysis platform combining SEC fundamentals, technical indicators, and multi-model valuation synthesis"
+readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "Proprietary"}
+license = {text = "Apache-2.0"}
 authors = [
-    {name = "Vijay Singh"}
+    {name = "Vijaykumar Singh", email = "user@example.com"}
+]
+maintainers = [
+    {name = "Vijaykumar Singh", email = "user@example.com"}
 ]
 keywords = [
     "investment",
@@ -18,23 +21,29 @@ keywords = [
     "sec",
     "financial-analysis",
     "llm",
-    "ollama",
+    "valuation",
     "fundamental-analysis",
-    "technical-analysis"
+    "technical-analysis",
+    "ai",
+    "machine-learning"
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 dependencies = [
-    # Victor AI Framework (local wheel)
-    # Install with: pip install ../codingagent/dist/victor-0.2.0-py3-none-any.whl
-    # Note: victor-core provides Agent, AgentSpec, StateGraph, ToolSet, etc.
+    # Victor AI Framework (from PyPI)
+    "victor-ai>=0.3.0",
 
     # Core dependencies
     "requests>=2.31.0",
@@ -156,9 +165,11 @@ victor-invest = "victor_invest.cli:main"
 investigator-legacy = "cli_orchestrator:cli"
 
 [project.urls]
-Homepage = "https://github.com/vsingh/investigator"
-Documentation = "https://github.com/vsingh/investigator/docs"
-Repository = "https://github.com/vsingh/investigator"
+Homepage = "https://github.com/vjsingh1984/victor-invest"
+Documentation = "https://github.com/vjsingh1984/victor-invest#readme"
+Repository = "https://github.com/vjsingh1984/victor-invest"
+Issues = "https://github.com/vjsingh1984/victor-invest/issues"
+Changelog = "https://github.com/vjsingh1984/victor-invest/releases"
 
 [tool.setuptools]
 package-dir = {"" = "src", "victor_invest" = "victor_invest"}

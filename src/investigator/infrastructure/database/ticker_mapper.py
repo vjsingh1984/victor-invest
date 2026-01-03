@@ -30,7 +30,7 @@ class TickerCIKMapper:
     """Maps stock tickers to SEC CIK numbers."""
 
     SEC_TICKER_URL = "https://www.sec.gov/include/ticker.txt"
-    DEFAULT_USER_AGENT = "InvestiGator/1.0 (Vijay Singh; singhvjd@gmail.com)"
+    DEFAULT_USER_AGENT = "InvestiGator/1.0 (user@example.com)"
     CACHE_DURATION = timedelta(hours=24)
     _mapping_loaded_logged = False  # Class-level flag to suppress duplicate load logs
 

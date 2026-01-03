@@ -35,7 +35,7 @@ def download_sec_cik_sic_mapping():
     """
     logger.info(f"Downloading SEC company tickers from: {SEC_TICKERS_URL}")
 
-    headers = {"User-Agent": "InvestiGator/1.0 (vijay@example.com)"}  # SEC requires user agent
+    headers = {"User-Agent": "InvestiGator/1.0 (user@example.com)"}  # SEC requires user agent
 
     try:
         response = requests.get(SEC_TICKERS_URL, headers=headers, timeout=30)
