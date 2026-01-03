@@ -221,6 +221,15 @@ class RLBacktester:
         self.data_source_facade = get_data_source_facade()
         logger.info("DataSourceFacade initialized for unified data access")
 
+        # Initialize DataSourceManager for consolidated data access (optional, Phase 1)
+        try:
+            from investigator.domain.services.data_sources.manager import get_data_source_manager
+            self.data_source_manager = get_data_source_manager()
+            logger.info("DataSourceManager initialized for consolidated data access")
+        except Exception as e:
+            logger.debug(f"DataSourceManager not available, using legacy fetchers: {e}")
+            self.data_source_manager = None
+
         # Initialize shared valuation config services
         # Single source of truth for sector multiples, CAPM, GGM defaults
         self.valuation_config_service = ValuationConfigService()
@@ -1230,6 +1239,61 @@ class RLBacktester:
         except Exception as e:
             logger.debug(f"Could not fetch economic indicators for {as_of_date}: {e}")
             return {"regional_fed": {}, "cboe": {}}
+
+    def get_rl_context_features(
+        self, symbol: str, as_of_date: date
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Get consolidated RL context features using DataSourceManager.
+
+        This method provides a unified interface for fetching all data needed
+        for RL feature extraction, falling back to legacy methods if
+        DataSourceManager is unavailable.
+
+        Returns:
+            Tuple of (insider_data, economic_indicators)
+        """
+        # Try DataSourceManager first (consolidated, efficient)
+        if self.data_source_manager is not None:
+            try:
+                consolidated = self.data_source_manager.get_data(symbol, as_of_date)
+
+                # Extract insider data
+                insider_data = {}
+                if consolidated.insider:
+                    summary = consolidated.insider.get("summary", {})
+                    insider_data = {
+                        "sentiment_score": summary.get("sentiment_score", 0.0),
+                        "buy_count": summary.get("buys", 0),
+                        "sell_count": summary.get("sells", 0),
+                        "buy_value": summary.get("buy_value", 0),
+                        "sell_value": summary.get("sell_value", 0),
+                        "cluster_detected": summary.get("cluster_detected", False),
+                        "key_exec_activity": summary.get("key_exec_activity", 0.0),
+                    }
+
+                # Extract economic indicators
+                economic_indicators = {}
+                if consolidated.fed_districts:
+                    economic_indicators["regional_fed"] = consolidated.fed_districts
+                if consolidated.volatility:
+                    economic_indicators["cboe"] = consolidated.volatility
+                if consolidated.macro:
+                    # Merge macro data if available
+                    economic_indicators["macro"] = consolidated.macro
+
+                logger.debug(
+                    f"Used DataSourceManager for {symbol} RL context (sources: {consolidated.sources_succeeded})"
+                )
+                return insider_data, economic_indicators
+
+            except Exception as e:
+                logger.debug(f"DataSourceManager fetch failed for {symbol}, falling back to legacy: {e}")
+
+        # Fallback to legacy fetchers
+        insider_data = self.fetch_insider_data_sync(symbol, as_of_date)
+        economic_indicators = self.fetch_economic_indicators_sync(as_of_date)
+        return insider_data, economic_indicators
 
     def record_prediction(
         self,

@@ -152,8 +152,25 @@ class TechnicalAnalysisAgent(InvestmentAgent):
         self.logger.info(f"Performing {analysis_type} technical analysis for {symbol}")
 
         try:
-            # Fetch market data
-            price_data = await self._fetch_price_data(symbol, timeframe)
+            # Phase 2: Check for pre-fetched consolidated data from DataSourceManager
+            consolidated_data = task.context.get("consolidated_data")
+            price_data = None
+
+            if consolidated_data is not None:
+                # Try to use pre-fetched technical/price data
+                try:
+                    price_info = getattr(consolidated_data, "price", None) or (
+                        consolidated_data.get("price") if isinstance(consolidated_data, dict) else None
+                    )
+                    if price_info and "dataframe" in price_info:
+                        price_data = pd.DataFrame(price_info["dataframe"])
+                        self.logger.debug(f"Using pre-fetched price data for {symbol} from DataSourceManager")
+                except Exception as e:
+                    self.logger.debug(f"Could not use consolidated data for {symbol}: {e}")
+
+            # Fallback to legacy fetch if no pre-fetched data
+            if price_data is None or price_data.empty:
+                price_data = await self._fetch_price_data(symbol, timeframe)
 
             # Calculate technical indicators
             indicators = await self._calculate_indicators(price_data, symbol)

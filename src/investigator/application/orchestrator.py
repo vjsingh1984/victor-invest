@@ -130,8 +130,17 @@ class AgentOrchestrator:
         try:
             self.market_data_fetcher = get_market_data_fetcher(self._config)
         except Exception as e:
-            self.logger.warning("ETF detection disabled (market data fetcher init failed): %s", e, exc_info=True)
+            self._logger.warning("ETF detection disabled (market data fetcher init failed): %s", e, exc_info=True)
             self.market_data_fetcher = None
+
+        # Initialize DataSourceManager for unified data access (Phase 1)
+        try:
+            from investigator.domain.services.data_sources.manager import DataSourceManager
+            self.data_source_manager = DataSourceManager()
+            self._logger.info("DataSourceManager initialized for unified data access")
+        except Exception as e:
+            self._logger.warning("DataSourceManager init failed, using legacy fetchers: %s", e)
+            self.data_source_manager = None
 
         self.max_concurrent_analyses = max_concurrent_analyses
         self.max_concurrent_agents = max_concurrent_agents
@@ -611,6 +620,30 @@ class AgentOrchestrator:
         agent_results: Dict[str, Any] = {}
         execution_trace: List[Dict[str, Any]] = []
 
+        # Pre-fetch consolidated data via DataSourceManager (Phase 1 integration)
+        consolidated_data = None
+        if hasattr(self, "data_source_manager") and self.data_source_manager is not None:
+            try:
+                # Run synchronous get_data in thread pool to avoid blocking
+                loop = asyncio.get_event_loop()
+                consolidated_data = await loop.run_in_executor(
+                    None,
+                    self.data_source_manager.get_data,
+                    task.symbol,
+                )
+                self.logger.debug(
+                    "Task %s (%s): Pre-fetched consolidated data from DataSourceManager",
+                    task.id,
+                    task.symbol,
+                )
+            except Exception as e:
+                self.logger.warning(
+                    "Task %s (%s): DataSourceManager fetch failed, agents will use legacy fetchers: %s",
+                    task.id,
+                    task.symbol,
+                    str(e),
+                )
+
         for step_index, level in enumerate(execution_order, start=1):
             step_name = f"step_{step_index}"
             agents_in_step = list(level)
@@ -677,6 +710,10 @@ class AgentOrchestrator:
                         "orchestrator_agents_in_step": agents_in_step,
                     }
                 )
+
+                # Inject pre-fetched consolidated data (Phase 1 - agents can optionally use it)
+                if consolidated_data is not None:
+                    agent_task.context["consolidated_data"] = consolidated_data
 
                 if agent_name == "synthesis":
                     agent_task.context["analyses"] = agent_results

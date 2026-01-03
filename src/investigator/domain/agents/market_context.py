@@ -293,8 +293,38 @@ class ETFMarketContextAgent(InvestmentAgent):
             # Determine sector for the symbol
             sector = self._determine_symbol_sector(symbol, task.context)
 
-            # Get macro indicators first (cached for 24 hours, includes VIXCLS)
-            macro_indicators = self._get_macro_indicators_cached()
+            # Phase 2: Check for pre-fetched consolidated data from DataSourceManager
+            consolidated_data = task.context.get("consolidated_data")
+            macro_indicators = None
+
+            if consolidated_data is not None:
+                try:
+                    # Extract macro data from consolidated data
+                    macro_data = getattr(consolidated_data, "macro", None) or (
+                        consolidated_data.get("macro") if isinstance(consolidated_data, dict) else None
+                    )
+                    fed_data = getattr(consolidated_data, "fed_districts", None) or (
+                        consolidated_data.get("fed_districts") if isinstance(consolidated_data, dict) else None
+                    )
+                    volatility_data = getattr(consolidated_data, "volatility", None) or (
+                        consolidated_data.get("volatility") if isinstance(consolidated_data, dict) else None
+                    )
+
+                    if macro_data or fed_data or volatility_data:
+                        macro_indicators = {
+                            "macro_summary": macro_data,
+                            "fed_districts": fed_data,
+                            "volatility": volatility_data,
+                            "buffett_indicator": None,  # Will be calculated if needed
+                            "fetched_at": datetime.now().isoformat(),
+                        }
+                        logger.debug(f"Using pre-fetched macro data for {symbol} from DataSourceManager")
+                except Exception as e:
+                    logger.debug(f"Could not use consolidated macro data for {symbol}: {e}")
+
+            # Fallback to legacy macro fetch if no pre-fetched data
+            if macro_indicators is None:
+                macro_indicators = self._get_macro_indicators_cached()
 
             # Get market context data (now includes VIX from macro_indicators)
             market_context = await self._analyze_market_context(macro_indicators)
