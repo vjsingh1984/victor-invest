@@ -4,9 +4,9 @@ LLM Model Configuration and Capability Management
 Handles dynamic model context and parameter configuration
 """
 
-from typing import Dict, Optional, Any
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

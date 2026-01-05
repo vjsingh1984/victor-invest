@@ -29,7 +29,6 @@ from investigator.domain.services.deterministic_competitive_analyzer import anal
 from investigator.domain.services.deterministic_valuation_synthesizer import synthesize_valuation
 from investigator.domain.services.dynamic_model_weighting import DynamicModelWeightingService
 from investigator.domain.services.fiscal_period_service import get_fiscal_period_service
-from investigator.domain.services.gordon_growth_model import GordonGrowthModel
 from investigator.domain.services.safe_formatters import format_currency as _fmt_currency
 from investigator.domain.services.safe_formatters import format_int_with_commas as _fmt_int_comma
 from investigator.domain.services.safe_formatters import (
@@ -46,6 +45,7 @@ from investigator.domain.services.valuation import SectorValuationRouter  # Sect
 # New valuation models (Milestone 7 - Plan implementation)
 from investigator.domain.services.valuation.damodaran_dcf import DamodaranDCFModel
 from investigator.domain.services.valuation.dcf import DCFValuation
+from investigator.domain.services.valuation.ggm import GordonGrowthModel
 
 # Clean architecture imports (Phase 6-7 migration)
 from investigator.domain.services.valuation.helpers import (

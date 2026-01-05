@@ -11,16 +11,16 @@ Strategy pattern implementations for different SEC data fetching approaches
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from utils.api_client import SECAPIClient
+from data.models import FinancialStatementData, QuarterlyData
+from investigator.config import get_config
 from investigator.infrastructure.cache import get_cache_manager
 from investigator.infrastructure.cache.cache_types import CacheType
+from utils.api_client import SECAPIClient
 from utils.ticker_cik_mapper import TickerCIKMapper
-from data.models import QuarterlyData, FinancialStatementData
-from investigator.config import get_config
 
 logger = logging.getLogger(__name__)
 

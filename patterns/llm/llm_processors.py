@@ -8,31 +8,32 @@ LLM Processor Pattern Implementations
 Chain of Responsibility, Template Method, and Queue-based processors
 """
 
+import json
 import logging
 import queue
 import threading
 import time
 import uuid
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 from concurrent.futures import Future
-import json
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from investigator.application.processors import get_llm_response_processor
+from utils.api_client import OllamaAPIClient
 
 from .llm_interfaces import (
+    ILLMAnalysisTemplate,
     ILLMHandler,
+    ILLMObserver,
     ILLMProcessor,
     ILLMSubject,
-    ILLMObserver,
-    ILLMAnalysisTemplate,
+    LLMPriority,
     LLMRequest,
     LLMResponse,
     LLMTaskType,
-    LLMPriority,
 )
-from .llm_strategies import ILLMStrategy, ILLMCacheStrategy
 from .llm_model_config import get_model_config_manager
-from utils.api_client import OllamaAPIClient
-from utils.llm_response_processor import get_llm_response_processor
+from .llm_strategies import ILLMCacheStrategy, ILLMStrategy
 
 logger = logging.getLogger(__name__)
 

@@ -10,8 +10,8 @@ LLM processing and interaction patterns
 
 from .llm_facade import *
 from .llm_interfaces import *
-from .llm_strategies import *
 from .llm_processors import *
+from .llm_strategies import *
 
 __all__ = [
     # Facade and factories
