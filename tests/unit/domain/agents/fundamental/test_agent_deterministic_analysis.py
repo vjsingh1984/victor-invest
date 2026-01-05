@@ -13,8 +13,9 @@ Author: InvestiGator Team
 Date: 2025-01-05
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestAnalyzeFinancialHealth:
