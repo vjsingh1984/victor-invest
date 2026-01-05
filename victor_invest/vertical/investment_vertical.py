@@ -322,12 +322,23 @@ class InvestmentVertical(VerticalBase):
             Configured AgentOrchestrator instance.
 
         Example:
+            # For most use cases, prefer run_agentic_workflow():
+            provider = InvestmentWorkflowProvider()
+            result = await provider.run_agentic_workflow(
+                "comprehensive",
+                context={"symbol": "AAPL"},
+                provider="ollama",
+            )
+
+            # For custom orchestrator usage:
             orchestrator = await InvestmentVertical.create_orchestrator(
                 provider="ollama",
                 model="gpt-oss:20b"
             )
-            executor = workflow_provider.create_executor(orchestrator)
-            result = await executor.execute(workflow, context)
+            # Use with WorkflowExecutor directly
+            executor = WorkflowExecutor(orchestrator)
+            workflow = provider.get_workflow("comprehensive")
+            result = await executor.execute(workflow, {"symbol": "AAPL"})
         """
         from victor.framework import Agent
 
@@ -362,7 +373,8 @@ class InvestmentVertical(VerticalBase):
         """Run investment analysis using the workflow system.
 
         This is the primary entry point for running investment analysis
-        through Victor's workflow framework.
+        through Victor's workflow framework. Uses WorkflowExecutor with
+        registered compute handlers for the context-stuffing pattern.
 
         Args:
             symbol: Stock ticker symbol to analyze.
@@ -377,7 +389,16 @@ class InvestmentVertical(VerticalBase):
         """
         workflow_provider = cls.get_workflow_provider()
         if workflow_provider:
-            return await workflow_provider.run_workflow(mode, symbol)
+            # Use run_workflow_with_handlers() for handler-based execution
+            # This avoids deprecated run_workflow() while maintaining handler support
+            result = await workflow_provider.run_workflow_with_handlers(
+                mode,
+                context={"symbol": symbol},
+            )
+            # Convert WorkflowResult to dict
+            if hasattr(result, "context") and result.context:
+                return result.context.to_dict() if hasattr(result.context, "to_dict") else dict(result.context)
+            return {"success": result.success, "error": getattr(result, "error", None)}
 
         # Fallback to direct workflow call
         from victor_invest.workflows import AnalysisMode

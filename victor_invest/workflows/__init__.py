@@ -29,15 +29,22 @@ Example:
 
     provider = InvestmentWorkflowProvider()
 
-    # Standard execution
-    executor = provider.create_executor(orchestrator)
-    workflow = provider.get_workflow("comprehensive")
-    result = await executor.execute(workflow, {"symbol": "AAPL"})
+    # Agentic workflow execution (with LLM support)
+    result = await provider.run_agentic_workflow(
+        "comprehensive",
+        context={"symbol": "AAPL"},
+        provider="ollama",
+        model="gpt-oss:20b",
+    )
+    if result.success:
+        synthesis = result.context.get("synthesis")
+        print(f"Recommendation: {synthesis.get('recommendation')}")
 
-    # Streaming execution
-    async for chunk in provider.astream("comprehensive", orchestrator, {"symbol": "AAPL"}):
-        if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
-            print(f"Completed: {chunk.node_name}")
+    # Compute-only workflow execution (no orchestrator needed)
+    result = await provider.run_workflow_with_handlers(
+        "comprehensive",
+        context={"symbol": "AAPL"},
+    )
 
 Available workflows (all YAML-defined):
 - quick: Technical analysis only (~5 seconds)
@@ -54,6 +61,11 @@ This package follows Victor's architecture:
 
 Handlers are defined in victor_invest.handlers and registered with Victor's
 workflow handler registry. YAML workflows reference handlers by path.
+
+Note on Execution Models:
+- run_agentic_workflow(): Uses WorkflowExecutor with orchestrator for agent nodes
+- run_workflow_with_handlers(): Uses WorkflowExecutor for compute handlers
+- run_compiled_workflow(): Uses UnifiedWorkflowCompiler (LangGraph) for transforms
 """
 
 from pathlib import Path
@@ -91,8 +103,7 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
     Inherits from BaseYAMLWorkflowProvider which provides:
     - YAML workflow loading and caching
     - Escape hatches registration from victor_invest.escape_hatches
-    - Streaming execution via StreamingWorkflowExecutor
-    - Standard workflow execution
+    - Unified workflow compilation via UnifiedWorkflowCompiler
 
     Example:
         provider = InvestmentWorkflowProvider()
@@ -100,12 +111,23 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Direct execution (compute-only workflows)
-        result = await provider.run_workflow("comprehensive", {"symbol": "AAPL"})
+        # Agentic execution (with LLM synthesis via orchestrator)
+        result = await provider.run_agentic_workflow(
+            "comprehensive",
+            context={"symbol": "AAPL"},
+            provider="ollama",
+        )
 
-        # Streaming (requires orchestrator for agent nodes)
-        async for chunk in provider.astream("comprehensive", orchestrator, {"symbol": "AAPL"}):
-            print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
+        # Compute-only execution (uses registered handlers)
+        result = await provider.run_workflow_with_handlers(
+            "comprehensive",
+            context={"symbol": "AAPL"},
+        )
+
+    Execution Models:
+        - run_agentic_workflow(): Full orchestrator support for agent nodes
+        - run_workflow_with_handlers(): WorkflowExecutor for compute handlers
+        - run_compiled_workflow(): UnifiedWorkflowCompiler for LangGraph transforms
     """
 
     def _get_escape_hatches_module(self) -> str:
@@ -272,8 +294,87 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
             timeout=timeout,
         )
 
-    # run_workflow() is inherited from BaseYAMLWorkflowProvider
-    # It executes compute-only YAML workflows without requiring a full orchestrator
+    async def run_workflow_with_handlers(
+        self,
+        workflow_name: str,
+        context: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
+    ) -> "WorkflowResult":
+        """Execute a YAML workflow using registered compute handlers.
+
+        This method executes workflows using WorkflowExecutor with the handlers
+        registered via register_compute_handler(). This is the recommended method
+        for running investment workflows that use the context-stuffing pattern.
+
+        Note: This method uses WorkflowExecutor (handler-based execution) rather
+        than UnifiedWorkflowCompiler (LangGraph-based execution). The handlers
+        in victor_invest.handlers are designed for WorkflowExecutor.
+
+        For workflows with full agent node support (LLM reasoning), use
+        run_agentic_workflow() instead.
+
+        Args:
+            workflow_name: Name of the YAML workflow (e.g., "comprehensive")
+            context: Initial context data (e.g., {"symbol": "AAPL"})
+            timeout: Optional overall timeout in seconds (default: 300)
+
+        Returns:
+            WorkflowResult with execution outcome and outputs
+
+        Raises:
+            ValueError: If workflow_name is not found
+
+        Example:
+            provider = InvestmentWorkflowProvider()
+            result = await provider.run_workflow_with_handlers(
+                "comprehensive",
+                context={"symbol": "AAPL"},
+            )
+            if result.success:
+                synthesis = result.context.get("synthesis")
+                print(f"Recommendation: {synthesis.get('recommendation')}")
+        """
+        import warnings
+
+        from victor.tools.registry import ToolRegistry
+        from victor.workflows.executor import WorkflowExecutor
+
+        # Ensure handlers are registered
+        ensure_handlers_registered()
+
+        workflow = self.get_workflow(workflow_name)
+        if not workflow:
+            raise ValueError(f"Unknown workflow: {workflow_name}")
+
+        # Create minimal mock orchestrator for compute-only workflows
+        # Agent nodes would fail, but compute handlers work fine
+        class _MinimalOrchestrator:
+            pass
+
+        orchestrator = _MinimalOrchestrator()
+
+        # Create tool registry (handlers may need it)
+        tool_registry = ToolRegistry()
+
+        # Create executor with handler support
+        executor = WorkflowExecutor(
+            orchestrator,
+            tool_registry=tool_registry,
+            max_parallel=4,
+            default_timeout=timeout or 300.0,
+        )
+
+        # Execute workflow with initial context
+        return await executor.execute(
+            workflow,
+            initial_context=context or {},
+            timeout=timeout,
+        )
+
+    # Inherited from BaseYAMLWorkflowProvider:
+    # - run_compiled_workflow(): Uses UnifiedWorkflowCompiler (LangGraph)
+    # - stream_compiled_workflow(): Streams via UnifiedWorkflowCompiler
+    # - compile_workflow(): Returns CachedCompiledGraph for manual execution
 
 
 # Lazy handler registration to prevent circular imports
