@@ -20,9 +20,14 @@ Updated: 2025-12-29 - Added defense contractor valuation tier (P2-B)
 Updated: 2025-12-30 - Integrated IndustryDatasetRegistry for metrics extraction
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
+
+if TYPE_CHECKING:
+    from investigator.domain.services.valuation.insurance_valuation import InsuranceType
 
 logger = logging.getLogger(__name__)
 

@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry

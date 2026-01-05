@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import yfinance as yf
+from scipy import stats
 
 # Removed cache facade - using cache manager directly
 from investigator.infrastructure.cache import get_cache_manager

@@ -8,11 +8,16 @@ Prompt Manager for Jinja2 Templates
 Handles loading and rendering of LLM prompt templates with proper JSON response formatting
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import TYPE_CHECKING, Dict, Any, Optional
 import json
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from utils.prompt_manager_enhanced import EnhancedPromptManager
 
 try:
     from jinja2 import Environment, FileSystemLoader, Template
