@@ -181,5 +181,7 @@ class TestIndustryOverrides:
         """Test Healthcare/Pharmaceuticals thresholds."""
         thresholds = registry.get_pe_thresholds('Healthcare', 'Pharmaceuticals')
         assert isinstance(thresholds, PEThresholds)
-        # Pharma can have high P/E due to R&D
-        assert thresholds.moderate >= 30
+        # Pharma thresholds adjusted for patent cliff risk (P0-3: 14x fallback)
+        # moderate=18 reflects conservative valuation due to patent expiration risks
+        assert thresholds.moderate == 18
+        assert thresholds.high >= thresholds.moderate

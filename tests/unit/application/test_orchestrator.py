@@ -77,11 +77,11 @@ class TestOrchestratorResilience:
     """Lifecycle and resilience behaviours."""
 
     def test_logger_available_when_market_data_init_fails(self, monkeypatch):
-        class RaisingFetcher:
-            def __init__(self, *args, **kwargs):
-                raise RuntimeError("db unavailable")
+        def raising_fetcher(*args, **kwargs):
+            raise RuntimeError("db unavailable")
 
-        monkeypatch.setattr(orchestrator_module, "DatabaseMarketDataFetcher", RaisingFetcher)
+        # Patch the actual function used by orchestrator
+        monkeypatch.setattr(orchestrator_module, "get_market_data_fetcher", raising_fetcher)
         orch = AgentOrchestrator(cache_manager=Mock(), metrics_collector=Mock())
         assert orch.logger is not None
         assert orch.market_data_fetcher is None
