@@ -75,7 +75,16 @@ from investigator.domain.services.valuation.biotech_valuation import (  # Phase 
     is_pre_revenue_biotech,
     value_biotech,
 )
+from investigator.domain.services.valuation.damodaran_dcf import DamodaranDCFModel
 from investigator.domain.services.valuation.dcf import DCFValuation
+
+# DCF Factory for unified model selection
+from investigator.domain.services.valuation.dcf_factory import (
+    DCFFactory,
+    DCFModelType,
+    auto_select_dcf,
+    create_dcf_model,
+)
 
 # Defense Contractor Valuation (P2-B)
 from investigator.domain.services.valuation.defense_valuation import (  # Defense contractor classification; Backlog metrics; Backlog premium/adjustments; Defense contractor tier; Comprehensive valuation
@@ -148,9 +157,15 @@ from investigator.domain.services.valuation.semiconductor_valuation import (  # 
 __all__ = [
     # Core valuation models
     "DCFValuation",
+    "DamodaranDCFModel",
     "GordonGrowthModel",
     "SectorValuationRouter",
     "ValuationResult",
+    # DCF Factory (SOLID: Open/Closed)
+    "DCFFactory",
+    "DCFModelType",
+    "create_dcf_model",
+    "auto_select_dcf",
     # Insurance valuation
     "value_insurance_company",
     "calculate_insurance_specific_metrics",
