@@ -5,14 +5,16 @@ Tests defensive formatting for None, NaN, inf, and edge cases.
 """
 
 import math
+
 import pytest
+
 from investigator.domain.services.safe_formatters import (
     format_currency,
-    format_percentage,
     format_number,
+    format_percentage,
     format_ratio,
-    safe_round,
     is_valid_number,
+    safe_round,
 )
 
 
@@ -36,15 +38,15 @@ class TestFormatCurrency:
 
     def test_nan_value(self):
         """Test that NaN returns the fallback."""
-        assert format_currency(float('nan')) == "N/A"
+        assert format_currency(float("nan")) == "N/A"
 
     def test_inf_value(self):
         """Test that inf returns the fallback."""
-        assert format_currency(float('inf')) == "N/A"
+        assert format_currency(float("inf")) == "N/A"
 
     def test_negative_inf_value(self):
         """Test that -inf returns the fallback."""
-        assert format_currency(float('-inf')) == "N/A"
+        assert format_currency(float("-inf")) == "N/A"
 
     def test_custom_fallback(self):
         """Test custom fallback string."""
@@ -88,11 +90,11 @@ class TestFormatPercentage:
 
     def test_nan_value(self):
         """Test that NaN returns fallback."""
-        assert format_percentage(float('nan')) == "N/A"
+        assert format_percentage(float("nan")) == "N/A"
 
     def test_inf_value(self):
         """Test that inf returns fallback."""
-        assert format_percentage(float('inf')) == "N/A"
+        assert format_percentage(float("inf")) == "N/A"
 
     def test_custom_decimals(self):
         """Test custom decimal places."""
@@ -124,7 +126,7 @@ class TestFormatNumber:
 
     def test_nan_value(self):
         """Test that NaN returns fallback."""
-        assert format_number(float('nan')) == "N/A"
+        assert format_number(float("nan")) == "N/A"
 
     def test_custom_decimals(self):
         """Test custom decimal places."""
@@ -145,7 +147,7 @@ class TestFormatRatio:
 
     def test_nan_value(self):
         """Test that NaN returns fallback."""
-        assert format_ratio(float('nan')) == "N/A"
+        assert format_ratio(float("nan")) == "N/A"
 
 
 class TestSafeRound:
@@ -161,11 +163,11 @@ class TestSafeRound:
 
     def test_nan_value(self):
         """Test that NaN returns None."""
-        assert safe_round(float('nan')) is None
+        assert safe_round(float("nan")) is None
 
     def test_inf_value(self):
         """Test that inf returns None."""
-        assert safe_round(float('inf')) is None
+        assert safe_round(float("inf")) is None
 
     def test_negative_number(self):
         """Test rounding negative number."""
@@ -193,15 +195,15 @@ class TestIsValidNumber:
 
     def test_nan_value(self):
         """Test NaN is not valid."""
-        assert is_valid_number(float('nan')) is False
+        assert is_valid_number(float("nan")) is False
 
     def test_inf_value(self):
         """Test inf is not valid."""
-        assert is_valid_number(float('inf')) is False
+        assert is_valid_number(float("inf")) is False
 
     def test_negative_inf(self):
         """Test -inf is not valid."""
-        assert is_valid_number(float('-inf')) is False
+        assert is_valid_number(float("-inf")) is False
 
     def test_string_number(self):
         """Test string that can be converted is valid."""
@@ -222,5 +224,3 @@ class TestIsValidNumber:
     def test_negative(self):
         """Test negative number is valid."""
         assert is_valid_number(-42) is True
-
-

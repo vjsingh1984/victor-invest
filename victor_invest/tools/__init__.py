@@ -70,20 +70,20 @@ Example usage:
 """
 
 from victor_invest.tools.base import BaseTool, ToolResult
-from victor_invest.tools.sec_filing import SECFilingTool
-from victor_invest.tools.valuation import ValuationTool
-from victor_invest.tools.technical_indicators import TechnicalIndicatorsTool
-from victor_invest.tools.market_data import MarketDataTool
 from victor_invest.tools.cache import CacheTool
-from victor_invest.tools.entry_exit_signals import EntryExitSignalTool
-from victor_invest.tools.rl_backtest import RLBacktestTool
-from victor_invest.tools.macro_data import MacroDataTool
 from victor_invest.tools.credit_risk import CreditRiskTool
+from victor_invest.tools.entry_exit_signals import EntryExitSignalTool
 from victor_invest.tools.insider_trading import InsiderTradingTool
-from victor_invest.tools.treasury_data import TreasuryDataTool
 from victor_invest.tools.institutional_holdings import InstitutionalHoldingsTool
-from victor_invest.tools.short_interest import ShortInterestTool
+from victor_invest.tools.macro_data import MacroDataTool
+from victor_invest.tools.market_data import MarketDataTool
 from victor_invest.tools.market_regime import MarketRegimeTool
+from victor_invest.tools.rl_backtest import RLBacktestTool
+from victor_invest.tools.sec_filing import SECFilingTool
+from victor_invest.tools.short_interest import ShortInterestTool
+from victor_invest.tools.technical_indicators import TechnicalIndicatorsTool
+from victor_invest.tools.treasury_data import TreasuryDataTool
+from victor_invest.tools.valuation import ValuationTool
 from victor_invest.tools.valuation_signals import ValuationSignalsTool
 
 # All tool classes
@@ -106,9 +106,7 @@ TOOL_CLASSES = [
 ]
 
 # Tool registry mapping names to classes
-TOOL_REGISTRY = {
-    tool_cls.name: tool_cls for tool_cls in TOOL_CLASSES if hasattr(tool_cls, 'name')
-}
+TOOL_REGISTRY = {tool_cls.name: tool_cls for tool_cls in TOOL_CLASSES if hasattr(tool_cls, "name")}
 
 
 def get_tool(name: str, config=None) -> BaseTool:
@@ -172,10 +170,7 @@ def get_tool_descriptions() -> dict:
         for name, desc in descriptions.items():
             print(f"- {name}: {desc[:100]}...")
     """
-    return {
-        name: cls.description
-        for name, cls in TOOL_REGISTRY.items()
-    }
+    return {name: cls.description for name, cls in TOOL_REGISTRY.items()}
 
 
 __all__ = [

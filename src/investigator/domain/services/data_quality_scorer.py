@@ -20,8 +20,8 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from investigator.domain.services.data_validation import DataValidator, ValidationResult, get_data_validator
 

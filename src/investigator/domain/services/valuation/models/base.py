@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Union
 from investigator.domain.services.valuation.models.company_profile import CompanyProfile
 
 
-@dataclass(slots=True)
+@dataclass
 class ModelDiagnostics:
     """Diagnostics that describe how reliable a model output is."""
 
@@ -29,7 +29,7 @@ class ModelDiagnostics:
     flags: List[str] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass
 class ValuationModelResult:
     """Normalized payload emitted by valuation models."""
 
@@ -43,7 +43,7 @@ class ValuationModelResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass
 class ModelNotApplicable:
     """Return type for models that refuse to produce a valuation."""
 

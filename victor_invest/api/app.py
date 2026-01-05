@@ -42,7 +42,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -63,6 +63,7 @@ logger = logging.getLogger(__name__)
 # Application Lifecycle
 # ========================================================================================
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle - startup and shutdown."""
@@ -76,6 +77,7 @@ async def lifespan(app: FastAPI):
     # Try to initialize cache manager
     try:
         from investigator.infrastructure.cache import CacheManager
+
         app.state.cache_manager = CacheManager()
         logger.info("Cache manager initialized")
     except Exception as e:
@@ -84,6 +86,7 @@ async def lifespan(app: FastAPI):
     # Try to initialize database
     try:
         from investigator.infrastructure.database import get_database_engine
+
         app.state.db_engine = get_database_engine()
         logger.info("Database engine initialized")
     except Exception as e:
@@ -101,7 +104,7 @@ async def lifespan(app: FastAPI):
     if app.state.cache_manager:
         try:
             # Close cache if it has a close method
-            if hasattr(app.state.cache_manager, 'close'):
+            if hasattr(app.state.cache_manager, "close"):
                 await app.state.cache_manager.close()
         except Exception as e:
             logger.warning(f"Error closing cache: {e}")
@@ -139,8 +142,10 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Pydantic Models
 # ========================================================================================
 
+
 class AnalysisRequest(BaseModel):
     """Request model for analysis endpoint."""
+
     symbol: str = Field(..., description="Stock ticker symbol (e.g., AAPL)")
     mode: str = Field(
         default="standard",
@@ -152,6 +157,7 @@ class AnalysisRequest(BaseModel):
 
 class AnalysisResponse(BaseModel):
     """Response model for analysis endpoint."""
+
     symbol: str
     mode: str
     status: str
@@ -166,6 +172,7 @@ class AnalysisResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response model for health check."""
+
     status: str
     version: str
     victor_installed: bool
@@ -176,12 +183,14 @@ class HealthResponse(BaseModel):
 
 class BatchAnalysisRequest(BaseModel):
     """Request model for batch analysis."""
+
     symbols: List[str] = Field(..., description="List of stock ticker symbols")
     mode: str = Field(default="standard", description="Analysis mode")
 
 
 class BatchAnalysisResponse(BaseModel):
     """Response model for batch analysis."""
+
     submitted: int
     job_id: str
     status: str
@@ -189,11 +198,13 @@ class BatchAnalysisResponse(BaseModel):
 
 class CacheWarmRequest(BaseModel):
     """Request model for cache warming."""
+
     symbols: List[str] = Field(..., description="Symbols to warm cache for")
 
 
 class ModelInfo(BaseModel):
     """Model information."""
+
     name: str
     size: Optional[str] = None
     modified: Optional[str] = None
@@ -202,6 +213,7 @@ class ModelInfo(BaseModel):
 # ========================================================================================
 # API Endpoints
 # ========================================================================================
+
 
 @app.get("/", response_model=Dict[str, str])
 async def root():
@@ -230,6 +242,7 @@ async def health():
     # Check database
     try:
         from investigator.infrastructure.database import get_database_engine
+
         engine = get_database_engine()
         services["database"] = "healthy" if engine else "unavailable"
     except Exception:
@@ -238,6 +251,7 @@ async def health():
     # Check cache
     try:
         from investigator.infrastructure.cache import CacheManager
+
         services["cache"] = "healthy"
     except Exception:
         services["cache"] = "unavailable"
@@ -245,6 +259,7 @@ async def health():
     # Check Ollama
     try:
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             async with session.get("http://localhost:11434/api/tags", timeout=2) as resp:
                 services["ollama"] = "healthy" if resp.status == 200 else "degraded"
@@ -389,6 +404,7 @@ async def list_models():
     """List available Ollama models."""
     try:
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             async with session.get("http://localhost:11434/api/tags") as resp:
                 if resp.status == 200:
@@ -421,6 +437,7 @@ async def cache_stats():
         else:
             # Try to get stats directly
             from investigator.infrastructure.cache import CacheManager
+
             cache = CacheManager()
             stats = cache.get_stats()
             return {"status": "ok", "stats": stats}
@@ -454,13 +471,14 @@ async def clear_symbol_cache(symbol: str):
         symbol = symbol.upper()
 
         # Try to clear from cache manager
-        if app.state.cache_manager and hasattr(app.state.cache_manager, 'clear_symbol'):
+        if app.state.cache_manager and hasattr(app.state.cache_manager, "clear_symbol"):
             await app.state.cache_manager.clear_symbol(symbol)
         else:
             # Try direct approach
             from investigator.infrastructure.cache import CacheManager
+
             cache = CacheManager()
-            if hasattr(cache, 'clear_symbol'):
+            if hasattr(cache, "clear_symbol"):
                 cache.clear_symbol(symbol)
 
         return {
@@ -478,6 +496,7 @@ async def clear_symbol_cache(symbol: str):
 # ========================================================================================
 # Background Tasks
 # ========================================================================================
+
 
 async def _run_batch_analysis(job_id: str, symbols: List[str], mode: str):
     """Background task for batch analysis."""
@@ -509,7 +528,7 @@ async def _run_batch_analysis(job_id: str, symbols: List[str], mode: str):
 async def _warm_cache_for_symbols(symbols: List[str]):
     """Background task for cache warming."""
     try:
-        from victor_invest.tools import SECFilingTool, MarketDataTool
+        from victor_invest.tools import MarketDataTool, SECFilingTool
 
         sec_tool = SECFilingTool()
         market_tool = MarketDataTool()
@@ -530,6 +549,7 @@ async def _warm_cache_for_symbols(symbols: List[str]):
 # ========================================================================================
 # Error Handlers
 # ========================================================================================
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
@@ -564,6 +584,7 @@ async def general_exception_handler(request, exc):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "victor_invest.api.app:app",
         host="0.0.0.0",

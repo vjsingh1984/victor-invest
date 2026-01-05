@@ -25,6 +25,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -110,6 +111,7 @@ from investigator.domain.services.market_data import (
 from investigator.domain.services.valuation_shared import (
     ValuationConfigService,
     SectorMultiplesService,
+    FairValueService,
 )
 
 logging.basicConfig(
@@ -168,8 +170,15 @@ class RLBacktester:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
+        stock_password = os.environ.get("STOCK_DB_PASSWORD")
+        stock_host = os.environ.get("STOCK_DB_HOST", "localhost")
+        if not stock_password:
+            raise EnvironmentError(
+                "STOCK_DB_PASSWORD environment variable not set. "
+                "Please set it or source your ~/.investigator/env file."
+            )
         self.stock_engine = create_engine(
-            "postgresql://stockuser:${STOCK_DB_PASSWORD}@${STOCK_DB_HOST}:5432/stock",
+            f"postgresql://stockuser:{stock_password}@{stock_host}:5432/stock",
             pool_size=5,
             max_overflow=10,
             pool_pre_ping=True,
@@ -220,6 +229,15 @@ class RLBacktester:
         # Initialize unified data source facade for insider, institutional, macro data
         self.data_source_facade = get_data_source_facade()
         logger.info("DataSourceFacade initialized for unified data access")
+
+        # Initialize DataSourceManager for consolidated data access (optional, Phase 1)
+        try:
+            from investigator.domain.services.data_sources.manager import get_data_source_manager
+            self.data_source_manager = get_data_source_manager()
+            logger.info("DataSourceManager initialized for consolidated data access")
+        except Exception as e:
+            logger.debug(f"DataSourceManager not available, using legacy fetchers: {e}")
+            self.data_source_manager = None
 
         # Initialize shared valuation config services
         # Single source of truth for sector multiples, CAPM, GGM defaults
@@ -734,8 +752,14 @@ class RLBacktester:
                     audit["sector_specific"] = True
                     audit["models_used"].append("reit_ffo")
 
-            # Insurance
-            elif "insurance" in industry.lower():
+            # Insurance, Managed Care & Health Care Distribution
+            # (health insurers and drug distributors are in Health Care sector, not Finance)
+            # All have same economics: high revenue, thin margins (1-3%), PS model inappropriate
+            elif any(term in industry.lower() for term in [
+                "insurance", "insurers", "insurer",
+                "managed health care", "managed care", "hmo", "health maintenance",
+                "health care distribution", "healthcare distribution"
+            ]):
                 ins_result = value_insurance_company(
                     symbol=symbol,
                     financials=financials,
@@ -918,7 +942,18 @@ class RLBacktester:
         audit["tier"] = tier
         audit["weights"] = weights
 
-        return fair_values, tier, audit
+        # Sanitize fair values - filter out complex numbers or non-numeric values
+        sanitized_fvs = {}
+        for model, fv in fair_values.items():
+            if fv is None:
+                sanitized_fvs[model] = None
+            elif isinstance(fv, (int, float)) and not isinstance(fv, complex):
+                sanitized_fvs[model] = fv
+            else:
+                logger.warning(f"{symbol} - Discarding {model} fair value (non-numeric: {type(fv).__name__})")
+                sanitized_fvs[model] = None
+
+        return sanitized_fvs, tier, audit
 
     def _get_sector_pe_multiple(self, sector: str) -> float:
         """Get sector-appropriate P/E multiple from config."""
@@ -940,20 +975,50 @@ class RLBacktester:
         self,
         fair_values: Dict[str, Optional[float]],
         weights: Dict[str, float],
+        current_price: Optional[float] = None,
+        max_upside_multiple: float = 3.0,
+        min_downside_multiple: float = 0.2,
+        tier: Optional[str] = None,
     ) -> float:
-        """Calculate weighted blended fair value."""
-        total_weight = 0
-        weighted_sum = 0
+        """
+        Calculate weighted blended fair value with tier-aware sanity caps.
 
-        for model, weight in weights.items():
-            fv = fair_values.get(model)
-            if fv is not None and fv > 0 and weight > 0:
-                weighted_sum += fv * weight
-                total_weight += weight
+        Delegates to shared FairValueService for consistency across all code paths:
+        - rl_backtest.py (this file)
+        - batch_analysis_runner.py
+        - CLI analysis
+        - workflow handlers
 
-        if total_weight > 0:
-            return weighted_sum / total_weight
-        return 0
+        Args:
+            fair_values: Dict mapping model name to fair value
+            weights: Dict mapping model name to weight
+            current_price: Current stock price for sanity capping (optional)
+            max_upside_multiple: Base max fair value as multiple of price (default 3x = 200% upside)
+            min_downside_multiple: Min fair value as multiple of price (default 0.2x = -80%)
+            tier: Optional tier classification for tier-aware capping (growth=5x, mature=3x)
+
+        Returns:
+            Blended fair value
+        """
+        # Filter out complex numbers before passing to shared service
+        clean_fair_values = {}
+        for model, fv in fair_values.items():
+            if fv is not None and isinstance(fv, (int, float)) and fv > 0:
+                clean_fair_values[model] = float(fv)
+            elif fv is not None and not isinstance(fv, (int, float)):
+                logger.warning(f"Skipping {model} with non-numeric fair value: {type(fv).__name__}")
+
+        # Use shared FairValueService for consistent calculation
+        fv_service = FairValueService()
+        blended, _audit = fv_service.calculate_blended_fair_value(
+            fair_values=clean_fair_values,
+            weights=weights,
+            current_price=current_price,
+            max_upside_multiple=max_upside_multiple,
+            min_downside_multiple=min_downside_multiple,
+            tier=tier,
+        )
+        return blended
 
     def calculate_reward(
         self,
@@ -999,7 +1064,8 @@ class RLBacktester:
         per_model = {}
 
         for model, fv in fair_values.items():
-            if fv is not None and fv > 0 and actual_price > 0 and price_at_prediction > 0:
+            # Protect against complex numbers (from sqrt of negative in growth calculations)
+            if fv is not None and isinstance(fv, (int, float)) and fv > 0 and actual_price > 0 and price_at_prediction > 0:
                 result = calculator.calculate(
                     predicted_fv=fv,
                     price_at_prediction=price_at_prediction,
@@ -1113,6 +1179,9 @@ class RLBacktester:
             debt_to_equity=min(3.0, ratios.get("debt_to_equity", 0)),
             gross_margin=ratios.get("gross_margin", 0),
             operating_margin=ratios.get("operating_margin", 0),
+            net_margin=self._calculate_net_margin(financials, ratios),
+            margin_bin=self._calculate_margin_bin(financials, ratios),
+            is_low_margin_industry=self._is_low_margin_industry(metadata.get("sector", ""), metadata.get("industry", "")),
             data_quality_score=75.0,  # Default for backtest
             quarters_available=financials.get("quarters_available", 4),
             current_price=current_price,
@@ -1187,6 +1256,67 @@ class RLBacktester:
             return 1.0
         return -1.0
 
+    def _calculate_net_margin(self, financials: Dict[str, Any], ratios: Dict[str, float]) -> float:
+        """Calculate net profit margin from financials or ratios."""
+        # Try ratios first
+        net_margin = ratios.get("net_margin", 0.0)
+        if net_margin != 0.0:
+            return net_margin
+        # Calculate from financials
+        revenue = financials.get("total_revenue") or financials.get("revenue") or 0
+        net_income = financials.get("net_income") or 0
+        if revenue > 0:
+            return net_income / revenue
+        return 0.0
+
+    def _calculate_margin_bin(self, financials: Dict[str, Any], ratios: Dict[str, float]) -> int:
+        """Categorize net margin into bins for RL learning.
+
+        Bins:
+            0: very_low (<2%) - PS weight should be minimal
+            1: low (2-5%) - PS weight should be reduced
+            2: medium (5-10%) - normal PS weight
+            3: high (>10%) - PS weight appropriate
+        """
+        net_margin = self._calculate_net_margin(financials, ratios)
+        if net_margin < 0.02:
+            return 0  # very_low
+        elif net_margin < 0.05:
+            return 1  # low
+        elif net_margin < 0.10:
+            return 2  # medium
+        else:
+            return 3  # high
+
+    def _is_low_margin_industry(self, sector: str, industry: str) -> bool:
+        """Check if industry is known to have structurally low margins (<5%)."""
+        if not industry:
+            return False
+
+        industry_lower = industry.lower()
+
+        low_margin_industries = [
+            "department", "specialty retail", "discount stores", "warehouse clubs",
+            "food chains", "grocery", "supermarket",
+            "consumer electronics/video chains",
+            "computer manufacturing", "computer hardware",
+            "electrical products", "electronic components",
+            "air freight", "airlines", "airline",
+            "meat/poultry/fish", "packaged foods", "food processing",
+            "farm products", "farming/seeds",
+            "hospital", "nursing", "medical/nursing services",
+            "insurance", "insurers", "managed health care", "managed care",
+            "health care distribution",
+            "cable", "pay television",
+            "oil/gas transmission", "gas distribution",
+            "beverages",
+        ]
+
+        for term in low_margin_industries:
+            if term in industry_lower:
+                return True
+        return False
+
     def _classify_volatility_regime_int(self, regime: Optional[str]) -> int:
         """Convert volatility regime string to integer for RL features.
 
@@ -1231,6 +1361,65 @@ class RLBacktester:
             logger.debug(f"Could not fetch economic indicators for {as_of_date}: {e}")
             return {"regional_fed": {}, "cboe": {}}
 
+    def get_rl_context_features(
+        self, symbol: str, as_of_date: date
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Get consolidated RL context features using DataSourceManager.
+
+        This method provides a unified interface for fetching all data needed
+        for RL feature extraction, falling back to legacy methods if
+        DataSourceManager is unavailable.
+
+        Returns:
+            Tuple of (insider_data, economic_indicators)
+        """
+        # Try DataSourceManager first (consolidated, efficient)
+        if self.data_source_manager is not None:
+            try:
+                consolidated = self.data_source_manager.get_data(symbol, as_of_date)
+
+                # Extract insider data - handle nested sentiment_score structure
+                insider_data = {}
+                if consolidated.insider:
+                    summary = consolidated.insider.get("summary", {})
+                    sentiment_score_obj = consolidated.insider.get("sentiment_score", {})
+                    insider_data = {
+                        # sentiment_score is nested: {"score": float, "buy_value": float, ...}
+                        "sentiment_score": sentiment_score_obj.get("score", 0.0) if isinstance(sentiment_score_obj, dict) else 0.0,
+                        "buy_count": summary.get("buys", 0),
+                        "sell_count": summary.get("sells", 0),
+                        # buy_value/sell_value from sentiment_score object
+                        "buy_value": sentiment_score_obj.get("buy_value", 0) if isinstance(sentiment_score_obj, dict) else 0,
+                        "sell_value": sentiment_score_obj.get("sell_value", 0) if isinstance(sentiment_score_obj, dict) else 0,
+                        "cluster_detected": summary.get("cluster_detected", False),
+                        "key_exec_activity": summary.get("key_exec_activity", 0.0),
+                    }
+
+                # Extract economic indicators
+                economic_indicators = {}
+                if consolidated.fed_districts:
+                    economic_indicators["regional_fed"] = consolidated.fed_districts
+                if consolidated.volatility:
+                    economic_indicators["cboe"] = consolidated.volatility
+                if consolidated.macro:
+                    economic_indicators["macro"] = consolidated.macro
+                if consolidated.treasury:
+                    economic_indicators["treasury"] = consolidated.treasury
+
+                logger.debug(
+                    f"Used DataSourceManager for {symbol} RL context (sources: {consolidated.sources_succeeded})"
+                )
+                return insider_data, economic_indicators
+
+            except Exception as e:
+                logger.debug(f"DataSourceManager fetch failed for {symbol}, falling back to legacy: {e}")
+
+        # Fallback to legacy fetchers
+        insider_data = self.fetch_insider_data_sync(symbol, as_of_date)
+        economic_indicators = self.fetch_economic_indicators_sync(as_of_date)
+        return insider_data, economic_indicators
+
     def record_prediction(
         self,
         symbol: str,
@@ -1259,7 +1448,17 @@ class RLBacktester:
             entry_date: Date when position was entered (defaults to analysis_date)
             exit_date_30d: Date 30 days after entry (when 30d price was measured)
             exit_date_90d: Date 90 days after entry (when 90d price was measured)
+
+        Returns:
+            Primary key of inserted record, or None if validation failed
         """
+        # Validation: Don't save records with $0 fair value (indicates all models failed)
+        if blended_fair_value <= 0:
+            logger.warning(
+                f"Skipping save for {symbol} {analysis_date}: blended_fair_value is ${blended_fair_value:.2f}"
+            )
+            return None
+
         try:
             predicted_upside_pct = (
                 ((blended_fair_value - current_price) / current_price * 100) if current_price > 0 else 0
@@ -1375,6 +1574,9 @@ class RLBacktester:
         if current_price <= 0:
             return rewards
 
+        # Ensure beta is valid (positive) to avoid complex numbers from sqrt
+        safe_beta = max(0.01, beta) if isinstance(beta, (int, float)) else 1.0
+
         # 30-day rewards
         if actual_price_30d and actual_price_30d > 0:
             price_return = (actual_price_30d - current_price) / current_price
@@ -1384,16 +1586,16 @@ class RLBacktester:
             # LONG: positive when price goes up
             long_raw = annualized
             if long_raw >= 0:
-                rewards["LONG"]["reward_30d"] = long_raw / max(0.5, beta ** 0.5)
+                rewards["LONG"]["reward_30d"] = long_raw / max(0.5, safe_beta ** 0.5)
             else:
-                rewards["LONG"]["reward_30d"] = long_raw * max(1.0, beta ** 0.75)
+                rewards["LONG"]["reward_30d"] = long_raw * max(1.0, safe_beta ** 0.75)
 
             # SHORT: positive when price goes down (inverse of LONG)
             short_raw = -annualized
             if short_raw >= 0:
-                rewards["SHORT"]["reward_30d"] = short_raw / max(0.5, beta ** 0.5)
+                rewards["SHORT"]["reward_30d"] = short_raw / max(0.5, safe_beta ** 0.5)
             else:
-                rewards["SHORT"]["reward_30d"] = short_raw * max(1.0, beta ** 0.75)
+                rewards["SHORT"]["reward_30d"] = short_raw * max(1.0, safe_beta ** 0.75)
 
         # 90-day rewards
         if actual_price_90d and actual_price_90d > 0:
@@ -1403,16 +1605,16 @@ class RLBacktester:
             # LONG
             long_raw = annualized
             if long_raw >= 0:
-                rewards["LONG"]["reward_90d"] = long_raw / max(0.5, beta ** 0.5)
+                rewards["LONG"]["reward_90d"] = long_raw / max(0.5, safe_beta ** 0.5)
             else:
-                rewards["LONG"]["reward_90d"] = long_raw * max(1.0, beta ** 0.75)
+                rewards["LONG"]["reward_90d"] = long_raw * max(1.0, safe_beta ** 0.75)
 
             # SHORT
             short_raw = -annualized
             if short_raw >= 0:
-                rewards["SHORT"]["reward_90d"] = short_raw / max(0.5, beta ** 0.5)
+                rewards["SHORT"]["reward_90d"] = short_raw / max(0.5, safe_beta ** 0.5)
             else:
-                rewards["SHORT"]["reward_90d"] = short_raw * max(1.0, beta ** 0.75)
+                rewards["SHORT"]["reward_90d"] = short_raw * max(1.0, safe_beta ** 0.75)
 
         # Clamp rewards to [-1, 1]
         for pos in rewards:
@@ -1449,6 +1651,9 @@ class RLBacktester:
         if current_price <= 0:
             return rewards
 
+        # Ensure beta is valid (positive) to avoid complex numbers from sqrt
+        safe_beta = max(0.01, beta) if isinstance(beta, (int, float)) else 1.0
+
         for period, days in HOLDING_PERIODS.items():
             actual_price = future_prices.get(period)
             if not actual_price or actual_price <= 0:
@@ -1460,16 +1665,16 @@ class RLBacktester:
             # LONG: positive when price goes up
             long_raw = annualized
             if long_raw >= 0:
-                rewards["LONG"][period] = long_raw / max(0.5, beta ** 0.5)
+                rewards["LONG"][period] = long_raw / max(0.5, safe_beta ** 0.5)
             else:
-                rewards["LONG"][period] = long_raw * max(1.0, beta ** 0.75)
+                rewards["LONG"][period] = long_raw * max(1.0, safe_beta ** 0.75)
 
             # SHORT: positive when price goes down
             short_raw = -annualized
             if short_raw >= 0:
-                rewards["SHORT"][period] = short_raw / max(0.5, beta ** 0.5)
+                rewards["SHORT"][period] = short_raw / max(0.5, safe_beta ** 0.5)
             else:
-                rewards["SHORT"][period] = short_raw * max(1.0, beta ** 0.75)
+                rewards["SHORT"][period] = short_raw * max(1.0, safe_beta ** 0.75)
 
         # Clamp rewards to [-1, 1]
         for pos in rewards:
@@ -1575,8 +1780,10 @@ class RLBacktester:
                         ratios=ratios,
                     )
 
-                # Calculate blended fair value
-                blended_fv = self.calculate_blended_fair_value(fair_values, weights)
+                # Calculate blended fair value (with tier-aware sanity caps to prevent extreme outliers)
+                blended_fv = self.calculate_blended_fair_value(
+                    fair_values, weights, current_price=price_at_prediction, tier=tier
+                )
 
                 if blended_fv <= 0:
                     results["errors"].append(f"{months_back}m: Could not calculate fair value")
@@ -1586,7 +1793,8 @@ class RLBacktester:
                 valuation_gap = (blended_fv - price_at_prediction) / price_at_prediction if price_at_prediction > 0 else 0
 
                 # Calculate valuation confidence based on model agreement
-                valid_fvs = [fv for fv in fair_values.values() if fv and fv > 0]
+                # Filter out complex numbers (from sqrt of negative in growth calculations)
+                valid_fvs = [fv for fv in fair_values.values() if fv and isinstance(fv, (int, float)) and fv > 0]
                 if len(valid_fvs) >= 2:
                     # How many models agree on direction (above or below current price)?
                     above_price = sum(1 for fv in valid_fvs if fv > price_at_prediction)

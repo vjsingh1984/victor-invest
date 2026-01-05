@@ -44,12 +44,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SaaSMetrics:
     """Container for SaaS-specific metrics."""
-    nrr: Optional[float] = None                # Net Revenue Retention (e.g., 1.15 for 115%)
-    ltv_cac: Optional[float] = None            # LTV/CAC ratio
-    gross_margin: Optional[float] = None       # Gross margin (as decimal)
-    cac_payback_months: Optional[float] = None # CAC payback in months
-    magic_number: Optional[float] = None       # Net new ARR / S&M spend
-    burn_multiple: Optional[float] = None      # Net burn / Net new ARR
+
+    nrr: Optional[float] = None  # Net Revenue Retention (e.g., 1.15 for 115%)
+    ltv_cac: Optional[float] = None  # LTV/CAC ratio
+    gross_margin: Optional[float] = None  # Gross margin (as decimal)
+    cac_payback_months: Optional[float] = None  # CAC payback in months
+    magic_number: Optional[float] = None  # Net new ARR / S&M spend
+    burn_multiple: Optional[float] = None  # Net burn / Net new ARR
 
 
 class SaaSValuationModel(BaseValuationModel):
@@ -70,42 +71,42 @@ class SaaSValuationModel(BaseValuationModel):
 
     # Base P/S multiples by growth rate tier
     BASE_PS_MULTIPLES = {
-        'hyper_growth': 15.0,    # >50% growth
-        'high_growth': 10.0,      # 30-50% growth
-        'growth': 7.0,            # 15-30% growth
-        'moderate': 5.0,          # 5-15% growth
-        'low': 3.0,               # <5% growth
+        "hyper_growth": 15.0,  # >50% growth
+        "high_growth": 10.0,  # 30-50% growth
+        "growth": 7.0,  # 15-30% growth
+        "moderate": 5.0,  # 5-15% growth
+        "low": 3.0,  # <5% growth
     }
 
     # Adjustment ranges for each metric
     METRIC_ADJUSTMENTS = {
-        'nrr': {
-            'min_value': 0.80,    # 80% retention
-            'max_value': 1.40,    # 140% retention
-            'min_adjustment': -0.30,
-            'max_adjustment': 0.50,
-            'benchmark': 1.10,    # 110% is benchmark
+        "nrr": {
+            "min_value": 0.80,  # 80% retention
+            "max_value": 1.40,  # 140% retention
+            "min_adjustment": -0.30,
+            "max_adjustment": 0.50,
+            "benchmark": 1.10,  # 110% is benchmark
         },
-        'ltv_cac': {
-            'min_value': 1.0,
-            'max_value': 7.0,
-            'min_adjustment': -0.40,
-            'max_adjustment': 0.30,
-            'benchmark': 3.0,
+        "ltv_cac": {
+            "min_value": 1.0,
+            "max_value": 7.0,
+            "min_adjustment": -0.40,
+            "max_adjustment": 0.30,
+            "benchmark": 3.0,
         },
-        'rule_of_40': {
-            'min_value': 0,
-            'max_value': 70,
-            'min_adjustment': -0.20,
-            'max_adjustment': 0.20,
-            'benchmark': 40,
+        "rule_of_40": {
+            "min_value": 0,
+            "max_value": 70,
+            "min_adjustment": -0.20,
+            "max_adjustment": 0.20,
+            "benchmark": 40,
         },
-        'gross_margin': {
-            'min_value': 0.50,
-            'max_value': 0.90,
-            'min_adjustment': -0.10,
-            'max_adjustment': 0.10,
-            'benchmark': 0.75,
+        "gross_margin": {
+            "min_value": 0.50,
+            "max_value": 0.90,
+            "min_adjustment": -0.10,
+            "max_adjustment": 0.10,
+            "benchmark": 0.75,
         },
     }
 
@@ -120,7 +121,7 @@ class SaaSValuationModel(BaseValuationModel):
         shares_outstanding: Optional[float] = None,
         current_price: Optional[float] = None,
         saas_metrics: Optional[SaaSMetrics] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> ValuationOutput:
         """
         Calculate fair value using SaaS metrics.
@@ -150,21 +151,21 @@ class SaaSValuationModel(BaseValuationModel):
             return ModelNotApplicable(
                 model_name=self.model_name,
                 reason="Revenue not available",
-                diagnostics=ModelDiagnostics(flags=["missing_revenue"])
+                diagnostics=ModelDiagnostics(flags=["missing_revenue"]),
             )
 
         if revenue_growth is None:
             return ModelNotApplicable(
                 model_name=self.model_name,
                 reason="Revenue growth not available",
-                diagnostics=ModelDiagnostics(flags=["missing_growth"])
+                diagnostics=ModelDiagnostics(flags=["missing_growth"]),
             )
 
         if shares_outstanding is None or shares_outstanding <= 0:
             return ModelNotApplicable(
                 model_name=self.model_name,
                 reason="Shares outstanding not available",
-                diagnostics=ModelDiagnostics(flags=["missing_shares"])
+                diagnostics=ModelDiagnostics(flags=["missing_shares"]),
             )
 
         # Normalize growth rate to percentage
@@ -179,21 +180,21 @@ class SaaSValuationModel(BaseValuationModel):
 
         # NRR adjustment
         if nrr is not None:
-            adj = self._calculate_adjustment('nrr', nrr)
-            adjustments['nrr'] = {
-                'value': nrr,
-                'adjustment': adj,
-                'benchmark': self.METRIC_ADJUSTMENTS['nrr']['benchmark']
+            adj = self._calculate_adjustment("nrr", nrr)
+            adjustments["nrr"] = {
+                "value": nrr,
+                "adjustment": adj,
+                "benchmark": self.METRIC_ADJUSTMENTS["nrr"]["benchmark"],
             }
             total_adjustment += adj
 
         # LTV/CAC adjustment
         if ltv_cac is not None:
-            adj = self._calculate_adjustment('ltv_cac', ltv_cac)
-            adjustments['ltv_cac'] = {
-                'value': ltv_cac,
-                'adjustment': adj,
-                'benchmark': self.METRIC_ADJUSTMENTS['ltv_cac']['benchmark']
+            adj = self._calculate_adjustment("ltv_cac", ltv_cac)
+            adjustments["ltv_cac"] = {
+                "value": ltv_cac,
+                "adjustment": adj,
+                "benchmark": self.METRIC_ADJUSTMENTS["ltv_cac"]["benchmark"],
             }
             total_adjustment += adj
 
@@ -203,11 +204,11 @@ class SaaSValuationModel(BaseValuationModel):
             margin_for_r40 = fcf_margin * 100 if abs(fcf_margin) < 5 else fcf_margin
             rule_40_score = growth_for_r40 + margin_for_r40
 
-            adj = self._calculate_adjustment('rule_of_40', rule_40_score)
-            adjustments['rule_of_40'] = {
-                'value': rule_40_score,
-                'adjustment': adj,
-                'benchmark': self.METRIC_ADJUSTMENTS['rule_of_40']['benchmark']
+            adj = self._calculate_adjustment("rule_of_40", rule_40_score)
+            adjustments["rule_of_40"] = {
+                "value": rule_40_score,
+                "adjustment": adj,
+                "benchmark": self.METRIC_ADJUSTMENTS["rule_of_40"]["benchmark"],
             }
             total_adjustment += adj
 
@@ -215,11 +216,11 @@ class SaaSValuationModel(BaseValuationModel):
         if gross_margin is not None:
             # Normalize to decimal if percentage
             gm = gross_margin / 100 if gross_margin > 1 else gross_margin
-            adj = self._calculate_adjustment('gross_margin', gm)
-            adjustments['gross_margin'] = {
-                'value': gm,
-                'adjustment': adj,
-                'benchmark': self.METRIC_ADJUSTMENTS['gross_margin']['benchmark']
+            adj = self._calculate_adjustment("gross_margin", gm)
+            adjustments["gross_margin"] = {
+                "value": gm,
+                "adjustment": adj,
+                "benchmark": self.METRIC_ADJUSTMENTS["gross_margin"]["benchmark"],
             }
             total_adjustment += adj
 
@@ -244,25 +245,25 @@ class SaaSValuationModel(BaseValuationModel):
 
         # Build assumptions
         assumptions = {
-            'revenue_growth_pct': growth_pct,
-            'growth_tier': growth_tier,
-            'base_ps_multiple': base_ps,
-            'total_adjustment': total_adjustment,
-            'adjusted_ps_multiple': adjusted_ps,
-            'metrics_available': metrics_available,
-            'adjustments': adjustments,
+            "revenue_growth_pct": growth_pct,
+            "growth_tier": growth_tier,
+            "base_ps_multiple": base_ps,
+            "total_adjustment": total_adjustment,
+            "adjusted_ps_multiple": adjusted_ps,
+            "metrics_available": metrics_available,
+            "adjustments": adjustments,
         }
 
         # Build metadata
         metadata = {
-            'fair_market_cap': fair_market_cap,
-            'current_revenue': current_revenue,
-            'shares_outstanding': shares_outstanding,
+            "fair_market_cap": fair_market_cap,
+            "current_revenue": current_revenue,
+            "shares_outstanding": shares_outstanding,
         }
 
         if upside_potential is not None:
-            metadata['upside_potential_pct'] = upside_potential
-            metadata['current_price'] = current_price
+            metadata["upside_potential_pct"] = upside_potential
+            metadata["current_price"] = current_price
 
         logger.info(
             f"[{self.company_profile.symbol}] SaaS Valuation: "
@@ -278,32 +279,31 @@ class SaaSValuationModel(BaseValuationModel):
             methodology=self.methodology,
             assumptions=assumptions,
             diagnostics=ModelDiagnostics(
-                data_quality_score=0.50 + 0.125 * metrics_available,
-                flags=[f"saas_tier_{growth_tier}"]
+                data_quality_score=0.50 + 0.125 * metrics_available, flags=[f"saas_tier_{growth_tier}"]
             ),
-            metadata=metadata
+            metadata=metadata,
         )
 
     def estimate_confidence(self, raw_output: Dict[str, Any]) -> float:
         """Estimate confidence for SaaS model."""
-        metrics = raw_output.get('metrics_available', 0)
-        adj = raw_output.get('total_adjustment', 0)
-        growth = raw_output.get('revenue_growth_pct', 0)
+        metrics = raw_output.get("metrics_available", 0)
+        adj = raw_output.get("total_adjustment", 0)
+        growth = raw_output.get("revenue_growth_pct", 0)
 
         return self._calculate_confidence(metrics, adj, growth)
 
     def _get_base_ps(self, growth_pct: float) -> tuple:
         """Get base P/S multiple from growth rate."""
         if growth_pct > 50:
-            return (self.BASE_PS_MULTIPLES['hyper_growth'], 'hyper_growth')
+            return (self.BASE_PS_MULTIPLES["hyper_growth"], "hyper_growth")
         elif growth_pct > 30:
-            return (self.BASE_PS_MULTIPLES['high_growth'], 'high_growth')
+            return (self.BASE_PS_MULTIPLES["high_growth"], "high_growth")
         elif growth_pct > 15:
-            return (self.BASE_PS_MULTIPLES['growth'], 'growth')
+            return (self.BASE_PS_MULTIPLES["growth"], "growth")
         elif growth_pct > 5:
-            return (self.BASE_PS_MULTIPLES['moderate'], 'moderate')
+            return (self.BASE_PS_MULTIPLES["moderate"], "moderate")
         else:
-            return (self.BASE_PS_MULTIPLES['low'], 'low')
+            return (self.BASE_PS_MULTIPLES["low"], "low")
 
     def _calculate_adjustment(self, metric: str, value: float) -> float:
         """Calculate adjustment for a metric based on its range."""
@@ -311,11 +311,11 @@ class SaaSValuationModel(BaseValuationModel):
             return 0
 
         config = self.METRIC_ADJUSTMENTS[metric]
-        min_val = config['min_value']
-        max_val = config['max_value']
-        min_adj = config['min_adjustment']
-        max_adj = config['max_adjustment']
-        benchmark = config['benchmark']
+        min_val = config["min_value"]
+        max_val = config["max_value"]
+        min_adj = config["min_adjustment"]
+        max_adj = config["max_adjustment"]
+        benchmark = config["benchmark"]
 
         # Clamp value to range
         value = max(min_val, min(max_val, value))
@@ -330,12 +330,7 @@ class SaaSValuationModel(BaseValuationModel):
             ratio = (value - benchmark) / (max_val - benchmark) if max_val > benchmark else 0
             return max_adj * ratio
 
-    def _calculate_confidence(
-        self,
-        metrics_available: int,
-        total_adjustment: float,
-        growth_pct: float
-    ) -> float:
+    def _calculate_confidence(self, metrics_available: int, total_adjustment: float, growth_pct: float) -> float:
         """Calculate confidence score."""
         # Base confidence from metrics availability
         base = 0.50 + 0.10 * metrics_available

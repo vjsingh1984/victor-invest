@@ -13,8 +13,8 @@ Date: 2025-11-02
 Updated: 2025-12-29 (TD2 fiscal_period fix)
 """
 
-from typing import Any, Dict, List, Optional
 import logging
+from typing import Any, Dict, List, Optional
 
 from investigator.infrastructure.cache.cache_types import CacheType
 
@@ -134,7 +134,7 @@ class CacheKeyBuilder:
         # TD2 FIX: Determine effective fiscal_period
         # Combine fiscal_year and fiscal_period if both provided separately
         effective_fiscal_period = fiscal_period
-        if fiscal_year and fiscal_period and '-' not in str(fiscal_period):
+        if fiscal_year and fiscal_period and "-" not in str(fiscal_period):
             # Combine: fiscal_year=2025, fiscal_period='Q2' -> '2025-Q2'
             effective_fiscal_period = f"{fiscal_year}-{fiscal_period}"
         elif fiscal_year and not fiscal_period:

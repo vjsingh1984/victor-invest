@@ -132,11 +132,12 @@ Signal Integration:
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "integrate",
         symbol: Optional[str] = None,
         base_fair_value: Optional[float] = None,
         current_price: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute valuation signal query.
 
@@ -161,9 +162,7 @@ Signal Integration:
             action = action.lower().strip()
 
             if action == "integrate":
-                return await self._integrate_signals(
-                    symbol, base_fair_value, current_price, **kwargs
-                )
+                return await self._integrate_signals(symbol, base_fair_value, current_price, **kwargs)
 
             elif action == "credit_risk":
                 return await self._get_credit_risk_signal(symbol, **kwargs)
@@ -186,16 +185,11 @@ Signal Integration:
         except Exception as e:
             logger.error(f"ValuationSignalsTool execute error: {e}")
             return ToolResult.error_result(
-                f"Valuation signal query failed: {str(e)}",
-                metadata={"action": action, "symbol": symbol}
+                f"Valuation signal query failed: {str(e)}", metadata={"action": action, "symbol": symbol}
             )
 
     async def _integrate_signals(
-        self,
-        symbol: Optional[str],
-        base_fair_value: Optional[float],
-        current_price: Optional[float],
-        **kwargs
+        self, symbol: Optional[str], base_fair_value: Optional[float], current_price: Optional[float], **kwargs
     ) -> ToolResult:
         """Integrate all signals for adjusted fair value."""
         if not symbol:
@@ -229,14 +223,10 @@ Signal Integration:
                 "source": "valuation_signal_integrator",
                 "symbol": symbol,
                 "adjustment_pct": result.total_adjustment_pct,
-            }
+            },
         )
 
-    async def _get_credit_risk_signal(
-        self,
-        symbol: Optional[str],
-        **kwargs
-    ) -> ToolResult:
+    async def _get_credit_risk_signal(self, symbol: Optional[str], **kwargs) -> ToolResult:
         """Get credit risk signal only."""
         if not symbol:
             return ToolResult.error_result("Symbol is required for credit risk signal")
@@ -273,14 +263,10 @@ Signal Integration:
                 "source": "credit_risk_signal",
                 "symbol": symbol,
                 "distress_tier": signal.distress_tier.value,
-            }
+            },
         )
 
-    async def _get_insider_signal(
-        self,
-        symbol: Optional[str],
-        **kwargs
-    ) -> ToolResult:
+    async def _get_insider_signal(self, symbol: Optional[str], **kwargs) -> ToolResult:
         """Get insider sentiment signal only."""
         if not symbol:
             return ToolResult.error_result("Symbol is required for insider signal")
@@ -313,14 +299,10 @@ Signal Integration:
                 "source": "insider_sentiment_signal",
                 "symbol": symbol,
                 "signal": signal.signal.value,
-            }
+            },
         )
 
-    async def _get_short_interest_signal(
-        self,
-        symbol: Optional[str],
-        **kwargs
-    ) -> ToolResult:
+    async def _get_short_interest_signal(self, symbol: Optional[str], **kwargs) -> ToolResult:
         """Get short interest signal only."""
         if not symbol:
             return ToolResult.error_result("Symbol is required for short interest signal")
@@ -355,7 +337,7 @@ Signal Integration:
                 "source": "short_interest_signal",
                 "symbol": symbol,
                 "signal": signal.signal.value,
-            }
+            },
         )
 
     async def _get_market_regime_adjustment(self, **kwargs) -> ToolResult:
@@ -392,7 +374,7 @@ Signal Integration:
                 "source": "market_regime_adjustment",
                 "phase": signal.credit_cycle_phase,
                 "wacc_adjustment_bps": signal.wacc_spread_adjustment_bps,
-            }
+            },
         )
 
     async def _fetch_credit_risk_data(self, symbol: str) -> Optional[Dict[str, Any]]:
@@ -486,20 +468,11 @@ Signal Integration:
                     "type": "string",
                     "enum": ["integrate", "credit_risk", "insider", "short_interest", "market_regime"],
                     "description": "Type of signal query",
-                    "default": "integrate"
+                    "default": "integrate",
                 },
-                "symbol": {
-                    "type": "string",
-                    "description": "Stock symbol"
-                },
-                "base_fair_value": {
-                    "type": "number",
-                    "description": "Base fair value from valuation models"
-                },
-                "current_price": {
-                    "type": "number",
-                    "description": "Current stock price"
-                }
+                "symbol": {"type": "string", "description": "Stock symbol"},
+                "base_fair_value": {"type": "number", "description": "Base fair value from valuation models"},
+                "current_price": {"type": "number", "description": "Current stock price"},
             },
-            "required": []
+            "required": [],
         }

@@ -18,8 +18,12 @@ from investigator.domain.services.valuation.models.base import (
     ModelNotApplicable,
     ValuationModelResult,
 )
-from investigator.domain.services.valuation.models.company_profile import CompanyArchetype, CompanyProfile, DataQualityFlag
 from investigator.domain.services.valuation.models.common import baseline_multiple_context, clamp
+from investigator.domain.services.valuation.models.company_profile import (
+    CompanyArchetype,
+    CompanyProfile,
+    DataQualityFlag,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,30 +35,24 @@ INDUSTRY_BASE_PS = {
     "Technology/Computer Software: Programming, Data Processing": 12.0,  # Dev tools
     "Technology/EDP Services": 8.0,  # Enterprise services
     "Technology/Services-Computer Programming, Data Processing, Etc.": 10.0,  # Cloud services
-
     # Technology - Hardware & Semiconductors
     "Technology/Semiconductors": 5.0,  # Semiconductor manufacturers
     "Technology/Computer Hardware": 2.0,  # Hardware manufacturers
     "Technology/Electronic Components": 3.0,
-
     # Technology - Internet & E-commerce
     "Technology/Services-Computer Programming": 9.0,
     "Technology/Retail": 1.5,
-
     # Healthcare - Biotech & Pharma
     "Health Care/Biotechnology: Biological Products (No Diagnostic Substances)": 8.0,
     "Health Care/Pharmaceutical Preparations": 5.0,
-
     # Financial Services
     "Financials/Security Brokers, Dealers & Flotation Companies": 3.0,  # Fintech
     "Financials/Banks": 2.0,
     "Financials/Insurance": 1.5,
-
     # Consumer
     "Consumer Discretionary/Catalog & Mail-Order Houses": 2.0,  # E-commerce
     "Consumer Discretionary/Restaurants": 1.5,
     "Consumer Staples/Food": 1.0,
-
     # Industrials
     "Industrials/Aerospace": 1.5,
     "Industrials/Machinery": 1.2,
@@ -77,28 +75,28 @@ SECTOR_BASE_PS = {
 
 # Growth tier adjustments (additive, based on YoY revenue growth)
 GROWTH_TIER_ADJUSTMENTS = {
-    (0.0, 0.10): -1.0,      # 0-10% (slow growth penalty)
-    (0.10, 0.15): 0.0,      # 10-15% (baseline)
-    (0.15, 0.25): 2.0,      # 15-25% (moderate growth)
-    (0.25, 0.35): 4.0,      # 25-35% (high growth) - SNOW: 32%
-    (0.35, 0.50): 6.0,      # 35-50% (very high growth)
-    (0.50, 1.00): 8.0,      # >50% (exceptional growth)
+    (0.0, 0.10): -1.0,  # 0-10% (slow growth penalty)
+    (0.10, 0.15): 0.0,  # 10-15% (baseline)
+    (0.15, 0.25): 2.0,  # 15-25% (moderate growth)
+    (0.25, 0.35): 4.0,  # 25-35% (high growth) - SNOW: 32%
+    (0.35, 0.50): 6.0,  # 35-50% (very high growth)
+    (0.50, 1.00): 8.0,  # >50% (exceptional growth)
 }
 
 # Stage/profitability adjustments (additive)
 STAGE_ADJUSTMENTS = {
     "pre_profitable_high_growth": 2.0,  # High-growth pre-profitable (SNOW)
     "pre_profitable_low_growth": -1.0,  # Low-growth pre-profitable (struggling)
-    "profitable_mature": 0.0,           # Baseline
-    "early_stage": 1.0,                 # Early-stage profitable
+    "profitable_mature": 0.0,  # Baseline
+    "early_stage": 1.0,  # Early-stage profitable
 }
 
 # Quality premium multipliers (multiplicative, applied AFTER additive adjustments)
 QUALITY_PREMIUMS = {
-    "rule_of_40_excellent": 1.2,    # Rule of 40 >40% (SNOW: 46.6%)
-    "rule_of_40_good": 1.1,         # Rule of 40 30-40%
-    "nrr_excellent": 1.15,          # Net Revenue Retention >120%
-    "gross_margin_high": 1.1,       # Gross margin >70%
+    "rule_of_40_excellent": 1.2,  # Rule of 40 >40% (SNOW: 46.6%)
+    "rule_of_40_good": 1.1,  # Rule of 40 30-40%
+    "nrr_excellent": 1.15,  # Net Revenue Retention >120%
+    "gross_margin_high": 1.1,  # Gross margin >70%
 }
 
 
@@ -211,7 +209,11 @@ class PSMultipleModel(BaseValuationModel):
 
         # Fallback to sector-level lookup
         if base_ps is None and self.company_profile.sector:
-            sector_key = self.company_profile.sector.split('/')[0].strip() if '/' in self.company_profile.sector else self.company_profile.sector.strip()
+            sector_key = (
+                self.company_profile.sector.split("/")[0].strip()
+                if "/" in self.company_profile.sector
+                else self.company_profile.sector.strip()
+            )
             base_ps = SECTOR_BASE_PS.get(sector_key)
             if base_ps:
                 logger.debug(f"PS_GRANULAR - Sector base P/S: {base_ps} (sector: {sector_key})")
@@ -222,7 +224,9 @@ class PSMultipleModel(BaseValuationModel):
             logger.debug(f"PS_GRANULAR - Using sector median P/S: {base_ps}")
 
         if base_ps is None:
-            logger.warning(f"PS_GRANULAR - No base P/S found (sector: {self.company_profile.sector}, industry: {self.company_profile.industry})")
+            logger.warning(
+                f"PS_GRANULAR - No base P/S found (sector: {self.company_profile.sector}, industry: {self.company_profile.industry})"
+            )
             return None
 
         target_ps = float(base_ps)
@@ -234,7 +238,9 @@ class PSMultipleModel(BaseValuationModel):
             for (low, high), adjustment in GROWTH_TIER_ADJUSTMENTS.items():
                 if low <= growth_rate < high:
                     growth_adjustment = adjustment
-                    logger.info(f"PS_GRANULAR - Growth adjustment: +{adjustment:.1f} (revenue growth: {growth_rate*100:.1f}%)")
+                    logger.info(
+                        f"PS_GRANULAR - Growth adjustment: +{adjustment:.1f} (revenue growth: {growth_rate*100:.1f}%)"
+                    )
                     break
         else:
             logger.debug("PS_GRANULAR - No revenue_growth_yoy available, skipping growth adjustment")
@@ -247,16 +253,14 @@ class PSMultipleModel(BaseValuationModel):
         # Determine stage classification
         # Use boolean flags from CompanyProfile (has_positive_earnings, has_positive_ebitda)
         is_pre_profitable = (
-            (self.company_profile.has_positive_earnings is not None and
-             not self.company_profile.has_positive_earnings) or
-            (self.company_profile.has_positive_ebitda is not None and
-             not self.company_profile.has_positive_ebitda)
-        )
+            self.company_profile.has_positive_earnings is not None and not self.company_profile.has_positive_earnings
+        ) or (self.company_profile.has_positive_ebitda is not None and not self.company_profile.has_positive_ebitda)
 
         if is_pre_profitable:
             # Check if high growth (>20% YoY)
-            is_high_growth = (self.company_profile.revenue_growth_yoy is not None and
-                            self.company_profile.revenue_growth_yoy > 0.20)
+            is_high_growth = (
+                self.company_profile.revenue_growth_yoy is not None and self.company_profile.revenue_growth_yoy > 0.20
+            )
 
             if is_high_growth:
                 stage_adjustment = STAGE_ADJUSTMENTS["pre_profitable_high_growth"]
@@ -303,7 +307,9 @@ class PSMultipleModel(BaseValuationModel):
         # Step 5: Clamp to min/max bounds
         final_ps = clamp(target_ps, self.min_ps, self.max_ps)
 
-        logger.info(f"PS_GRANULAR - Final P/S: {final_ps:.2f} (base: {base_ps:.1f} + growth: {growth_adjustment:.1f} + stage: {stage_adjustment:.1f}) × quality: {quality_multiplier:.2f})")
+        logger.info(
+            f"PS_GRANULAR - Final P/S: {final_ps:.2f} (base: {base_ps:.1f} + growth: {growth_adjustment:.1f} + stage: {stage_adjustment:.1f}) × quality: {quality_multiplier:.2f})"
+        )
 
         return final_ps
 
@@ -329,7 +335,10 @@ class PSMultipleModel(BaseValuationModel):
                 diagnostics.flags.append("PS_DIVERGENCE")
                 diagnostics.fit_score = clamp(diagnostics.fit_score - 0.1, 0.0, 1.0)
 
-        if self.company_profile.daily_liquidity_usd and self.company_profile.daily_liquidity_usd < self.liquidity_floor_usd:
+        if (
+            self.company_profile.daily_liquidity_usd
+            and self.company_profile.daily_liquidity_usd < self.liquidity_floor_usd
+        ):
             diagnostics.flags.append("LOW_LIQUIDITY")
             diagnostics.data_quality_score = clamp(diagnostics.data_quality_score - 0.1, 0.0, 1.0)
 

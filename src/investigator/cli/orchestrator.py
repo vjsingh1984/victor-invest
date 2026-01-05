@@ -5,28 +5,34 @@ Agentic AI-powered investment analysis system
 """
 
 import asyncio
-import click
-import logging
-import sys
-import os
-from typing import List, Optional
-from datetime import datetime
 import json
-import yaml
+import logging
+import os
+import sys
+from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
+
+import click
+import yaml
 
 # Add src/ to Python path for investigator package
 src_dir = Path(__file__).parent / "src"
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
-from investigator.application import AgentOrchestrator, AnalysisMode, Priority
-from investigator.application import OutputDetailLevel, format_analysis_output
-from investigator.infrastructure.cache import CacheManager
+from investigator.application import (
+    AgentOrchestrator,
+    AnalysisMode,
+    OutputDetailLevel,
+    Priority,
+    format_analysis_output,
+)
 from investigator.domain.agents.sec import SECAnalysisAgent
-from investigator.infrastructure.monitoring import MetricsCollector, AlertManager
-from investigator.infrastructure.llm import OllamaClient
+from investigator.infrastructure.cache import CacheManager
 from investigator.infrastructure.events import EventBus
+from investigator.infrastructure.llm import OllamaClient
+from investigator.infrastructure.monitoring import AlertManager, MetricsCollector
 
 # from api.main import create_app  # Will fix this separately
 
@@ -833,6 +839,7 @@ def economic(ctx, source, json_output):
     - CBOE VIX, SKEW, term structure
     """
     from datetime import date
+
     from investigator.domain.services.data_sources.facade import get_data_source_facade
 
     facade = get_data_source_facade()
@@ -846,6 +853,7 @@ def economic(ctx, source, json_output):
 
     if json_output:
         import json as json_lib
+
         output = {
             "regional_fed": regional_fed,
             "cboe": cboe,
@@ -1116,8 +1124,8 @@ def clean_cache(ctx, clean_all, clean_db, clean_disk, symbol):
     """Clean analysis caches"""
     from investigator.infrastructure.cache import get_cache_manager
     from investigator.infrastructure.cache.cache_types import CacheType
-    from investigator.infrastructure.cache.rdbms_cache_handler import RdbmsCacheStorageHandler
     from investigator.infrastructure.cache.file_cache_handler import FileCacheStorageHandler
+    from investigator.infrastructure.cache.rdbms_cache_handler import RdbmsCacheStorageHandler
 
     cache_manager = get_cache_manager()
 
@@ -1225,8 +1233,8 @@ def inspect_cache(ctx, symbol, verbose):
 @click.pass_context
 def cache_sizes(ctx):
     """Show cache sizes by type"""
-    from pathlib import Path
     import os
+    from pathlib import Path
 
     click.echo("Cache Directory Sizes")
     click.echo("=" * 60)
@@ -1373,9 +1381,10 @@ def run_tests(ctx, pattern, verbose):
 )
 def cache_facts(symbols_file, symbol_list, parallel, process_raw, hydrate_from_db):
     """Fetch CompanyFacts for SP100 (or supplied) symbols without running full analysis."""
+    import hashlib
+
     from investigator.config import get_config
     from investigator.infrastructure.database.db import get_db_manager
-    import hashlib
 
     cfg = get_config()
     cache_manager = CacheManager(cfg)
@@ -1500,8 +1509,9 @@ def cache_facts(symbols_file, symbol_list, parallel, process_raw, hydrate_from_d
 @click.pass_context
 def setup_database(ctx):
     """Initialize database schema"""
-    from investigator.infrastructure.database.db import get_engine
     from sqlalchemy import text
+
+    from investigator.infrastructure.database.db import get_engine
 
     click.echo("Setting up database...")
 
@@ -1586,8 +1596,9 @@ def setup_system(ctx):
 def system_stats(ctx):
     """Show system statistics and information"""
     import platform
-    import psutil
     from pathlib import Path
+
+    import psutil
 
     click.echo("InvestiGator System Information")
     click.echo("=" * 60)

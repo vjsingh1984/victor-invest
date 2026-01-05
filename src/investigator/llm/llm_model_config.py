@@ -4,9 +4,9 @@ LLM Model Configuration and Capability Management
 Handles dynamic model context and parameter configuration
 """
 
-from typing import Dict, Optional, Any
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ModelConfig:
     """Configuration for a specific LLM model"""
+
     name: str
     context_window: int
     default_num_predict: int
@@ -34,7 +35,7 @@ MODEL_CONFIGS = {
         max_num_predict=16384,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Llama 3.3 70B - BEST ACCURACY (70.6B params, 128K context)"
+        description="Llama 3.3 70B - BEST ACCURACY (70.6B params, 128K context)",
     ),
     "llama-3.3-70b-instruct-q4_k_m-128K-custom": ModelConfig(
         name="llama-3.3-70b-instruct-q4_k_m-128K-custom",
@@ -43,7 +44,7 @@ MODEL_CONFIGS = {
         max_num_predict=16384,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Llama 3.3 70B Custom - High accuracy (70.6B params)"
+        description="Llama 3.3 70B Custom - High accuracy (70.6B params)",
     ),
     "llama3.1:8b-instruct-q8_0": ModelConfig(
         name="llama3.1:8b-instruct-q8_0",
@@ -52,7 +53,7 @@ MODEL_CONFIGS = {
         max_num_predict=8192,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Llama 3.1 8B with 128K context window"
+        description="Llama 3.1 8B with 128K context window",
     ),
     "llama3.1:8b": ModelConfig(
         name="llama3.1:8b",
@@ -61,7 +62,7 @@ MODEL_CONFIGS = {
         max_num_predict=8192,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Llama 3.1 8B base model"
+        description="Llama 3.1 8B base model",
     ),
     "llama-3.3-70b-instruct-q4_k_m": ModelConfig(
         name="llama-3.3-70b-instruct-q4_k_m",
@@ -70,9 +71,8 @@ MODEL_CONFIGS = {
         max_num_predict=16384,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Llama 3.3 70B with extended context"
+        description="Llama 3.3 70B with extended context",
     ),
-    
     # Phi models
     "phi4-reasoning": ModelConfig(
         name="phi4-reasoning",
@@ -81,7 +81,7 @@ MODEL_CONFIGS = {
         max_num_predict=4096,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Microsoft Phi-4 reasoning model"
+        description="Microsoft Phi-4 reasoning model",
     ),
     "phi4-reasoning:plus": ModelConfig(
         name="phi4-reasoning:plus",
@@ -90,7 +90,7 @@ MODEL_CONFIGS = {
         max_num_predict=6144,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Microsoft Phi-4 reasoning model with extended context"
+        description="Microsoft Phi-4 reasoning model with extended context",
     ),
     "phi3:14b-medium-4k-instruct-q4_1": ModelConfig(
         name="phi3:14b-medium-4k-instruct-q4_1",
@@ -98,9 +98,8 @@ MODEL_CONFIGS = {
         default_num_predict=1024,
         max_num_predict=2048,
         supports_system_prompt=True,
-        description="Microsoft Phi-3 14B model"
+        description="Microsoft Phi-3 14B model",
     ),
-    
     # DeepSeek models - REASONING SPECIALISTS
     "deepseek-r1:32b": ModelConfig(
         name="deepseek-r1:32b",
@@ -109,9 +108,8 @@ MODEL_CONFIGS = {
         max_num_predict=16384,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="DeepSeek R1 32B - REASONING EXPERT (32.8B params, 128K context, thinking capability)"
+        description="DeepSeek R1 32B - REASONING EXPERT (32.8B params, 128K context, thinking capability)",
     ),
-
     # Qwen models (reasoning models with thinking tags)
     "qwen3:30b": ModelConfig(
         name="qwen3:30b",
@@ -120,7 +118,7 @@ MODEL_CONFIGS = {
         max_num_predict=16384,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Qwen3 30B MoE - HUGE CONTEXT (30.5B params, 262K context, thinking + tools)"
+        description="Qwen3 30B MoE - HUGE CONTEXT (30.5B params, 262K context, thinking + tools)",
     ),
     "qwen3:32b": ModelConfig(
         name="qwen3:32b",
@@ -129,7 +127,7 @@ MODEL_CONFIGS = {
         max_num_predict=8192,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Qwen3 32B with 40K context - excellent for long documents"
+        description="Qwen3 32B with 40K context - excellent for long documents",
     ),
     "qwen3-coder:30b": ModelConfig(
         name="qwen3-coder:30b",
@@ -138,7 +136,7 @@ MODEL_CONFIGS = {
         max_num_predict=16384,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Qwen3 Coder 30B with 262K context - code specialist"
+        description="Qwen3 Coder 30B with 262K context - code specialist",
     ),
     "qwen3:30b-a3b": ModelConfig(
         name="qwen3:30b-a3b",
@@ -147,7 +145,7 @@ MODEL_CONFIGS = {
         max_num_predict=8192,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Qwen3 30B variant with 40K context"
+        description="Qwen3 30B variant with 40K context",
     ),
     "qwen3-30b-40k-financial:latest": ModelConfig(
         name="qwen3-30b-40k-financial:latest",
@@ -156,7 +154,7 @@ MODEL_CONFIGS = {
         max_num_predict=8192,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Qwen3 30B financial model with thinking"
+        description="Qwen3 30B financial model with thinking",
     ),
     "qwen2.5:32b-instruct-q4_K_M": ModelConfig(
         name="qwen2.5:32b-instruct-q4_K_M",
@@ -165,9 +163,8 @@ MODEL_CONFIGS = {
         max_num_predict=6144,
         supports_system_prompt=True,
         supports_json_mode=True,
-        description="Qwen 2.5 32B instruction model"
+        description="Qwen 2.5 32B instruction model",
     ),
-    
     # Mixtral models
     "mixtral:8x7b-instruct-v0.1-q4_K_M": ModelConfig(
         name="mixtral:8x7b-instruct-v0.1-q4_K_M",
@@ -175,7 +172,7 @@ MODEL_CONFIGS = {
         default_num_predict=2048,
         max_num_predict=4096,
         supports_system_prompt=True,
-        description="Mixtral 8x7B MoE model"
+        description="Mixtral 8x7B MoE model",
     ),
     "mistral:v0.3": ModelConfig(
         name="mistral:v0.3",
@@ -183,9 +180,8 @@ MODEL_CONFIGS = {
         default_num_predict=1024,
         max_num_predict=2048,
         supports_system_prompt=True,
-        description="Mistral v0.3 base model"
+        description="Mistral v0.3 base model",
     ),
-    
     # Default fallback configuration
     "default": ModelConfig(
         name="default",
@@ -193,8 +189,8 @@ MODEL_CONFIGS = {
         default_num_predict=1024,
         max_num_predict=2048,
         supports_system_prompt=True,
-        description="Default fallback configuration"
-    )
+        description="Default fallback configuration",
+    ),
 }
 
 
@@ -209,9 +205,9 @@ class ModelConfigManager:
     def get_model_config(self, model_name: str) -> ModelConfig:
         """Get configuration for a specific model"""
         # PRIORITY 1: Try to get from config.json model_specs (single source of truth)
-        if self.config and hasattr(self.config, 'ollama'):
+        if self.config and hasattr(self.config, "ollama"):
             ollama_config = self.config.ollama
-            if hasattr(ollama_config, 'model_specs'):
+            if hasattr(ollama_config, "model_specs"):
                 model_specs = ollama_config.model_specs
                 # Try exact match first
                 if model_name in model_specs:
@@ -220,12 +216,12 @@ class ModelConfigManager:
                     self.logger.info(f"Using config.json spec for {model_name}")
                     return ModelConfig(
                         name=model_name,
-                        context_window=getattr(spec, 'context_window', 4096),
-                        default_num_predict=getattr(spec, 'default_num_predict', 2048),
-                        max_num_predict=getattr(spec, 'max_num_predict', 4096),
+                        context_window=getattr(spec, "context_window", 4096),
+                        default_num_predict=getattr(spec, "default_num_predict", 2048),
+                        max_num_predict=getattr(spec, "max_num_predict", 4096),
                         supports_system_prompt=True,
                         supports_json_mode=True,
-                        description=f"{model_name} from config.json"
+                        description=f"{model_name} from config.json",
                     )
                 # Try partial match
                 for spec_model, spec in model_specs.items():
@@ -233,12 +229,12 @@ class ModelConfigManager:
                         self.logger.info(f"Using config.json spec for {spec_model} (matched {model_name})")
                         return ModelConfig(
                             name=spec_model,
-                            context_window=getattr(spec, 'context_window', 4096),
-                            default_num_predict=getattr(spec, 'default_num_predict', 2048),
-                            max_num_predict=getattr(spec, 'max_num_predict', 4096),
+                            context_window=getattr(spec, "context_window", 4096),
+                            default_num_predict=getattr(spec, "default_num_predict", 2048),
+                            max_num_predict=getattr(spec, "max_num_predict", 4096),
                             supports_system_prompt=True,
                             supports_json_mode=True,
-                            description=f"{spec_model} from config.json"
+                            description=f"{spec_model} from config.json",
                         )
 
         # PRIORITY 2: Fallback to hardcoded MODEL_CONFIGS for backward compatibility
@@ -254,15 +250,16 @@ class ModelConfigManager:
         # PRIORITY 3: Return default config
         self.logger.warning(f"Unknown model {model_name}, using default configuration")
         return self.configs["default"]
-    
-    def get_optimal_context_size(self, model_name: str, prompt_length: int, 
-                                desired_output: int, task_type: str) -> Dict[str, int]:
+
+    def get_optimal_context_size(
+        self, model_name: str, prompt_length: int, desired_output: int, task_type: str
+    ) -> Dict[str, int]:
         """Calculate optimal context parameters for a request"""
         config = self.get_model_config(model_name)
-        
+
         # Estimate tokens (rough: 1 token ≈ 4 chars)
         prompt_tokens = prompt_length // 4
-        
+
         # Get desired output tokens based on task type
         if task_type == "synthesis":
             # Synthesis needs more output for comprehensive analysis
@@ -275,52 +272,54 @@ class ModelConfigManager:
             output_tokens = min(desired_output or 4096, config.max_num_predict)
         else:
             output_tokens = min(desired_output or config.default_num_predict, config.max_num_predict)
-        
+
         # Calculate total needed context
         total_needed = prompt_tokens + output_tokens + 512  # 512 buffer
-        
+
         # Ensure we don't exceed model's context window
         if total_needed > config.context_window:
             # Scale down proportionally
             scale_factor = config.context_window / total_needed * 0.9  # 90% to be safe
             output_tokens = int(output_tokens * scale_factor)
             total_needed = prompt_tokens + output_tokens + 512
-        
+
         # Use the smaller of model's context window and what we need
         optimal_context = min(config.context_window, total_needed)
-        
+
         self.logger.info(
             f"Model: {model_name}, Task: {task_type}, "
             f"Prompt tokens: {prompt_tokens}, Output tokens: {output_tokens}, "
             f"Total context: {optimal_context}/{config.context_window}"
         )
-        
+
         return {
             "num_ctx": optimal_context,
             "num_predict": output_tokens,
             "prompt_tokens": prompt_tokens,
-            "max_context": config.context_window
+            "max_context": config.context_window,
         }
-    
+
     def get_recommended_models(self, task_type: str, context_needed: int) -> list:
         """Get recommended models for a specific task"""
         suitable_models = []
-        
+
         for model_name, config in self.configs.items():
             if model_name == "default":
                 continue
-                
+
             if config.context_window >= context_needed:
-                suitable_models.append({
-                    "model": model_name,
-                    "context_window": config.context_window,
-                    "max_output": config.max_num_predict,
-                    "description": config.description
-                })
-        
+                suitable_models.append(
+                    {
+                        "model": model_name,
+                        "context_window": config.context_window,
+                        "max_output": config.max_num_predict,
+                        "description": config.description,
+                    }
+                )
+
         # Sort by context window size
         suitable_models.sort(key=lambda x: x["context_window"], reverse=True)
-        
+
         return suitable_models
 
 

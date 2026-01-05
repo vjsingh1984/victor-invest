@@ -395,7 +395,12 @@ class ResourceAwareOllamaPool:
                 # For ROUND_ROBIN, RANDOM, MOST_CAPACITY, and PREFER_REMOTE: combine pools for distribution
                 # MOST_CAPACITY will naturally prefer servers with more free RAM
                 # PREFER_REMOTE will prefer by priority then RAM, regardless of reuse
-                if self.strategy in (PoolStrategy.ROUND_ROBIN, PoolStrategy.RANDOM, PoolStrategy.MOST_CAPACITY, PoolStrategy.PREFER_REMOTE):
+                if self.strategy in (
+                    PoolStrategy.ROUND_ROBIN,
+                    PoolStrategy.RANDOM,
+                    PoolStrategy.MOST_CAPACITY,
+                    PoolStrategy.PREFER_REMOTE,
+                ):
                     candidate_pool = [(s, r, True) for s, r in reuse_candidates] + [
                         (s, r, False) for s, r in new_candidates
                     ]
@@ -415,7 +420,7 @@ class ResourceAwareOllamaPool:
                         sorted_pool = sorted(
                             candidate_pool,
                             key=lambda item: (item[0].capacity.priority, item[0].free_ram_gb),
-                            reverse=True
+                            reverse=True,
                         )
                         selected, required, reuse_existing = sorted_pool[0]
                     elif self.strategy == PoolStrategy.LEAST_BUSY:
@@ -678,7 +683,9 @@ def create_resource_aware_pool(config) -> ResourceAwareOllamaPool:
                     )
                 )
             else:
-                servers.append(ServerCapacity(url=server_config, total_ram_gb=64, usable_ram_gb=48, max_concurrent=1, priority=0))
+                servers.append(
+                    ServerCapacity(url=server_config, total_ram_gb=64, usable_ram_gb=48, max_concurrent=1, priority=0)
+                )
 
         strategy_str = getattr(ollama_config, "pool_strategy", "most_capacity")
         strategy = PoolStrategy(strategy_str)

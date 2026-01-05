@@ -44,18 +44,21 @@ logger = logging.getLogger(__name__)
 # Atlanta Fed data URLs
 GDPNOW_URL = "https://www.atlantafed.org/cqer/research/gdpnow"
 GDPNOW_DATA_URL = "https://www.atlantafed.org/-/media/documents/cqer/researchcq/gdpnow/GDPNowForecast.xlsx"
-WAGE_TRACKER_URL = "https://www.atlantafed.org/-/media/documents/datafiles/chcs/wage-growth-tracker/wage-growth-data.xlsx"
+WAGE_TRACKER_URL = (
+    "https://www.atlantafed.org/-/media/documents/datafiles/chcs/wage-growth-tracker/wage-growth-data.xlsx"
+)
 BIE_URL = "https://www.atlantafed.org/-/media/documents/research/inflationproject/bie/BIEData.xlsx"
 
 
 class GDPOutlook(Enum):
     """Classification of GDP growth outlook."""
+
     STRONG_CONTRACTION = "strong_contraction"  # < -2%
-    CONTRACTION = "contraction"                # -2% to 0%
-    WEAK_GROWTH = "weak_growth"                # 0% to 1%
-    MODERATE_GROWTH = "moderate_growth"        # 1% to 2.5%
-    STRONG_GROWTH = "strong_growth"            # 2.5% to 4%
-    VERY_STRONG = "very_strong"                # > 4%
+    CONTRACTION = "contraction"  # -2% to 0%
+    WEAK_GROWTH = "weak_growth"  # 0% to 1%
+    MODERATE_GROWTH = "moderate_growth"  # 1% to 2.5%
+    STRONG_GROWTH = "strong_growth"  # 2.5% to 4%
+    VERY_STRONG = "very_strong"  # > 4%
 
 
 @dataclass
@@ -77,6 +80,7 @@ class GDPNowData:
         outlook: Classified growth outlook
         data_releases_incorporated: List of data releases in estimate
     """
+
     date: date
     quarter: str
     gdp_estimate: float
@@ -138,6 +142,7 @@ class WageGrowthData:
         hourly: Hourly workers wage growth
         non_hourly: Non-hourly workers wage growth
     """
+
     date: date
     overall: float
     job_stayers: Optional[float] = None
@@ -168,6 +173,7 @@ class BusinessInflationExpectations:
         unit_cost_growth: Expected unit cost growth
         sales_growth: Expected sales growth
     """
+
     date: date
     year_ahead: float
     year_ahead_uncertainty: Optional[float] = None
@@ -201,6 +207,7 @@ class AtlantaFedClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()
@@ -246,6 +253,7 @@ class AtlantaFedClient:
         """Parse GDPNow data from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -258,8 +266,8 @@ class AtlantaFedClient:
             prev = df.iloc[-2] if len(df) > 1 else None
 
             # Column names vary - try common patterns
-            date_col = next((c for c in df.columns if 'date' in c.lower()), df.columns[0])
-            gdp_col = next((c for c in df.columns if 'gdpnow' in c.lower() or 'forecast' in c.lower()), df.columns[1])
+            date_col = next((c for c in df.columns if "date" in c.lower()), df.columns[0])
+            gdp_col = next((c for c in df.columns if "gdpnow" in c.lower() or "forecast" in c.lower()), df.columns[1])
 
             estimate_date = pd.to_datetime(latest[date_col]).date()
             gdp_estimate = float(latest[gdp_col])
@@ -285,9 +293,9 @@ class AtlantaFedClient:
         try:
             # Look for GDP growth patterns - try multiple approaches
             patterns = [
-                r'GDP.*?(-?\d+\.\d+).*?percent',  # "GDP growth is 3.0 percent"
-                r'GDPNow.*?(-?\d+\.\d+)',  # "GDPNow model estimate... 3.0"
-                r'estimate.*?(-?\d+\.\d+).*?percent',  # "estimate of 3.0 percent"
+                r"GDP.*?(-?\d+\.\d+).*?percent",  # "GDP growth is 3.0 percent"
+                r"GDPNow.*?(-?\d+\.\d+)",  # "GDPNow model estimate... 3.0"
+                r"estimate.*?(-?\d+\.\d+).*?percent",  # "estimate of 3.0 percent"
             ]
 
             gdp_estimate = None
@@ -338,6 +346,7 @@ class AtlantaFedClient:
         """Parse wage growth data from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -348,8 +357,8 @@ class AtlantaFedClient:
             latest = df.iloc[-1]
 
             # Find columns
-            date_col = next((c for c in df.columns if 'date' in c.lower()), df.columns[0])
-            overall_col = next((c for c in df.columns if 'overall' in c.lower() or 'total' in c.lower()), None)
+            date_col = next((c for c in df.columns if "date" in c.lower()), df.columns[0])
+            overall_col = next((c for c in df.columns if "overall" in c.lower() or "total" in c.lower()), None)
 
             obs_date = pd.to_datetime(latest[date_col]).date()
             overall = float(latest[overall_col]) if overall_col else float(latest.iloc[1])
@@ -385,6 +394,7 @@ class AtlantaFedClient:
         """Parse Business Inflation Expectations from Excel."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -397,7 +407,7 @@ class AtlantaFedClient:
             obs_date = pd.to_datetime(latest[date_col]).date()
 
             # Find year-ahead column
-            ya_col = next((c for c in df.columns if 'year' in c.lower() and 'ahead' in c.lower()), None)
+            ya_col = next((c for c in df.columns if "year" in c.lower() and "ahead" in c.lower()), None)
             year_ahead = float(latest[ya_col]) if ya_col else float(latest.iloc[1])
 
             return BusinessInflationExpectations(

@@ -28,11 +28,11 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
 
 from investigator.config.lookback_periods import (
+    CREDIT_RISK_PERIODS,
     INSIDER_PERIODS,
     INSTITUTIONAL_PERIODS,
-    SHORT_INTEREST_PERIODS,
     MACRO_PERIODS,
-    CREDIT_RISK_PERIODS,
+    SHORT_INTEREST_PERIODS,
     TECHNICAL_PERIODS,
 )
 from investigator.domain.services.data_sources.interfaces import (
@@ -49,6 +49,7 @@ class AnalysisData:
 
     Contains all data sources needed for RL feature extraction.
     """
+
     symbol: str
     as_of_date: date
     # Core financial data (from existing pipelines)
@@ -262,9 +263,7 @@ class DataSourceFacade:
         import concurrent.futures
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                self.get_historical_data_sync, symbol, as_of_date, include_sources
-            )
+            future = executor.submit(self.get_historical_data_sync, symbol, as_of_date, include_sources)
             return future.result(timeout=60)
 
     async def get_batch_data(
@@ -286,10 +285,7 @@ class DataSourceFacade:
         as_of_date = as_of_date or date.today()
 
         # Fetch all symbols concurrently
-        tasks = [
-            self.get_historical_data(symbol, as_of_date, include_sources)
-            for symbol in symbols
-        ]
+        tasks = [self.get_historical_data(symbol, as_of_date, include_sources) for symbol in symbols]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -306,18 +302,18 @@ class DataSourceFacade:
 
     # Data source fetch methods
 
-    def _fetch_insider_data_sync(
-        self, symbol: str, as_of_date: date
-    ) -> Dict[str, Any]:
+    def _fetch_insider_data_sync(self, symbol: str, as_of_date: date) -> Dict[str, Any]:
         """Fetch insider sentiment data from database (synchronous)."""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT sentiment_score, buy_count, sell_count,
                                buy_value, sell_value, cluster_detected
                         FROM insider_sentiment
@@ -326,7 +322,8 @@ class DataSourceFacade:
                           AND period_days = :period_days
                         ORDER BY calculation_date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {
                         "symbol": symbol,
                         "as_of_date": as_of_date,
@@ -352,19 +349,19 @@ class DataSourceFacade:
 
         return {"type": DataSourceType.INSIDER_SENTIMENT, "data": {}}
 
-    def _fetch_institutional_data_sync(
-        self, symbol: str, as_of_date: date
-    ) -> Dict[str, Any]:
+    def _fetch_institutional_data_sync(self, symbol: str, as_of_date: date) -> Dict[str, Any]:
         """Fetch institutional holdings data from database (synchronous)."""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 # Join holdings with filings to get report dates
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             SUM(h.shares) as total_shares,
                             COUNT(DISTINCT f.institution_id) as num_institutions,
@@ -374,7 +371,8 @@ class DataSourceFacade:
                         WHERE h.symbol = :symbol
                           AND f.report_quarter <= :as_of_date
                           AND f.report_quarter >= :as_of_date - INTERVAL '90 days'
-                    """),
+                    """
+                    ),
                     {"symbol": symbol, "as_of_date": as_of_date},
                 )
                 row = result.fetchone()
@@ -393,18 +391,18 @@ class DataSourceFacade:
 
         return {"type": DataSourceType.INSTITUTIONAL_HOLDINGS, "data": {}}
 
-    def _fetch_short_interest_sync(
-        self, symbol: str, as_of_date: date
-    ) -> Dict[str, Any]:
+    def _fetch_short_interest_sync(self, symbol: str, as_of_date: date) -> Dict[str, Any]:
         """Fetch short interest data from database (synchronous)."""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT short_interest, avg_daily_volume,
                                days_to_cover, short_interest_ratio
                         FROM short_interest
@@ -412,7 +410,8 @@ class DataSourceFacade:
                           AND settlement_date <= :as_of_date
                         ORDER BY settlement_date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"symbol": symbol, "as_of_date": as_of_date},
                 )
                 row = result.fetchone()
@@ -435,13 +434,15 @@ class DataSourceFacade:
     def _fetch_treasury_data_sync(self, as_of_date: date) -> Dict[str, Any]:
         """Fetch treasury yield data from database (synchronous)."""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT yield_1m, yield_3m, yield_6m, yield_1y,
                                yield_2y, yield_5y, yield_10y, yield_30y,
                                spread_10y_2y, spread_10y_3m, is_inverted
@@ -449,7 +450,8 @@ class DataSourceFacade:
                         WHERE date <= :as_of_date
                         ORDER BY date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"as_of_date": as_of_date},
                 )
                 row = result.fetchone()
@@ -479,8 +481,9 @@ class DataSourceFacade:
     def _fetch_macro_data_sync(self, as_of_date: date) -> Dict[str, Any]:
         """Fetch macro indicator data from database (synchronous)."""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
@@ -495,14 +498,16 @@ class DataSourceFacade:
 
                 # Join with macro_indicators to get series_id
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT mi.series_id, mv.value
                         FROM macro_indicator_values mv
                         JOIN macro_indicators mi ON mv.indicator_id = mi.id
                         WHERE mi.series_id IN :indicators
                           AND mv.date <= :as_of_date
                         ORDER BY mi.series_id, mv.date DESC
-                    """),
+                    """
+                    ),
                     {"indicators": tuple(key_indicators), "as_of_date": as_of_date},
                 )
                 rows = result.fetchall()
@@ -526,13 +531,15 @@ class DataSourceFacade:
     def _fetch_market_regime_sync(self, as_of_date: date) -> Dict[str, Any]:
         """Fetch market regime classification from database (synchronous)."""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT regime, credit_cycle_phase, volatility_regime,
                                recession_probability, yield_curve_inverted,
                                risk_off_signal
@@ -540,7 +547,8 @@ class DataSourceFacade:
                         WHERE snapshot_date <= :as_of_date
                         ORDER BY snapshot_date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"as_of_date": as_of_date},
                 )
                 row = result.fetchone()
@@ -562,18 +570,18 @@ class DataSourceFacade:
 
         return {"type": DataSourceType.MARKET_REGIME, "data": {}}
 
-    def _fetch_credit_risk_sync(
-        self, symbol: str, as_of_date: date
-    ) -> Dict[str, Any]:
+    def _fetch_credit_risk_sync(self, symbol: str, as_of_date: date) -> Dict[str, Any]:
         """Fetch credit risk scores from database (synchronous)."""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT altman_z_score, beneish_m_score,
                                piotroski_f_score, distress_tier
                         FROM credit_risk_scores
@@ -581,7 +589,8 @@ class DataSourceFacade:
                           AND calculation_date <= :as_of_date
                         ORDER BY calculation_date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"symbol": symbol, "as_of_date": as_of_date},
                 )
                 row = result.fetchone()
@@ -601,9 +610,7 @@ class DataSourceFacade:
 
         return {"type": DataSourceType.CREDIT_RISK, "data": {}}
 
-    def _fetch_technical_data_sync(
-        self, symbol: str, as_of_date: date
-    ) -> Dict[str, Any]:
+    def _fetch_technical_data_sync(self, symbol: str, as_of_date: date) -> Dict[str, Any]:
         """Fetch technical indicator data (synchronous)."""
         # Technical data is typically calculated on-demand from price history
         # This would integrate with the technical analysis service
@@ -614,8 +621,10 @@ class DataSourceFacade:
         if self._stock_engine is None:
             from sqlalchemy import create_engine
 
+            from investigator.domain.services.market_data import get_stock_db_url
+
             self._stock_engine = create_engine(
-                "postgresql://stockuser:${STOCK_DB_PASSWORD}@${STOCK_DB_HOST}:5432/stock",
+                get_stock_db_url(),
                 pool_size=3,
                 max_overflow=5,
                 pool_pre_ping=True,
@@ -623,9 +632,7 @@ class DataSourceFacade:
             )
         return self._stock_engine
 
-    def _fetch_price_data_sync(
-        self, symbol: str, as_of_date: date
-    ) -> Dict[str, Any]:
+    def _fetch_price_data_sync(self, symbol: str, as_of_date: date) -> Dict[str, Any]:
         """Fetch price data from stock database (synchronous)."""
         try:
             from sqlalchemy import text
@@ -635,14 +642,16 @@ class DataSourceFacade:
 
             with stock_engine.connect() as conn:
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT adjclose
                         FROM tickerdata
                         WHERE ticker = :symbol
                           AND date <= :as_of_date
                         ORDER BY date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"symbol": symbol.upper(), "as_of_date": as_of_date},
                 )
                 row = result.fetchone()
@@ -673,19 +682,22 @@ class DataSourceFacade:
         - New York Fed: Recession Probability, Empire State, GSCPI
         """
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 # Fetch all regional Fed indicators for the date
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT district, indicator_name, indicator_data, observation_date
                         FROM regional_fed_indicators
                         WHERE observation_date <= :as_of_date
                         ORDER BY district, indicator_name, observation_date DESC
-                    """),
+                    """
+                    ),
                     {"as_of_date": as_of_date},
                 )
                 rows = result.fetchall()
@@ -706,6 +718,7 @@ class DataSourceFacade:
                         data = row[2]
                         if isinstance(data, str):
                             import json
+
                             data = json.loads(data)
 
                         # Extract value
@@ -728,20 +741,14 @@ class DataSourceFacade:
                     "inflation_expectations": self._extract_indicator_value(
                         indicators, "cleveland_fed", "inflation_expectations"
                     ),
-                    "trimmed_mean_pce": self._extract_indicator_value(
-                        indicators, "dallas_fed", "trimmed_mean_pce"
-                    ),
-                    "median_cpi": self._extract_indicator_value(
-                        indicators, "cleveland_fed", "median_cpi"
-                    ),
+                    "trimmed_mean_pce": self._extract_indicator_value(indicators, "dallas_fed", "trimmed_mean_pce"),
+                    "median_cpi": self._extract_indicator_value(indicators, "cleveland_fed", "median_cpi"),
                     # Recession
                     "recession_probability": self._extract_indicator_value(
                         indicators, "new_york_fed", "recession_probability"
                     ),
                     # Manufacturing
-                    "empire_state_mfg": self._extract_indicator_value(
-                        indicators, "new_york_fed", "empire_state_mfg"
-                    ),
+                    "empire_state_mfg": self._extract_indicator_value(indicators, "new_york_fed", "empire_state_mfg"),
                 }
 
                 return {
@@ -783,20 +790,23 @@ class DataSourceFacade:
         - Volatility regime classification
         """
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db = get_db_manager()
             with db.get_session() as session:
                 # First try regional_fed_indicators (where CBOE data is stored)
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT indicator_name, indicator_data, observation_date
                         FROM regional_fed_indicators
                         WHERE district = 'cboe'
                           AND observation_date <= :as_of_date
                         ORDER BY indicator_name, observation_date DESC
-                    """),
+                    """
+                    ),
                     {"as_of_date": as_of_date},
                 )
                 rows = result.fetchall()
@@ -809,6 +819,7 @@ class DataSourceFacade:
                         data = row[1]
                         if isinstance(data, str):
                             import json
+
                             data = json.loads(data)
 
                         # Extract value
@@ -915,9 +926,7 @@ class DataSourceFacade:
             # Clean entries older than TTL
             cutoff = (now - self._cache_ttl).date()
             for symbol in list(self._cache.keys()):
-                self._cache[symbol] = {
-                    d: v for d, v in self._cache[symbol].items() if d >= cutoff
-                }
+                self._cache[symbol] = {d: v for d, v in self._cache[symbol].items() if d >= cutoff}
                 if not self._cache[symbol]:
                     del self._cache[symbol]
             self._last_cache_clean = now

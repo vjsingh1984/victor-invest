@@ -17,7 +17,14 @@ import aiohttp
 # Exception Classes (Fix: LLM client ignores HTTP failures)
 class OllamaError(Exception):
     """Base exception for Ollama client errors"""
-    def __init__(self, message: str, status_code: Optional[int] = None, endpoint: Optional[str] = None, model: Optional[str] = None):
+
+    def __init__(
+        self,
+        message: str,
+        status_code: Optional[int] = None,
+        endpoint: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
         self.status_code = status_code
         self.endpoint = endpoint
         self.model = model
@@ -36,16 +43,19 @@ class OllamaError(Exception):
 
 class OllamaHTTPError(OllamaError):
     """HTTP error from Ollama API (4xx/5xx responses)"""
+
     pass
 
 
 class OllamaConnectionError(OllamaError):
     """Connection error to Ollama server"""
+
     pass
 
 
 class OllamaTimeoutError(OllamaError):
     """Timeout error from Ollama server"""
+
     pass
 
 
@@ -203,7 +213,7 @@ class OllamaClient:
                         f"Failed to pull model '{model}': {error_text}",
                         status_code=response.status,
                         endpoint=endpoint,
-                        model=model
+                        model=model,
                     )
 
                 if stream:
@@ -218,25 +228,15 @@ class OllamaClient:
 
         except aiohttp.ClientError as e:
             raise OllamaConnectionError(
-                f"Connection error pulling model '{model}': {e}",
-                endpoint=endpoint,
-                model=model
+                f"Connection error pulling model '{model}': {e}", endpoint=endpoint, model=model
             )
 
         except asyncio.TimeoutError as e:
-            raise OllamaTimeoutError(
-                f"Timeout pulling model '{model}': {e}",
-                endpoint=endpoint,
-                model=model
-            )
+            raise OllamaTimeoutError(f"Timeout pulling model '{model}': {e}", endpoint=endpoint, model=model)
 
         except Exception as e:
             self.logger.error(f"Unexpected error pulling model {model}: {e}")
-            raise OllamaError(
-                f"Unexpected error pulling model: {e}",
-                endpoint=endpoint,
-                model=model
-            )
+            raise OllamaError(f"Unexpected error pulling model: {e}", endpoint=endpoint, model=model)
 
     async def generate(
         self,
@@ -392,7 +392,7 @@ class OllamaClient:
                         raise
 
                     # Retryable error - log and retry
-                    backoff = 2 ** attempt
+                    backoff = 2**attempt
                     self.logger.warning(
                         f"HTTP {e.status_code} error on attempt {attempt + 1}/{self.max_retries}, "
                         f"retrying in {backoff}s: {e}"
@@ -404,7 +404,7 @@ class OllamaClient:
                     if attempt == self.max_retries - 1:
                         raise
 
-                    backoff = 2 ** attempt
+                    backoff = 2**attempt
                     self.logger.warning(
                         f"Connection/timeout error on attempt {attempt + 1}/{self.max_retries}, "
                         f"retrying in {backoff}s: {e}"
@@ -418,7 +418,7 @@ class OllamaClient:
                         raise
 
                     self.logger.warning(f"Unexpected error on attempt {attempt + 1}, retrying: {e}")
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
 
     async def _make_generation_request(
         self,
@@ -460,7 +460,7 @@ class OllamaClient:
                     f"Generation failed for model '{model}': {error_text}",
                     status_code=response.status,
                     endpoint=endpoint,
-                    model=model
+                    model=model,
                 )
 
             if stream:

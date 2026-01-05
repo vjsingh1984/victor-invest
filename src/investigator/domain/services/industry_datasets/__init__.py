@@ -37,6 +37,8 @@ Author: Claude Code
 Date: 2025-12-30
 """
 
+from investigator.domain.services.industry_datasets.auto_dataset import AutoDataset
+from investigator.domain.services.industry_datasets.bank_dataset import BankDataset
 from investigator.domain.services.industry_datasets.base import (
     BaseIndustryDataset,
     IndustryMetrics,
@@ -44,35 +46,33 @@ from investigator.domain.services.industry_datasets.base import (
     MetricQuality,
     ValuationAdjustment,
 )
-from investigator.domain.services.industry_datasets.registry import (
-    IndustryDatasetRegistry,
-    get_registry,
-    get_dataset_for_industry,
-    get_dataset_for_symbol,
-    register_dataset,
-    list_registered_industries,
-)
-
-# Import and auto-register all industry datasets
-from investigator.domain.services.industry_datasets.semiconductor_dataset import SemiconductorDataset
-from investigator.domain.services.industry_datasets.bank_dataset import BankDataset
-from investigator.domain.services.industry_datasets.reit_dataset import REITDataset
-from investigator.domain.services.industry_datasets.auto_dataset import AutoDataset
 from investigator.domain.services.industry_datasets.defense_dataset import DefenseDataset
 from investigator.domain.services.industry_datasets.insurance_dataset import InsuranceDataset
 
 # Integration helpers - simpler API for using datasets
 from investigator.domain.services.industry_datasets.integration import (
-    extract_industry_metrics,
-    get_valuation_adjustments,
-    get_recommended_tier_weights,
-    get_xbrl_tag_aliases,
     apply_adjustments_to_fair_value,
+    extract_industry_metrics,
     get_industry_summary,
-    list_available_industries,
+    get_recommended_tier_weights,
+    get_valuation_adjustments,
+    get_xbrl_tag_aliases,
     is_industry_covered,
     is_symbol_covered,
+    list_available_industries,
 )
+from investigator.domain.services.industry_datasets.registry import (
+    IndustryDatasetRegistry,
+    get_dataset_for_industry,
+    get_dataset_for_symbol,
+    get_registry,
+    list_registered_industries,
+    register_dataset,
+)
+from investigator.domain.services.industry_datasets.reit_dataset import REITDataset
+
+# Import and auto-register all industry datasets
+from investigator.domain.services.industry_datasets.semiconductor_dataset import SemiconductorDataset
 
 __all__ = [
     # Base classes

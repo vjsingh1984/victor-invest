@@ -45,15 +45,18 @@ class SECCompanyFactsExtractor:
         Args:
             db_config: Database configuration dict
         """
+        import os
+
         self.db_config = db_config or {
-            "host": "${DB_HOST:-localhost}",
-            "port": 5432,
-            "database": "sec_database",
-            "username": "investigator",
-            "password": "investigator",
+            "host": os.environ.get("SEC_DB_HOST", os.environ.get("DB_HOST", "localhost")),
+            "port": int(os.environ.get("SEC_DB_PORT", os.environ.get("DB_PORT", "5432"))),
+            "database": os.environ.get("SEC_DB_NAME", "sec_database"),
+            "username": os.environ.get("SEC_DB_USER", "investigator"),
+            "password": os.environ.get("SEC_DB_PASSWORD", "investigator"),
         }
         self.engine = self._create_engine()
         self.default_max_age_days = 90  # 1 quarter staleness threshold
+        self._facts_cache = {}  # Instance-level cache for company facts to avoid repeated loads
 
     def _create_engine(self):
         """Create SQLAlchemy engine for database connection"""
@@ -88,6 +91,11 @@ class SECCompanyFactsExtractor:
         if max_age_days is None:
             max_age_days = self.default_max_age_days
 
+        # Check instance cache first (for repeated calls within same extraction)
+        cache_key = f"{symbol}_{max_age_days}"
+        if not force_refresh and cache_key in self._facts_cache:
+            return self._facts_cache[cache_key]
+
         # Step 1: Try database first (unless force_refresh)
         db_data = None
         age_days = None
@@ -105,6 +113,8 @@ class SECCompanyFactsExtractor:
                     )
                     db_data["source"] = "database_cache"
                     db_data["cache_age_days"] = age_days
+                    # Cache for repeated calls in same session
+                    self._facts_cache[cache_key] = db_data
                     return db_data
                 else:
                     logger.info(
@@ -436,13 +446,16 @@ class SECCompanyFactsExtractor:
             logger.error(f"Error fetching CIK for {symbol} via TickerCIKMapper: {e}")
             return None
 
-    def _get_latest_value(self, units_data: List[Dict], prefer_annual: bool = True) -> Optional[float]:
+    def _get_latest_value(
+        self, units_data: List[Dict], prefer_annual: bool = True, max_years: int = 4
+    ) -> Optional[float]:
         """
         Get the most recent value from units array.
 
         Args:
             units_data: List of data points with 'val', 'end', 'fy', 'fp' fields
             prefer_annual: Prefer annual (FY) data over quarterly
+            max_years: Maximum years of historical data to consider (default: 4)
 
         Returns:
             Latest value as float or None
@@ -451,6 +464,18 @@ class SECCompanyFactsExtractor:
             return None
 
         try:
+            from datetime import datetime
+
+            current_year = datetime.now().year
+            min_year = current_year - max_years
+
+            # Filter to only last N years to avoid processing decades of data
+            filtered_data = [entry for entry in units_data if entry.get("fy", 0) >= min_year]
+
+            # Fallback to all data if no recent data found
+            if not filtered_data:
+                filtered_data = units_data
+
             # Sort by FISCAL YEAR + PERIOD (not just end date) to get truly latest data
             # This ensures we get 2024-FY instead of 2018-FY with a recent 'end' date
             def get_sort_key(entry):
@@ -463,7 +488,9 @@ class SECCompanyFactsExtractor:
 
                 return (fy, period_priority)
 
-            sorted_data = sorted(units_data, key=get_sort_key, reverse=True)  # Most recent fiscal year + period first
+            sorted_data = sorted(
+                filtered_data, key=get_sort_key, reverse=True
+            )  # Most recent fiscal year + period first
 
             # If prefer_annual, try to find most recent annual data first
             if prefer_annual:
@@ -482,7 +509,7 @@ class SECCompanyFactsExtractor:
             return None
 
     def _get_latest_value_with_period(
-        self, units_data: List[Dict], prefer_annual: bool = True
+        self, units_data: List[Dict], prefer_annual: bool = True, max_years: int = 4
     ) -> Tuple[Optional[float], Optional[int], Optional[str]]:
         """
         Get the most recent value from units array along with fiscal period info.
@@ -496,6 +523,7 @@ class SECCompanyFactsExtractor:
         Args:
             units_data: List of data points with 'val', 'end', 'fy', 'fp' fields
             prefer_annual: Prefer annual (FY) data over quarterly
+            max_years: Maximum years of historical data to consider (default: 4)
 
         Returns:
             Tuple of (value, fiscal_year, fiscal_period) e.g. (100.0, 2024, 'Q3')
@@ -504,21 +532,33 @@ class SECCompanyFactsExtractor:
             return (None, None, None)
 
         try:
-            # CRITICAL FIX: Filter to only standard 10-Q/10-K filings
+            from datetime import datetime
+
+            current_year = datetime.now().year
+            min_year = current_year - max_years  # Only consider last N years
+
+            # CRITICAL FIX: Filter to only standard 10-Q/10-K filings AND last N years
             # Excludes amendments (10-Q/A, 10-K/A), restatements, and other non-standard forms
             # This prevents old data (e.g., 2012-FY) from being selected over recent quarters
             filtered_data = [
                 entry
                 for entry in units_data
                 if entry.get("form") in ["10-Q", "10-K", "20-F"]  # Standard quarterly/annual filings only
+                and entry.get("fy", 0) >= min_year  # Only last N years
             ]
 
-            # Fallback: If no standard forms found, use all data (better than nothing)
+            # Fallback: If no standard forms found in date range, try without date filter
+            if not filtered_data:
+                filtered_data = [entry for entry in units_data if entry.get("form") in ["10-Q", "10-K", "20-F"]]
+
+            # Final fallback: If still no data, use all data (better than nothing)
             if not filtered_data:
                 logger.warning(f"No standard 10-Q/10-K filings found in data, using all {len(units_data)} entries")
                 filtered_data = units_data
             else:
-                logger.debug(f"Filtered to {len(filtered_data)} standard filings from {len(units_data)} total entries")
+                logger.debug(
+                    f"Filtered to {len(filtered_data)} entries (last {max_years} years) from {len(units_data)} total"
+                )
 
             # Sort by FISCAL YEAR + PERIOD (not just end date) to get truly latest data
             def get_sort_key(entry):
@@ -593,8 +633,7 @@ class SECCompanyFactsExtractor:
             return None
 
     def _calculate_fiscal_year_from_date(
-        self, period_end_date: str, fiscal_year_end_month: int,
-        fiscal_period: Optional[str] = None
+        self, period_end_date: str, fiscal_year_end_month: int, fiscal_period: Optional[str] = None
     ) -> int:
         """
         Calculate fiscal year from period end date and fiscal year end month.
@@ -629,7 +668,7 @@ class SECCompanyFactsExtractor:
                 period_end_date=period_end_date,
                 fiscal_year_end_month=fy_end_month,
                 fiscal_year_end_day=fy_end_day,
-                fiscal_period=fiscal_period
+                fiscal_period=fiscal_period,
             )
 
         except Exception as e:
@@ -1272,13 +1311,17 @@ class SECCompanyFactsExtractor:
             weighted_avg_diluted = get_metric(None, canonical_name="weighted_average_shares_diluted")
             if not shares_outstanding and weighted_avg_diluted:
                 shares_outstanding = weighted_avg_diluted
-                logger.info(f"ℹ️  {symbol} - Using weighted_average_shares_diluted as shares_outstanding: {shares_outstanding:,.0f}")
+                logger.info(
+                    f"ℹ️  {symbol} - Using weighted_average_shares_diluted as shares_outstanding: {shares_outstanding:,.0f}"
+                )
 
             # Fallback: Try weighted average basic shares
             weighted_avg_basic = get_metric(None, canonical_name="weighted_average_shares_basic")
             if not shares_outstanding and weighted_avg_basic:
                 shares_outstanding = weighted_avg_basic
-                logger.info(f"ℹ️  {symbol} - Using weighted_average_shares_basic as shares_outstanding: {shares_outstanding:,.0f}")
+                logger.info(
+                    f"ℹ️  {symbol} - Using weighted_average_shares_basic as shares_outstanding: {shares_outstanding:,.0f}"
+                )
 
             # =====================================================
             # EBITDA - Calculate from operating_income + D&A
@@ -1287,7 +1330,9 @@ class SECCompanyFactsExtractor:
             ebitda = None
             if operating_income is not None and depreciation_amortization is not None:
                 ebitda = operating_income + abs(depreciation_amortization)  # D&A is positive expense
-                logger.info(f"📊 {symbol} - Calculated EBITDA: {ebitda:,.0f} (operating_income: {operating_income:,.0f} + D&A: {depreciation_amortization:,.0f})")
+                logger.info(
+                    f"📊 {symbol} - Calculated EBITDA: {ebitda:,.0f} (operating_income: {operating_income:,.0f} + D&A: {depreciation_amortization:,.0f})"
+                )
             elif operating_income is not None:
                 # Estimate D&A as ~5-10% of operating income for rough EBITDA
                 ebitda = operating_income * 1.08  # Conservative 8% D&A estimate

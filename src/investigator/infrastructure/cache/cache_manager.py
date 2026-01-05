@@ -76,10 +76,7 @@ class CacheManager:
 
         # FIX Issue #3: Thread pool for async I/O offloading
         # Prevents blocking the event loop during disk/DB operations
-        self._executor = ThreadPoolExecutor(
-            max_workers=4,
-            thread_name_prefix="cache_io"
-        )
+        self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cache_io")
         logger.debug("Cache manager initialized with 4-thread I/O pool")
 
         # FIX Issue #5: Per-instance cache overrides
@@ -497,12 +494,7 @@ class CacheManager:
             cached = await cache_manager.get_async(CacheType.LLM_RESPONSE, cache_key)
         """
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            self.get,  # Existing sync implementation
-            cache_type,
-            key
-        )
+        return await loop.run_in_executor(self._executor, self.get, cache_type, key)  # Existing sync implementation
 
     async def set_async(self, cache_type: CacheType, key: Union[Tuple, Dict], value: Dict[str, Any]) -> bool:
         """
@@ -525,11 +517,7 @@ class CacheManager:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            self._executor,
-            self.set,  # Existing sync implementation
-            cache_type,
-            key,
-            value
+            self._executor, self.set, cache_type, key, value  # Existing sync implementation
         )
 
     def shutdown(self):
@@ -542,7 +530,7 @@ class CacheManager:
         Should be called when the application terminates or when
         the cache manager is no longer needed.
         """
-        if hasattr(self, '_executor') and self._executor:
+        if hasattr(self, "_executor") and self._executor:
             logger.info("Shutting down cache I/O thread pool...")
             self._executor.shutdown(wait=True, cancel_futures=False)
             logger.debug("Cache I/O thread pool shutdown complete")
@@ -550,7 +538,7 @@ class CacheManager:
     def __del__(self):
         """Cleanup on garbage collection"""
         try:
-            if hasattr(self, '_executor') and self._executor:
+            if hasattr(self, "_executor") and self._executor:
                 self._executor.shutdown(wait=False, cancel_futures=True)
         except:
             pass  # Ignore errors during cleanup
@@ -630,8 +618,11 @@ class CacheManager:
         if self.config and hasattr(self.config, "cache_control"):
             if self.config.cache_control.force_refresh:
                 return True
-            if (symbol and self.config.cache_control.force_refresh_symbols
-                and symbol in self.config.cache_control.force_refresh_symbols):
+            if (
+                symbol
+                and self.config.cache_control.force_refresh_symbols
+                and symbol in self.config.cache_control.force_refresh_symbols
+            ):
                 return True
 
         return False
@@ -1298,10 +1289,7 @@ class CacheManager:
     # ========================================================================
 
     def create_cache_metadata(
-        self,
-        cache_type: CacheType,
-        key: Union[Tuple, Dict],
-        additional_metadata: Optional[Dict[str, Any]] = None
+        self, cache_type: CacheType, key: Union[Tuple, Dict], additional_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Create standardized cache metadata with version tagging.
@@ -1366,10 +1354,7 @@ class CacheManager:
             return {"raw_key": str(key)}
 
     def validate_cache_entry(
-        self,
-        entry: Dict[str, Any],
-        cache_type: CacheType,
-        strict: bool = False
+        self, entry: Dict[str, Any], cache_type: CacheType, strict: bool = False
     ) -> Tuple[bool, List[str]]:
         """
         Validate a cache entry for integrity and compatibility.
@@ -1412,9 +1397,7 @@ class CacheManager:
         if schema_version:
             min_version = MINIMUM_COMPATIBLE_VERSIONS.get(cache_type, "1.0.0")
             if not self._is_version_compatible(schema_version, min_version):
-                issues.append(
-                    f"Schema version {schema_version} < minimum {min_version}"
-                )
+                issues.append(f"Schema version {schema_version} < minimum {min_version}")
         else:
             # No version = legacy cache, may need migration
             issues.append("Missing schema_version (legacy cache entry)")
@@ -1429,10 +1412,7 @@ class CacheManager:
 
         # Check for required timestamp
         if isinstance(metadata, dict):
-            has_timestamp = any(
-                metadata.get(field) for field in
-                ["cached_at", "fetched_at", "created_at", "timestamp"]
-            )
+            has_timestamp = any(metadata.get(field) for field in ["cached_at", "fetched_at", "created_at", "timestamp"])
             if not has_timestamp:
                 issues.append("Missing timestamp field")
 
@@ -1451,17 +1431,14 @@ class CacheManager:
         is_valid = len(issues) == 0
         return (is_valid, issues)
 
-    def _is_version_compatible(
-        self,
-        version: str,
-        minimum: str
-    ) -> bool:
+    def _is_version_compatible(self, version: str, minimum: str) -> bool:
         """
         Check if version is >= minimum version.
 
         Uses semantic versioning comparison (MAJOR.MINOR.PATCH).
         """
         try:
+
             def parse_version(v: str) -> Tuple[int, int, int]:
                 parts = v.split(".")
                 major = int(parts[0]) if len(parts) > 0 else 0
@@ -1509,12 +1486,7 @@ class CacheManager:
     # M8: Auto-Invalidation on SEC Updates
     # ========================================================================
 
-    def invalidate_on_sec_update(
-        self,
-        symbol: str,
-        new_filing_date: str,
-        dry_run: bool = False
-    ) -> Dict[str, Any]:
+    def invalidate_on_sec_update(self, symbol: str, new_filing_date: str, dry_run: bool = False) -> Dict[str, Any]:
         """
         Invalidate cache entries when new SEC filing is detected.
 
@@ -1612,9 +1584,7 @@ class CacheManager:
                                 try:
                                     handler.delete(entry_key)
                                 except Exception as del_err:
-                                    result["errors"].append(
-                                        f"Failed to delete {entry_key}: {del_err}"
-                                    )
+                                    result["errors"].append(f"Failed to delete {entry_key}: {del_err}")
                                     continue
 
                             result["entries_invalidated"] += 1
@@ -1629,14 +1599,10 @@ class CacheManager:
                             )
                         else:
                             result["entries_kept"] += 1
-                            result["kept_by_type"][type_name] = (
-                                result["kept_by_type"].get(type_name, 0) + 1
-                            )
+                            result["kept_by_type"][type_name] = result["kept_by_type"].get(type_name, 0) + 1
 
                 except Exception as e:
-                    result["errors"].append(
-                        f"Error processing {handler_name}/{type_name}: {e}"
-                    )
+                    result["errors"].append(f"Error processing {handler_name}/{type_name}: {e}")
                     logger.error(f"SEC invalidation error: {e}")
 
         total_time = (time.time() - operation_start) * 1000
@@ -1675,11 +1641,7 @@ class CacheManager:
     # M8: Corruption Detection and Purge
     # ========================================================================
 
-    def detect_and_purge_corrupted(
-        self,
-        symbol: Optional[str] = None,
-        dry_run: bool = True
-    ) -> Dict[str, Any]:
+    def detect_and_purge_corrupted(self, symbol: Optional[str] = None, dry_run: bool = True) -> Dict[str, Any]:
         """
         Detect and optionally purge corrupted cache entries.
 
@@ -1756,9 +1718,7 @@ class CacheManager:
                         result["entries_scanned"] += 1
 
                         # Validate entry
-                        is_valid, issues = self.validate_cache_entry(
-                            entry_data, cache_type, strict=True
-                        )
+                        is_valid, issues = self.validate_cache_entry(entry_data, cache_type, strict=True)
 
                         if not is_valid:
                             result["corrupted_entries"] += 1
@@ -1796,14 +1756,9 @@ class CacheManager:
                             if not dry_run:
                                 try:
                                     handler.delete(entry_key)
-                                    logger.info(
-                                        f"Purged corrupted entry [{handler_name}] "
-                                        f"{type_name}: {entry_key}"
-                                    )
+                                    logger.info(f"Purged corrupted entry [{handler_name}] " f"{type_name}: {entry_key}")
                                 except Exception as del_err:
-                                    result["errors"].append(
-                                        f"Failed to purge {entry_key}: {del_err}"
-                                    )
+                                    result["errors"].append(f"Failed to purge {entry_key}: {del_err}")
 
                             logger.debug(
                                 f"{'Would purge' if dry_run else 'Purged'} corrupted "
@@ -1813,17 +1768,14 @@ class CacheManager:
                             result["healthy_entries"] += 1
 
                 except Exception as e:
-                    result["errors"].append(
-                        f"Error scanning {handler_name}/{type_name}: {e}"
-                    )
+                    result["errors"].append(f"Error scanning {handler_name}/{type_name}: {e}")
                     logger.error(f"Corruption scan error: {e}")
 
         total_time = (time.time() - operation_start) * 1000
 
         # Summary
         corruption_rate = (
-            (result["corrupted_entries"] / result["entries_scanned"] * 100)
-            if result["entries_scanned"] > 0 else 0
+            (result["corrupted_entries"] / result["entries_scanned"] * 100) if result["entries_scanned"] > 0 else 0
         )
 
         logger.info(

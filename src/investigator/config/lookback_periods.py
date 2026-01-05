@@ -34,6 +34,7 @@ from typing import Dict, List
 @dataclass(frozen=True)
 class InsiderTradingPeriods:
     """Lookback periods for insider transaction analysis."""
+
     # Recent activity (cluster detection, urgency signals)
     recent_days: int = 14
     # Short-term sentiment (recent quarter)
@@ -49,6 +50,7 @@ class InsiderTradingPeriods:
 @dataclass(frozen=True)
 class InstitutionalPeriods:
     """Lookback periods for institutional holdings (13F) analysis."""
+
     # Recent quarter filings
     recent_days: int = 90
     # Year-over-year comparison
@@ -60,6 +62,7 @@ class InstitutionalPeriods:
 @dataclass(frozen=True)
 class ShortInterestPeriods:
     """Lookback periods for short interest analysis."""
+
     # Recent changes
     recent_days: int = 14
     # Standard analysis period
@@ -71,6 +74,7 @@ class ShortInterestPeriods:
 @dataclass(frozen=True)
 class CreditRiskPeriods:
     """Lookback periods for credit risk analysis."""
+
     # Refresh interval (weekly recalculation)
     refresh_days: int = 7
     # Standard calculation uses annual data
@@ -80,6 +84,7 @@ class CreditRiskPeriods:
 @dataclass(frozen=True)
 class MacroIndicatorPeriods:
     """Lookback periods for macro/market regime analysis."""
+
     # Current regime assessment
     current_days: int = 30
     # Trend analysis
@@ -91,6 +96,7 @@ class MacroIndicatorPeriods:
 @dataclass(frozen=True)
 class TechnicalAnalysisPeriods:
     """Lookback periods for technical analysis."""
+
     # Short-term momentum
     momentum_short_days: int = 14
     # Medium-term trend
@@ -112,6 +118,7 @@ class RLBacktestPeriods:
     - Holding period evaluation
     - Training data windowing
     """
+
     # Standard lookback months for analysis (quarterly snapshots)
     standard_lookback_months: List[int] = (3, 6, 9, 12)
     # Extended lookback for full cycle analysis
@@ -126,15 +133,19 @@ class RLBacktestPeriods:
     def __post_init__(self):
         if self.holding_periods is None:
             # Use object.__setattr__ for frozen dataclass
-            object.__setattr__(self, 'holding_periods', {
-                "1m": 30,
-                "3m": 90,
-                "6m": 180,
-                "12m": 365,
-                "18m": 548,
-                "24m": 730,
-                "36m": 1095,
-            })
+            object.__setattr__(
+                self,
+                "holding_periods",
+                {
+                    "1m": 30,
+                    "3m": 90,
+                    "6m": 180,
+                    "12m": 365,
+                    "18m": 548,
+                    "24m": 730,
+                    "36m": 1095,
+                },
+            )
 
 
 # Singleton instances for easy import

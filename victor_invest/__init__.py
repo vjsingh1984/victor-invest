@@ -51,37 +51,56 @@ def __getattr__(name):
     # Vertical (Victor integration) - requires victor package
     if name in ("InvestmentVertical", "InvestmentAssistant"):
         from victor_invest.vertical import InvestmentVertical
+
         if name == "InvestmentAssistant":
             return InvestmentVertical  # Backward compatibility alias
         return InvestmentVertical
 
     # Workflows (StateGraph-based)
     if name in (
-        "AnalysisMode", "AnalysisWorkflowState", "build_graph_for_mode",
-        "build_quick_graph", "build_standard_graph", "build_comprehensive_graph",
-        "run_analysis"
+        "AnalysisMode",
+        "AnalysisWorkflowState",
+        "build_graph_for_mode",
+        "build_quick_graph",
+        "build_standard_graph",
+        "build_comprehensive_graph",
+        "run_analysis",
     ):
         from victor_invest import workflows
+
         return getattr(workflows, name)
 
     # Agent specifications
     if name in (
-        "SEC_AGENT_SPEC", "FUNDAMENTAL_AGENT_SPEC", "TECHNICAL_AGENT_SPEC",
-        "MARKET_AGENT_SPEC", "SYNTHESIS_AGENT_SPEC"
+        "SEC_AGENT_SPEC",
+        "FUNDAMENTAL_AGENT_SPEC",
+        "TECHNICAL_AGENT_SPEC",
+        "MARKET_AGENT_SPEC",
+        "SYNTHESIS_AGENT_SPEC",
     ):
         from victor_invest import agents
+
         return getattr(agents, name)
 
     # Tools - these work without victor
     if name in (
-        "BaseTool", "ToolResult", "SECFilingTool", "ValuationTool",
-        "TechnicalIndicatorsTool", "MarketDataTool", "CacheTool",
-        "get_tool", "get_all_tools", "get_tool_names"
+        "BaseTool",
+        "ToolResult",
+        "SECFilingTool",
+        "ValuationTool",
+        "TechnicalIndicatorsTool",
+        "MarketDataTool",
+        "CacheTool",
+        "get_tool",
+        "get_all_tools",
+        "get_tool_names",
     ):
         from victor_invest import tools
+
         return getattr(tools, name)
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Version info

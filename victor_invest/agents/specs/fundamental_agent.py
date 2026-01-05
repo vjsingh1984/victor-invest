@@ -19,15 +19,14 @@ and financial health analysis.
 """
 
 from victor.agents.spec import (
-    AgentSpec,
     AgentCapabilities,
     AgentConstraints,
+    AgentSpec,
     ModelPreference,
     OutputFormat,
 )
 
 from victor_invest.prompts.investment_prompts import FUNDAMENTAL_ANALYST_PROMPT
-
 
 FUNDAMENTAL_AGENT_SPEC = AgentSpec(
     name="fundamental_analyst",

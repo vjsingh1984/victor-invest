@@ -69,8 +69,8 @@ DCF/TTM Calculations: Use only Q periods (NO FY periods present)
 
 import logging
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import FiscalPeriodService for centralized fiscal period handling
 from investigator.domain.services.fiscal_period_service import get_fiscal_period_service
@@ -86,7 +86,7 @@ def compute_missing_quarter(
     fy_data: Dict[str, Any],
     q1_data: Optional[Dict[str, Any]] = None,
     q2_data: Optional[Dict[str, Any]] = None,
-    q3_data: Optional[Dict[str, Any]] = None
+    q3_data: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Compute Q4 metrics implicitly from FY and Q1-Q3.
@@ -146,8 +146,7 @@ def compute_missing_quarter(
     if len(available_quarters) < 2:
         # Special case: Q3 only with YTD data allows Q4 = FY - Q3_YTD
         if len(available_quarters) == 1 and q3_data is not None:
-            q3_is_ytd = (q3_data.get('income_statement', {}).get('is_ytd') or
-                        q3_data.get('cash_flow', {}).get('is_ytd'))
+            q3_is_ytd = q3_data.get("income_statement", {}).get("is_ytd") or q3_data.get("cash_flow", {}).get("is_ytd")
             if q3_is_ytd:
                 logger.info(
                     f"✅ Q4 computation ALLOWED with only Q3 (YTD): "
@@ -155,14 +154,18 @@ def compute_missing_quarter(
                 )
                 # Continue to computation
             else:
-                logger.debug("Insufficient quarterly data: only Q3 available and not YTD (need at least 2 quarters or YTD Q3)")
+                logger.debug(
+                    "Insufficient quarterly data: only Q3 available and not YTD (need at least 2 quarters or YTD Q3)"
+                )
                 return None
         else:
-            logger.debug(f"Insufficient quarterly data to compute missing quarter (need at least 2, have {len(available_quarters)})")
+            logger.debug(
+                f"Insufficient quarterly data to compute missing quarter (need at least 2, have {len(available_quarters)})"
+            )
             return None
 
     # Get fiscal year and period from FY data
-    fiscal_year = fy_data.get('fiscal_year')
+    fiscal_year = fy_data.get("fiscal_year")
     if not fiscal_year:
         logger.warning("FY data missing fiscal_year field")
         return None
@@ -173,20 +176,20 @@ def compute_missing_quarter(
             return
 
         def derive(target: Dict[str, Any], prefix: str = "") -> None:
-            ocf = target.get('operating_cash_flow')
-            capex = target.get('capital_expenditures')
+            ocf = target.get("operating_cash_flow")
+            capex = target.get("capital_expenditures")
             if ocf is None or capex is None:
                 return
 
             # CRITICAL FIX: Derive FCF if missing OR if explicit zero (database artifact)
             # Only skip derivation if FCF is present AND non-zero
-            existing_fcf = target.get('free_cash_flow')
+            existing_fcf = target.get("free_cash_flow")
             if existing_fcf and existing_fcf != 0:  # Has non-zero FCF, don't override
                 return
 
             # Derive FCF = OCF - |CapEx|
             derived = ocf - abs(capex)
-            target['free_cash_flow'] = derived
+            target["free_cash_flow"] = derived
             replaced_zero = " [replaced explicit zero]" if existing_fcf == 0 else ""
             logger.debug(
                 "   ↳ Derived free_cash_flow for %s%s: %.1fM (OCF %.1fM - |CapEx| %.1fM)%s",
@@ -195,11 +198,11 @@ def compute_missing_quarter(
                 derived / 1e6,
                 ocf / 1e6,
                 abs(capex) / 1e6,
-                replaced_zero
+                replaced_zero,
             )
 
-        if 'cash_flow' in container and isinstance(container['cash_flow'], dict):
-            derive(container['cash_flow'])
+        if "cash_flow" in container and isinstance(container["cash_flow"], dict):
+            derive(container["cash_flow"])
         else:
             derive(container)
 
@@ -212,9 +215,15 @@ def compute_missing_quarter(
     # CRITICAL: Validate that Q4 can be computed
     # Special case: If Q1 and Q2 are missing, but Q3 is YTD, we can compute Q4 = FY - Q3_YTD
     # This handles cases where early quarters aren't filed yet (e.g., 2024-Q1, 2025-Q1)
-    q1_is_ytd = q1_data and (q1_data.get('income_statement', {}).get('is_ytd') or q1_data.get('cash_flow', {}).get('is_ytd'))
-    q2_is_ytd = q2_data and (q2_data.get('income_statement', {}).get('is_ytd') or q2_data.get('cash_flow', {}).get('is_ytd'))
-    q3_is_ytd = q3_data and (q3_data.get('income_statement', {}).get('is_ytd') or q3_data.get('cash_flow', {}).get('is_ytd'))
+    q1_is_ytd = q1_data and (
+        q1_data.get("income_statement", {}).get("is_ytd") or q1_data.get("cash_flow", {}).get("is_ytd")
+    )
+    q2_is_ytd = q2_data and (
+        q2_data.get("income_statement", {}).get("is_ytd") or q2_data.get("cash_flow", {}).get("is_ytd")
+    )
+    q3_is_ytd = q3_data and (
+        q3_data.get("income_statement", {}).get("is_ytd") or q3_data.get("cash_flow", {}).get("is_ytd")
+    )
 
     # If Q3 is YTD and Q1/Q2 are missing or also YTD, we can compute Q4 = FY - Q3_YTD
     if q3_is_ytd and not q1_data and not q2_data:
@@ -249,51 +258,47 @@ def compute_missing_quarter(
     # CRITICAL: fiscal_period='Q4' (NOT 'FY') and is_ytd=False (PIT, not cumulative)
     # ═══════════════════════════════════════════════════════════════════════════
     q4_computed = {
-        'symbol': fy_data.get('symbol'),
-        'fiscal_year': fiscal_year,
-        'fiscal_period': 'Q4',  # ← LABELED AS Q4 (not FY) - represents individual quarter
-        'computed': True,  # Flag to indicate this is derived data
-        'computation_method': 'FY_minus_reported_quarters',
-        'cash_flow': {'is_ytd': False},  # ← Q4 is POINT-IN-TIME, not YTD cumulative
-        'income_statement': {'is_ytd': False},  # ← Q4 is POINT-IN-TIME, not YTD cumulative
-        'balance_sheet': {},  # Will be populated from FY data
-        'ratios': {}  # Will be populated from FY data
+        "symbol": fy_data.get("symbol"),
+        "fiscal_year": fiscal_year,
+        "fiscal_period": "Q4",  # ← LABELED AS Q4 (not FY) - represents individual quarter
+        "computed": True,  # Flag to indicate this is derived data
+        "computation_method": "FY_minus_reported_quarters",
+        "cash_flow": {"is_ytd": False},  # ← Q4 is POINT-IN-TIME, not YTD cumulative
+        "income_statement": {"is_ytd": False},  # ← Q4 is POINT-IN-TIME, not YTD cumulative
+        "balance_sheet": {},  # Will be populated from FY data
+        "ratios": {},  # Will be populated from FY data
     }
 
     # CLEAN ARCHITECTURE: Statement-level structure
     # Cash flow metrics
     cash_flow_keys = [
-        'operating_cash_flow',
-        'capital_expenditures',
-        'free_cash_flow',
-        'financing_cash_flow',
-        'investing_cash_flow',
-        'dividends_paid'
+        "operating_cash_flow",
+        "capital_expenditures",
+        "free_cash_flow",
+        "financing_cash_flow",
+        "investing_cash_flow",
+        "dividends_paid",
     ]
 
     # Income statement metrics
-    income_keys = [
-        'total_revenue',
-        'net_income',
-        'operating_income',
-        'gross_profit',
-        'cost_of_revenue'
-    ]
+    income_keys = ["total_revenue", "net_income", "operating_income", "gross_profit", "cost_of_revenue"]
 
     # DEBUG: Log input data structure for debugging
     logger.info(f"🔧 [Q4_COMPUTE] Computing Q4 for FY {fiscal_year}")
-    logger.info(f"   FY data structure: cash_flow={('cash_flow' in fy_data)}, income_statement={('income_statement' in fy_data)}")
+    logger.info(
+        f"   FY data structure: cash_flow={('cash_flow' in fy_data)}, income_statement={('income_statement' in fy_data)}"
+    )
     logger.info(f"   Available quarters: {len(available_quarters)} quarters")
     for i, q in enumerate(available_quarters):
-        fp = q.get('fiscal_period', 'Unknown')
+        fp = q.get("fiscal_period", "Unknown")
         logger.info(f"   Q{i+1} ({fp}): cash_flow={('cash_flow' in q)}, income_statement={('income_statement' in q)}")
 
     # Compute cash flow metrics for Q4
     for key in cash_flow_keys:
         # Get FY value
         fy_value = None
-        if 'cash_flow' in fy_data and key in fy_data['cash_flow']:
-            fy_value = fy_data['cash_flow'].get(key)
+        if "cash_flow" in fy_data and key in fy_data["cash_flow"]:
+            fy_value = fy_data["cash_flow"].get(key)
         elif key in fy_data:  # Fallback for flat structure
             fy_value = fy_data.get(key)
 
@@ -308,29 +313,31 @@ def compute_missing_quarter(
         quarters_count = 0
         for q_data in available_quarters:
             q_value = None
-            if 'cash_flow' in q_data and key in q_data['cash_flow']:
-                q_value = q_data['cash_flow'].get(key)
+            if "cash_flow" in q_data and key in q_data["cash_flow"]:
+                q_value = q_data["cash_flow"].get(key)
             elif key in q_data:  # Fallback for flat structure
                 q_value = q_data.get(key)
 
             if q_value is not None:
-                fp = q_data.get('fiscal_period', '??')
+                fp = q_data.get("fiscal_period", "??")
                 logger.debug(f"      {fp}: {key}={q_value/1e6:.1f}M")
                 quarters_sum += q_value
                 quarters_count += 1
 
         # Compute Q4 value
         # Allow with 1 quarter if Q3 is YTD (special case for missing Q1/Q2)
-        q3_is_ytd = q3_data and (q3_data.get('income_statement', {}).get('is_ytd') or q3_data.get('cash_flow', {}).get('is_ytd'))
+        q3_is_ytd = q3_data and (
+            q3_data.get("income_statement", {}).get("is_ytd") or q3_data.get("cash_flow", {}).get("is_ytd")
+        )
         min_quarters_needed = 1 if (q3_is_ytd and not q1_data and not q2_data) else 2
 
         if quarters_count >= min_quarters_needed:
             q4_value = fy_value - quarters_sum
-            q4_computed['cash_flow'][key] = q4_value
+            q4_computed["cash_flow"][key] = q4_value
             logger.info(f"   ✅ {key}: Q4={q4_value/1e6:.1f}M (FY {fy_value/1e6:.1f}M - Q1-Q3 {quarters_sum/1e6:.1f}M)")
 
             # Validation: Q4 should be reasonable (not negative for most metrics except capex)
-            if key not in ['capital_expenditures', 'dividends_paid'] and q4_value < 0:
+            if key not in ["capital_expenditures", "dividends_paid"] and q4_value < 0:
                 logger.warning(
                     f"Computed negative Q4 {key}: {q4_value/1e6:.1f}M "
                     f"(FY: {fy_value/1e6:.1f}M, Q1-Q3 sum: {quarters_sum/1e6:.1f}M). "
@@ -338,16 +345,16 @@ def compute_missing_quarter(
                 )
 
     # If free cash flow wasn't explicitly computed but we have OCF and CapEx, derive it now
-    q4_cf = q4_computed.get('cash_flow', {})
+    q4_cf = q4_computed.get("cash_flow", {})
     if (
-        'free_cash_flow' not in q4_cf
-        and q4_cf.get('operating_cash_flow') is not None
-        and q4_cf.get('capital_expenditures') is not None
+        "free_cash_flow" not in q4_cf
+        and q4_cf.get("operating_cash_flow") is not None
+        and q4_cf.get("capital_expenditures") is not None
     ):
-        ocf = q4_cf['operating_cash_flow']
-        capex = q4_cf['capital_expenditures']
+        ocf = q4_cf["operating_cash_flow"]
+        capex = q4_cf["capital_expenditures"]
         derived_fcf = ocf - abs(capex)
-        q4_cf['free_cash_flow'] = derived_fcf
+        q4_cf["free_cash_flow"] = derived_fcf
         logger.info(
             "   🔁 free_cash_flow derived from operating_cash_flow %.1fM - |capital_expenditures| %.1fM = %.1fM",
             ocf / 1e6,
@@ -359,8 +366,8 @@ def compute_missing_quarter(
     for key in income_keys:
         # Get FY value
         fy_value = None
-        if 'income_statement' in fy_data and key in fy_data['income_statement']:
-            fy_value = fy_data['income_statement'].get(key)
+        if "income_statement" in fy_data and key in fy_data["income_statement"]:
+            fy_value = fy_data["income_statement"].get(key)
         elif key in fy_data:  # Fallback for flat structure
             fy_value = fy_data.get(key)
 
@@ -372,8 +379,8 @@ def compute_missing_quarter(
         quarters_count = 0
         for q_data in available_quarters:
             q_value = None
-            if 'income_statement' in q_data and key in q_data['income_statement']:
-                q_value = q_data['income_statement'].get(key)
+            if "income_statement" in q_data and key in q_data["income_statement"]:
+                q_value = q_data["income_statement"].get(key)
             elif key in q_data:  # Fallback for flat structure
                 q_value = q_data.get(key)
 
@@ -383,15 +390,17 @@ def compute_missing_quarter(
 
         # Compute Q4 value
         # Allow with 1 quarter if Q3 is YTD (special case for missing Q1/Q2)
-        q3_is_ytd = q3_data and (q3_data.get('income_statement', {}).get('is_ytd') or q3_data.get('cash_flow', {}).get('is_ytd'))
+        q3_is_ytd = q3_data and (
+            q3_data.get("income_statement", {}).get("is_ytd") or q3_data.get("cash_flow", {}).get("is_ytd")
+        )
         min_quarters_needed = 1 if (q3_is_ytd and not q1_data and not q2_data) else 2
 
         if quarters_count >= min_quarters_needed:
             q4_value = fy_value - quarters_sum
-            q4_computed['income_statement'][key] = q4_value
+            q4_computed["income_statement"][key] = q4_value
 
             # Validation: Q4 should be reasonable (not negative)
-            if q4_value < 0 and key not in ['net_income', 'operating_income']:
+            if q4_value < 0 and key not in ["net_income", "operating_income"]:
                 logger.warning(
                     f"Computed negative Q4 {key}: {q4_value/1e6:.1f}M "
                     f"(FY: {fy_value/1e6:.1f}M, Q1-Q3 sum: {quarters_sum/1e6:.1f}M). "
@@ -399,16 +408,16 @@ def compute_missing_quarter(
                 )
 
     # Copy balance sheet from FY (it's a point-in-time snapshot)
-    if 'balance_sheet' in fy_data:
-        q4_computed['balance_sheet'] = fy_data['balance_sheet'].copy()
+    if "balance_sheet" in fy_data:
+        q4_computed["balance_sheet"] = fy_data["balance_sheet"].copy()
 
     # Copy ratios from FY (or could recompute from Q4 metrics)
-    if 'ratios' in fy_data:
-        q4_computed['ratios'] = fy_data['ratios'].copy()
+    if "ratios" in fy_data:
+        q4_computed["ratios"] = fy_data["ratios"].copy()
 
     # Check if we computed at least some metrics
-    has_cash_flow = len(q4_computed['cash_flow']) > 1  # More than just is_ytd
-    has_income = len(q4_computed['income_statement']) > 1  # More than just is_ytd
+    has_cash_flow = len(q4_computed["cash_flow"]) > 1  # More than just is_ytd
+    has_income = len(q4_computed["income_statement"]) > 1  # More than just is_ytd
 
     return q4_computed if (has_cash_flow or has_income) else None
 
@@ -433,12 +442,13 @@ def extract_nested_value(data_dict: Dict[str, Any], key: str, debug: bool = Fals
     """
     if debug:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.info(f"🔍 extract: key='{key}', top_keys={list(data_dict.keys())}")
 
     # FIRST: Handle dot notation (e.g., 'cash_flow.free_cash_flow')
-    if '.' in key:
-        parts = key.split('.')
+    if "." in key:
+        parts = key.split(".")
         current = data_dict
         for part in parts:
             if isinstance(current, dict) and part in current:
@@ -467,8 +477,8 @@ def extract_nested_value(data_dict: Dict[str, Any], key: str, debug: bool = Fals
         return float(val) if val is not None else None
 
     # Try nested in financial_data
-    if 'financial_data' in data_dict:
-        fd = data_dict['financial_data']
+    if "financial_data" in data_dict:
+        fd = data_dict["financial_data"]
         if not isinstance(fd, dict):
             if debug:
                 logger.warning(f"🔍 extract: financial_data NOT dict, type={type(fd)}")
@@ -485,27 +495,27 @@ def extract_nested_value(data_dict: Dict[str, Any], key: str, debug: bool = Fals
             return float(val) if val is not None else None
 
         # Try cash_flow_statement
-        if 'cash_flow_statement' in fd and isinstance(fd['cash_flow_statement'], dict):
+        if "cash_flow_statement" in fd and isinstance(fd["cash_flow_statement"], dict):
             if debug:
                 logger.info(f"🔍 extract: cash_flow keys={list(fd['cash_flow_statement'].keys())[:5]}")
-            if key in fd['cash_flow_statement']:
-                val = fd['cash_flow_statement'][key]
+            if key in fd["cash_flow_statement"]:
+                val = fd["cash_flow_statement"][key]
                 if debug:
                     logger.info(f"🔍 extract: FOUND in CASH_FLOW key='{key}', val={val}")
                 return float(val) if val is not None else None
 
         # Try income_statement
-        if 'income_statement' in fd and isinstance(fd['income_statement'], dict):
-            if key in fd['income_statement']:
-                val = fd['income_statement'][key]
+        if "income_statement" in fd and isinstance(fd["income_statement"], dict):
+            if key in fd["income_statement"]:
+                val = fd["income_statement"][key]
                 if debug:
                     logger.info(f"🔍 extract: FOUND in INCOME key='{key}', val={val}")
                 return float(val) if val is not None else None
 
         # Try balance_sheet
-        if 'balance_sheet' in fd and isinstance(fd['balance_sheet'], dict):
-            if key in fd['balance_sheet']:
-                val = fd['balance_sheet'][key]
+        if "balance_sheet" in fd and isinstance(fd["balance_sheet"], dict):
+            if key in fd["balance_sheet"]:
+                val = fd["balance_sheet"][key]
                 if debug:
                     logger.info(f"🔍 extract: FOUND in BALANCE key='{key}', val={val}")
                 return float(val) if val is not None else None
@@ -545,11 +555,11 @@ def convert_ytd_to_quarterly(quarters: List[Dict[str, Any]]) -> List[Dict[str, A
     fiscal_year_groups: List[Dict[str, Dict]] = []
 
     def parse_date(q):
-        date_str = q.get('period_end_date', '')
+        date_str = q.get("period_end_date", "")
         if not date_str:
             return None
         try:
-            return datetime.strptime(date_str, '%Y-%m-%d')
+            return datetime.strptime(date_str, "%Y-%m-%d")
         except ValueError:
             return None
 
@@ -558,11 +568,11 @@ def convert_ytd_to_quarterly(quarters: List[Dict[str, Any]]) -> List[Dict[str, A
     fy_dict: Dict[int, Dict[str, Dict]] = {}
 
     for q in quarters:
-        period = q.get('fiscal_period', '')
-        if not period.startswith('Q'):
+        period = q.get("fiscal_period", "")
+        if not period.startswith("Q"):
             continue
 
-        fiscal_year = q.get('fiscal_year')
+        fiscal_year = q.get("fiscal_year")
         if not fiscal_year:
             logger.warning(f"Quarter missing fiscal_year: {q.get('period_end_date')}, skipping YTD conversion")
             continue
@@ -593,14 +603,14 @@ def convert_ytd_to_quarterly(quarters: List[Dict[str, Any]]) -> List[Dict[str, A
         # Examples: ORCL Q2 (-$1,085M), ZS Q1 (NULL), META Q2 (-$178M)
 
         # Convert Q2 if marked as YTD
-        if 'Q2' in year_quarters:
-            q2 = year_quarters['Q2']
+        if "Q2" in year_quarters:
+            q2 = year_quarters["Q2"]
 
             # Check if Q2 is YTD and requires conversion
-            if q2.get('income_statement', {}).get('is_ytd') or q2.get('cash_flow', {}).get('is_ytd'):
+            if q2.get("income_statement", {}).get("is_ytd") or q2.get("cash_flow", {}).get("is_ytd"):
                 # CRITICAL: Q2 YTD conversion requires Q1
-                if 'Q1' not in year_quarters:
-                    fiscal_year = q2.get('fiscal_year', 'Unknown')
+                if "Q1" not in year_quarters:
+                    fiscal_year = q2.get("fiscal_year", "Unknown")
                     # Use cache to suppress duplicate warnings
                     warning_key = f"Q2-{fiscal_year}-missing_q1"
                     if warning_key not in _ytd_warnings_logged:
@@ -611,84 +621,84 @@ def convert_ytd_to_quarterly(quarters: List[Dict[str, Any]]) -> List[Dict[str, A
                         )
                         _ytd_warnings_logged.add(warning_key)
                     # Mark as conversion_failed to prevent downstream use
-                    q2['ytd_conversion_failed'] = True
-                    q2['ytd_conversion_error'] = 'Missing Q1'
+                    q2["ytd_conversion_failed"] = True
+                    q2["ytd_conversion_error"] = "Missing Q1"
                     continue  # Skip this Q2 conversion
 
-            q1 = year_quarters.get('Q1')
+            q1 = year_quarters.get("Q1")
             if q1:
                 # Check if income_statement is YTD
-                if q2.get('income_statement', {}).get('is_ytd'):
-                    income = q2['income_statement']
-                    q1_income = q1.get('income_statement', {})
+                if q2.get("income_statement", {}).get("is_ytd"):
+                    income = q2["income_statement"]
+                    q1_income = q1.get("income_statement", {})
 
                     # Subtract Q1 from Q2 YTD to get Q2 individual
                     for key in income:
-                        if key != 'is_ytd' and isinstance(income.get(key), (int, float)):
+                        if key != "is_ytd" and isinstance(income.get(key), (int, float)):
                             q1_val = q1_income.get(key, 0) or 0
                             q2_ytd_val = income[key] or 0
                             income[key] = q2_ytd_val - q1_val
 
-                    income['is_ytd'] = False
-                    q2_end_date = q2.get('period_end_date', 'Unknown')
+                    income["is_ytd"] = False
+                    q2_end_date = q2.get("period_end_date", "Unknown")
                     logger.debug(f"Converted Q2 ending {q2_end_date} income_statement from YTD to individual quarter")
 
                 # Check if cash_flow is YTD
-                if q2.get('cash_flow', {}).get('is_ytd'):
-                    cash_flow = q2['cash_flow']
-                    q1_cash_flow = q1.get('cash_flow', {})
+                if q2.get("cash_flow", {}).get("is_ytd"):
+                    cash_flow = q2["cash_flow"]
+                    q1_cash_flow = q1.get("cash_flow", {})
 
                     # Subtract Q1 from Q2 YTD to get Q2 individual
                     for key in cash_flow:
-                        if key != 'is_ytd' and isinstance(cash_flow.get(key), (int, float)):
+                        if key != "is_ytd" and isinstance(cash_flow.get(key), (int, float)):
                             q1_val = q1_cash_flow.get(key, 0) or 0
                             q2_ytd_val = cash_flow[key] or 0
                             cash_flow[key] = q2_ytd_val - q1_val
 
-                    cash_flow['is_ytd'] = False
-                    q2_end_date = q2.get('period_end_date', 'Unknown')
+                    cash_flow["is_ytd"] = False
+                    q2_end_date = q2.get("period_end_date", "Unknown")
                     logger.debug(f"Converted Q2 ending {q2_end_date} cash_flow from YTD to individual quarter")
 
         # Convert Q3 if marked as YTD
-        if 'Q3' in year_quarters:
-            q3 = year_quarters['Q3']
+        if "Q3" in year_quarters:
+            q3 = year_quarters["Q3"]
 
             # Check if Q3 is YTD and requires conversion
-            if q3.get('income_statement', {}).get('is_ytd') or q3.get('cash_flow', {}).get('is_ytd'):
+            if q3.get("income_statement", {}).get("is_ytd") or q3.get("cash_flow", {}).get("is_ytd"):
                 # CRITICAL: Q3 YTD conversion requires BOTH Q1 AND Q2
                 missing_quarters = []
-                if 'Q1' not in year_quarters:
-                    missing_quarters.append('Q1')
-                if 'Q2' not in year_quarters:
-                    missing_quarters.append('Q2')
+                if "Q1" not in year_quarters:
+                    missing_quarters.append("Q1")
+                if "Q2" not in year_quarters:
+                    missing_quarters.append("Q2")
 
                 if missing_quarters:
-                    fiscal_year = q3.get('fiscal_year', 'Unknown')
+                    fiscal_year = q3.get("fiscal_year", "Unknown")
                     logger.warning(
                         f"⚠️  YTD CONVERSION SKIPPED: Q3-{fiscal_year} is YTD but {', '.join(missing_quarters)} missing from dataset. "
                         f"Cannot convert YTD to quarterly without prior quarters. This is expected if company didn't file or data is outside range. "
                         f"Marking quarter as conversion_failed."
                     )
                     # Mark as conversion_failed to prevent downstream use
-                    q3['ytd_conversion_failed'] = True
-                    q3['ytd_conversion_error'] = f"Missing {', '.join(missing_quarters)}"
+                    q3["ytd_conversion_failed"] = True
+                    q3["ytd_conversion_error"] = f"Missing {', '.join(missing_quarters)}"
                     continue  # Skip this Q3 conversion
 
             # Proceed with conversion only if all required quarters present
-            if 'Q2' in year_quarters and 'Q1' in year_quarters:
-                q2 = year_quarters['Q2']
-                q1 = year_quarters['Q1']
+            if "Q2" in year_quarters and "Q1" in year_quarters:
+                q2 = year_quarters["Q2"]
+                q1 = year_quarters["Q1"]
 
                 # Check if income_statement is YTD
-                if q3.get('income_statement', {}).get('is_ytd'):
-                    income = q3['income_statement']
-                    q1_income = q1.get('income_statement', {})
-                    q2_income = q2.get('income_statement', {})
+                if q3.get("income_statement", {}).get("is_ytd"):
+                    income = q3["income_statement"]
+                    q1_income = q1.get("income_statement", {})
+                    q2_income = q2.get("income_statement", {})
 
                     # Subtract Q1+Q2 from Q3 YTD to get Q3 individual
                     # Note: Q2 may already be converted to individual, so we need Q1+Q2 cumulative
                     for key in income:
-                        if key != 'is_ytd' and isinstance(income.get(key), (int, float)):
+                        if key != "is_ytd" and isinstance(income.get(key), (int, float)):
                             q1_val = q1_income.get(key, 0) or 0
                             q2_val = q2_income.get(key, 0) or 0
                             q3_ytd_val = income[key] or 0
@@ -698,19 +708,19 @@ def convert_ytd_to_quarterly(quarters: List[Dict[str, Any]]) -> List[Dict[str, A
                             q2_cumulative = q1_val + q2_val
                             income[key] = q3_ytd_val - q2_cumulative
 
-                    income['is_ytd'] = False
-                    q3_end_date = q3.get('period_end_date', 'Unknown')
+                    income["is_ytd"] = False
+                    q3_end_date = q3.get("period_end_date", "Unknown")
                     logger.debug(f"Converted Q3 ending {q3_end_date} income_statement from YTD to individual quarter")
 
                 # Check if cash_flow is YTD
-                if q3.get('cash_flow', {}).get('is_ytd'):
-                    cash_flow = q3['cash_flow']
-                    q1_cash_flow = q1.get('cash_flow', {})
-                    q2_cash_flow = q2.get('cash_flow', {})
+                if q3.get("cash_flow", {}).get("is_ytd"):
+                    cash_flow = q3["cash_flow"]
+                    q1_cash_flow = q1.get("cash_flow", {})
+                    q2_cash_flow = q2.get("cash_flow", {})
 
                     # Subtract Q1+Q2 from Q3 YTD to get Q3 individual
                     for key in cash_flow:
-                        if key != 'is_ytd' and isinstance(cash_flow.get(key), (int, float)):
+                        if key != "is_ytd" and isinstance(cash_flow.get(key), (int, float)):
                             q1_val = q1_cash_flow.get(key, 0) or 0
                             q2_val = q2_cash_flow.get(key, 0) or 0
                             q3_ytd_val = cash_flow[key] or 0
@@ -718,19 +728,15 @@ def convert_ytd_to_quarterly(quarters: List[Dict[str, Any]]) -> List[Dict[str, A
                             q2_cumulative = q1_val + q2_val
                             cash_flow[key] = q3_ytd_val - q2_cumulative
 
-                    cash_flow['is_ytd'] = False
-                    q3_end_date = q3.get('period_end_date', 'Unknown')
+                    cash_flow["is_ytd"] = False
+                    q3_end_date = q3.get("period_end_date", "Unknown")
                     logger.debug(f"Converted Q3 ending {q3_end_date} cash_flow from YTD to individual quarter")
 
     logger.info(f"YTD to quarterly conversion complete for {len(fiscal_year_groups)} fiscal year groups")
     return quarters
 
 
-def _find_consecutive_quarters(
-    periods: List[Dict[str, Any]],
-    target_count: int,
-    logger
-) -> List[Dict[str, Any]]:
+def _find_consecutive_quarters(periods: List[Dict[str, Any]], target_count: int, logger) -> List[Dict[str, Any]]:
     """
     Find the longest sequence of consecutive quarters from a sorted list.
 
@@ -756,35 +762,35 @@ def _find_consecutive_quarters(
     def parse_date(p):
         """Parse period_end_date to datetime, with filed_date as fallback."""
         # Try period_end_date first
-        date_str = p.get('period_end_date', '')
+        date_str = p.get("period_end_date", "")
         if date_str:
             try:
-                return datetime.strptime(date_str, '%Y-%m-%d')
+                return datetime.strptime(date_str, "%Y-%m-%d")
             except ValueError:
                 pass
         # Fallback to filed_date (more reliable for quarter sequencing)
-        date_str = p.get('filed_date', '')
+        date_str = p.get("filed_date", "")
         if date_str:
             try:
-                if hasattr(date_str, 'isoformat'):
+                if hasattr(date_str, "isoformat"):
                     return date_str  # Already a datetime
-                return datetime.strptime(str(date_str)[:10], '%Y-%m-%d')
+                return datetime.strptime(str(date_str)[:10], "%Y-%m-%d")
             except (ValueError, TypeError):
                 pass
         return None
 
     def is_consecutive_by_fiscal(prev_p, curr_p):
         """Check if two periods are consecutive by fiscal year/period."""
-        prev_fy = prev_p.get('fiscal_year')
-        curr_fy = curr_p.get('fiscal_year')
-        prev_fp = prev_p.get('fiscal_period', '')
-        curr_fp = curr_p.get('fiscal_period', '')
+        prev_fy = prev_p.get("fiscal_year")
+        curr_fy = curr_p.get("fiscal_year")
+        prev_fp = prev_p.get("fiscal_period", "")
+        curr_fp = curr_p.get("fiscal_period", "")
 
         if not all([prev_fy, curr_fy, prev_fp, curr_fp]):
             return False
 
         # Map periods to quarter numbers
-        q_map = {'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4}
+        q_map = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
         prev_q = q_map.get(prev_fp)
         curr_q = q_map.get(curr_fp)
 
@@ -863,9 +869,7 @@ def _find_consecutive_quarters(
 
 
 def get_rolling_ttm_periods(
-    all_periods: List[Dict[str, Any]],
-    compute_missing: bool = True,
-    num_quarters: int = 4
+    all_periods: List[Dict[str, Any]], compute_missing: bool = True, num_quarters: int = 4
 ) -> List[Dict[str, Any]]:
     """
     Get the most recent N quarters for TTM or historical analysis.
@@ -949,17 +953,17 @@ def get_rolling_ttm_periods(
         Returns:
             Period dict with corrected fiscal_year/fiscal_period
         """
-        frame = period.get('frame', '')
-        fy = period.get('fiscal_year')
-        fp = period.get('fiscal_period', '')
+        frame = period.get("frame", "")
+        fy = period.get("fiscal_year")
+        fp = period.get("fiscal_period", "")
 
         if frame:
             # Extract year and quarter from frame (e.g., "CY2025Q3" -> year=2025, period="Q3")
             try:
                 # Frame format: [C|F]Y followed by year and optionally Q[1-4]
-                if 'Q' in frame:
+                if "Q" in frame:
                     # Quarterly frame: "CY2025Q3" or "FY2025Q1"
-                    parts = frame.split('Q')
+                    parts = frame.split("Q")
                     year_part = parts[0]  # "CY2025" or "FY2025"
                     quarter_num = parts[1]  # "3"
 
@@ -984,8 +988,8 @@ def get_rolling_ttm_periods(
                     )
 
                 # Correct using frame (authoritative source)
-                period['fiscal_year'] = frame_year
-                period['fiscal_period'] = frame_period
+                period["fiscal_year"] = frame_year
+                period["fiscal_period"] = frame_period
 
             except (ValueError, IndexError) as e:
                 logger.warning(f"Failed to parse frame '{frame}': {e}. Using existing fy/fp.")
@@ -996,26 +1000,28 @@ def get_rolling_ttm_periods(
     all_periods = [normalize_period_data(p) for p in all_periods]
 
     # DEBUG: Check fiscal periods AFTER normalization
-    fiscal_periods_after_norm = [p.get('fiscal_period') for p in all_periods]
+    fiscal_periods_after_norm = [p.get("fiscal_period") for p in all_periods]
     logger.info(f"[QUARTERLY_CALC_DEBUG] Fiscal periods AFTER normalization: {fiscal_periods_after_norm}")
 
     # ═══════════════════════════════════════════════════════════════════════════
     # Separate FY and quarterly periods
     # FY periods will be used for Q4 computation, then DISCARDED from output
     # ═══════════════════════════════════════════════════════════════════════════
-    fy_periods = [p for p in all_periods if p.get('fiscal_period') == 'FY']
-    quarterly_periods = [p for p in all_periods if p.get('fiscal_period', '').startswith('Q')]
+    fy_periods = [p for p in all_periods if p.get("fiscal_period") == "FY"]
+    quarterly_periods = [p for p in all_periods if p.get("fiscal_period", "").startswith("Q")]
 
-    logger.info(f"[QUARTERLY_CALC_DEBUG] After separation: {len(fy_periods)} FY periods, {len(quarterly_periods)} Q periods")
+    logger.info(
+        f"[QUARTERLY_CALC_DEBUG] After separation: {len(fy_periods)} FY periods, {len(quarterly_periods)} Q periods"
+    )
 
     # Helper function for date parsing (used for YTD conversion and Q4 proximity matching)
     def parse_date(p):
         """Parse period_end_date for date-based proximity matching."""
-        date_str = p.get('period_end_date', '')
+        date_str = p.get("period_end_date", "")
         if not date_str:
             return datetime.min
         try:
-            return datetime.strptime(date_str, '%Y-%m-%d')
+            return datetime.strptime(date_str, "%Y-%m-%d")
         except ValueError:
             logger.warning(f"Invalid period_end_date format: {date_str}")
             return datetime.min
@@ -1026,8 +1032,20 @@ def get_rolling_ttm_periods(
     fiscal_period_service = get_fiscal_period_service()
 
     # Sort DESC by fiscal_year, then DESC by fiscal_period (2025-Q4 > 2025-Q3 > ... > 2024-Q4)
-    quarterly_periods.sort(key=lambda p: (p.get('fiscal_year', 0), fiscal_period_service.get_period_sort_key(p.get('fiscal_period', 'Q1'))), reverse=True)
-    fy_periods.sort(key=lambda p: (p.get('fiscal_year', 0), fiscal_period_service.get_period_sort_key(p.get('fiscal_period', 'FY'))), reverse=True)
+    quarterly_periods.sort(
+        key=lambda p: (
+            p.get("fiscal_year", 0),
+            fiscal_period_service.get_period_sort_key(p.get("fiscal_period", "Q1")),
+        ),
+        reverse=True,
+    )
+    fy_periods.sort(
+        key=lambda p: (
+            p.get("fiscal_year", 0),
+            fiscal_period_service.get_period_sort_key(p.get("fiscal_period", "FY")),
+        ),
+        reverse=True,
+    )
 
     # CRITICAL: Convert YTD to individual quarters BEFORE any calculations
     quarterly_periods = convert_ytd_to_quarterly(quarterly_periods)
@@ -1037,10 +1055,14 @@ def get_rolling_ttm_periods(
     # REFACTORED: Use chronological grouping instead of fiscal_year labels
     # OPTIMIZATION: Only compute Q4s until we have enough quarters for TTM calculations
     # ═══════════════════════════════════════════════════════════════════════════
-    logger.info(f"[Q4_COMPUTE] Before condition: compute_missing={compute_missing}, quarterly_periods={len(quarterly_periods)}, fy_periods={len(fy_periods)}")
+    logger.info(
+        f"[Q4_COMPUTE] Before condition: compute_missing={compute_missing}, quarterly_periods={len(quarterly_periods)}, fy_periods={len(fy_periods)}"
+    )
 
     if compute_missing and len(quarterly_periods) >= 3 and len(fy_periods) >= 1:
-        logger.info(f"[Q4_COMPUTE] ✅ Entering Q4 computation block: {len(fy_periods)} FY periods, {len(quarterly_periods)} Q periods")
+        logger.info(
+            f"[Q4_COMPUTE] ✅ Entering Q4 computation block: {len(fy_periods)} FY periods, {len(quarterly_periods)} Q periods"
+        )
 
         # OPTIMIZATION: Define minimum quarters needed for TTM calculations
         # This is configurable - if you need 16 quarters, change this value and the logic adapts
@@ -1054,167 +1076,184 @@ def get_rolling_ttm_periods(
 
         # CRITICAL FIX: Always attempt Q4 computation for ALL FY periods
         # Don't skip based on current count - YTD filtering happens later and may reduce count
-        logger.info(f"[Q4_COMPUTE] Will attempt to compute Q4 for ALL {len(fy_periods)} FY periods where quarterly data available")
+        logger.info(
+            f"[Q4_COMPUTE] Will attempt to compute Q4 for ALL {len(fy_periods)} FY periods where quarterly data available"
+        )
 
         # Process each FY period chronologically
         # CRITICAL FIX: Compute Q4 for ALL FY periods, not just until target reached
         # Rationale: YTD filtering may later reduce quarter count, creating gaps
         # This ensures we have complete Q4 data to eliminate 184-day gaps between Q1 and Q3
         for fy_idx, fy in enumerate(fy_periods):
-                logger.info(f"[Q4_COMPUTE] Processing FY {fy_idx+1}/{len(fy_periods)}: fiscal_year={fy.get('fiscal_year')}, period_end={fy.get('period_end_date')}")
-                fy_end_date = parse_date(fy)
-                if fy_end_date == datetime.min:
-                    logger.info(f"[Q4_COMPUTE] ❌ FY has invalid date, skipping")
-                    continue
+            logger.info(
+                f"[Q4_COMPUTE] Processing FY {fy_idx+1}/{len(fy_periods)}: fiscal_year={fy.get('fiscal_year')}, period_end={fy.get('period_end_date')}"
+            )
+            fy_end_date = parse_date(fy)
+            if fy_end_date == datetime.min:
+                logger.info(f"[Q4_COMPUTE] ❌ FY has invalid date, skipping")
+                continue
 
-                # Find Q1, Q2, Q3 that belong to this fiscal year
-                # Strategy: Quarters whose period_end_date is within ~365 days before FY end date
-                # and closest to FY end date (latest Q3 should be within ~90 days of FY)
+            # Find Q1, Q2, Q3 that belong to this fiscal year
+            # Strategy: Quarters whose period_end_date is within ~365 days before FY end date
+            # and closest to FY end date (latest Q3 should be within ~90 days of FY)
 
-                q1, q2, q3 = None, None, None
+            q1, q2, q3 = None, None, None
 
-                # Find Q3 first (should be ~90 days before FY end)
-                logger.info(f"[Q4_COMPUTE] Searching for Q3 matching FY ending {fy.get('period_end_date')}")
-                q3_candidates = []
+            # Find Q3 first (should be ~90 days before FY end)
+            logger.info(f"[Q4_COMPUTE] Searching for Q3 matching FY ending {fy.get('period_end_date')}")
+            q3_candidates = []
+            for q in quarterly_periods:
+                if q.get("fiscal_period") == "Q3":
+                    q_end_date = parse_date(q)
+                    days_diff = (fy_end_date - q_end_date).days
+                    q3_candidates.append((q.get("fiscal_year"), q.get("period_end_date"), days_diff))
+                    # Q3 should end 60-120 days before FY (typical fiscal quarter)
+                    if 30 <= days_diff <= 150:
+                        q3 = q
+                        logger.info(
+                            f"[Q4_COMPUTE] ✅ Found Q3: fiscal_year={q.get('fiscal_year')}, period_end={q.get('period_end_date')}, days_before_FY={days_diff}"
+                        )
+                        break
+
+            if not q3 and q3_candidates:
+                logger.info(f"[Q4_COMPUTE] Q3 candidates found but none matched (30-150 days): {q3_candidates}")
+
+            # FALLBACK 1: If no Q3 found, try relaxed proximity (30-180 days)
+            if not q3:
+                logger.warning(
+                    f"[Q4_COMPUTE] No Q3 found within 30-150 days for FY {fy.get('fiscal_year')} ending {fy.get('period_end_date')}, "
+                    f"trying relaxed proximity (30-180 days)"
+                )
                 for q in quarterly_periods:
-                    if q.get('fiscal_period') == 'Q3':
+                    if q.get("fiscal_period") == "Q3":
                         q_end_date = parse_date(q)
                         days_diff = (fy_end_date - q_end_date).days
-                        q3_candidates.append((q.get('fiscal_year'), q.get('period_end_date'), days_diff))
-                        # Q3 should end 60-120 days before FY (typical fiscal quarter)
-                        if 30 <= days_diff <= 150:
-                            q3 = q
-                            logger.info(f"[Q4_COMPUTE] ✅ Found Q3: fiscal_year={q.get('fiscal_year')}, period_end={q.get('period_end_date')}, days_before_FY={days_diff}")
-                            break
-
-                if not q3 and q3_candidates:
-                    logger.info(f"[Q4_COMPUTE] Q3 candidates found but none matched (30-150 days): {q3_candidates}")
-
-                # FALLBACK 1: If no Q3 found, try relaxed proximity (30-180 days)
-                if not q3:
-                    logger.warning(
-                        f"[Q4_COMPUTE] No Q3 found within 30-150 days for FY {fy.get('fiscal_year')} ending {fy.get('period_end_date')}, "
-                        f"trying relaxed proximity (30-180 days)"
-                    )
-                    for q in quarterly_periods:
-                        if q.get('fiscal_period') == 'Q3':
-                            q_end_date = parse_date(q)
-                            days_diff = (fy_end_date - q_end_date).days
-                            if 30 <= days_diff <= 180:
-                                q3 = q
-                                logger.info(
-                                    f"[Q4_COMPUTE] ✅ Found Q3 with relaxed proximity: fiscal_year={q.get('fiscal_year')}, "
-                                    f"period_end={q.get('period_end_date')}, days_before_FY={days_diff}"
-                                )
-                                break
-
-                # FALLBACK 2: If still no Q3 found, try fiscal year match only (ignore proximity)
-                if not q3:
-                    logger.warning(
-                        f"[Q4_COMPUTE] No Q3 found within 30-180 days, attempting fiscal year match only"
-                    )
-                    for q in quarterly_periods:
-                        if q.get('fiscal_period') == 'Q3' and q.get('fiscal_year') == fy.get('fiscal_year'):
+                        if 30 <= days_diff <= 180:
                             q3 = q
                             logger.info(
-                                f"[Q4_COMPUTE] ✅ Found Q3 by fiscal year match (ignoring proximity): "
-                                f"fiscal_year={q.get('fiscal_year')}, period_end={q.get('period_end_date')}"
+                                f"[Q4_COMPUTE] ✅ Found Q3 with relaxed proximity: fiscal_year={q.get('fiscal_year')}, "
+                                f"period_end={q.get('period_end_date')}, days_before_FY={days_diff}"
                             )
                             break
 
-                # If no Q3 found, can't compute Q4 reliably
-                if not q3:
-                    logger.warning(f"[Q4_COMPUTE] ❌ No Q3 found for FY {fy.get('fiscal_year')} ending {fy.get('period_end_date')}, skipping Q4 computation")
-                    continue
-
-                q3_end_date = parse_date(q3)
-                fy_year = fy.get('fiscal_year')
-
-                # Find Q2 - first try date proximity, then fiscal year match
+            # FALLBACK 2: If still no Q3 found, try fiscal year match only (ignore proximity)
+            if not q3:
+                logger.warning(f"[Q4_COMPUTE] No Q3 found within 30-180 days, attempting fiscal year match only")
                 for q in quarterly_periods:
-                    if q.get('fiscal_period') == 'Q2':
-                        q_end_date = parse_date(q)
-                        if q_end_date and q3_end_date:
-                            days_diff = (q3_end_date - q_end_date).days
-                            if 30 <= days_diff <= 150:
-                                q2 = q
-                                break
-                # Fallback: fiscal year match
-                if not q2:
-                    for q in quarterly_periods:
-                        if q.get('fiscal_period') == 'Q2' and q.get('fiscal_year') == fy_year:
+                    if q.get("fiscal_period") == "Q3" and q.get("fiscal_year") == fy.get("fiscal_year"):
+                        q3 = q
+                        logger.info(
+                            f"[Q4_COMPUTE] ✅ Found Q3 by fiscal year match (ignoring proximity): "
+                            f"fiscal_year={q.get('fiscal_year')}, period_end={q.get('period_end_date')}"
+                        )
+                        break
+
+            # If no Q3 found, can't compute Q4 reliably
+            if not q3:
+                logger.warning(
+                    f"[Q4_COMPUTE] ❌ No Q3 found for FY {fy.get('fiscal_year')} ending {fy.get('period_end_date')}, skipping Q4 computation"
+                )
+                continue
+
+            q3_end_date = parse_date(q3)
+            fy_year = fy.get("fiscal_year")
+
+            # Find Q2 - first try date proximity, then fiscal year match
+            for q in quarterly_periods:
+                if q.get("fiscal_period") == "Q2":
+                    q_end_date = parse_date(q)
+                    if q_end_date and q3_end_date:
+                        days_diff = (q3_end_date - q_end_date).days
+                        if 30 <= days_diff <= 150:
                             q2 = q
                             break
-
-                # Find Q1 - first try date proximity, then fiscal year match
+            # Fallback: fiscal year match
+            if not q2:
                 for q in quarterly_periods:
-                    if q.get('fiscal_period') == 'Q1':
-                        q_end_date = parse_date(q)
-                        if q2:
-                            q2_end_date = parse_date(q2)
-                            if q_end_date and q2_end_date:
-                                days_diff = (q2_end_date - q_end_date).days
-                                if 30 <= days_diff <= 150:
-                                    q1 = q
-                                    break
-                        elif q3_end_date and q_end_date:
-                            # No Q2, try matching to Q3
-                            days_diff = (q3_end_date - q_end_date).days
-                            if 120 <= days_diff <= 250:
+                    if q.get("fiscal_period") == "Q2" and q.get("fiscal_year") == fy_year:
+                        q2 = q
+                        break
+
+            # Find Q1 - first try date proximity, then fiscal year match
+            for q in quarterly_periods:
+                if q.get("fiscal_period") == "Q1":
+                    q_end_date = parse_date(q)
+                    if q2:
+                        q2_end_date = parse_date(q2)
+                        if q_end_date and q2_end_date:
+                            days_diff = (q2_end_date - q_end_date).days
+                            if 30 <= days_diff <= 150:
                                 q1 = q
                                 break
-                # Fallback: fiscal year match
-                if not q1:
-                    for q in quarterly_periods:
-                        if q.get('fiscal_period') == 'Q1' and q.get('fiscal_year') == fy_year:
+                    elif q3_end_date and q_end_date:
+                        # No Q2, try matching to Q3
+                        days_diff = (q3_end_date - q_end_date).days
+                        if 120 <= days_diff <= 250:
                             q1 = q
                             break
-
-                # Check if Q4 already exists for this fiscal year
-                # (within ~30 days of FY end date)
-                has_q4 = False
+            # Fallback: fiscal year match
+            if not q1:
                 for q in quarterly_periods:
-                    if q.get('fiscal_period') == 'Q4':
-                        q_end_date = parse_date(q)
-                        days_diff = abs((fy_end_date - q_end_date).days)
-                        if days_diff <= 30:
-                            has_q4 = True
-                            break
+                    if q.get("fiscal_period") == "Q1" and q.get("fiscal_year") == fy_year:
+                        q1 = q
+                        break
 
-                if has_q4:
-                    logger.debug(f"Q4 already exists for FY ending {fy.get('period_end_date')}, skipping computation")
-                    continue
+            # Check if Q4 already exists for this fiscal year
+            # (within ~30 days of FY end date)
+            has_q4 = False
+            for q in quarterly_periods:
+                if q.get("fiscal_period") == "Q4":
+                    q_end_date = parse_date(q)
+                    days_diff = abs((fy_end_date - q_end_date).days)
+                    if days_diff <= 30:
+                        has_q4 = True
+                        break
 
-                # If we have FY + at least 2 quarters, compute Q4
-                available_quarters = [q for q in [q1, q2, q3] if q is not None]
-                logger.info(f"[Q4_COMPUTE] Available quarters for computation: Q1={q1 is not None}, Q2={q2 is not None}, Q3={q3 is not None} (count={len(available_quarters)})")
+            if has_q4:
+                logger.debug(f"Q4 already exists for FY ending {fy.get('period_end_date')}, skipping computation")
+                continue
 
-                if len(available_quarters) >= 2:
-                    logger.info(f"[Q4_COMPUTE] 🔄 Computing Q4 from FY={fy.get('fiscal_year')}")
-                    q4_computed = compute_missing_quarter(fy, q1, q2, q3)
+            # If we have FY + at least 2 quarters, compute Q4
+            available_quarters = [q for q in [q1, q2, q3] if q is not None]
+            logger.info(
+                f"[Q4_COMPUTE] Available quarters for computation: Q1={q1 is not None}, Q2={q2 is not None}, Q3={q3 is not None} (count={len(available_quarters)})"
+            )
 
-                    if q4_computed:
-                        # Set period_end_date for computed Q4 (same as FY)
-                        q4_computed['period_end_date'] = fy.get('period_end_date')
+            if len(available_quarters) >= 2:
+                logger.info(f"[Q4_COMPUTE] 🔄 Computing Q4 from FY={fy.get('fiscal_year')}")
+                q4_computed = compute_missing_quarter(fy, q1, q2, q3)
 
-                        fiscal_year_display = fy.get('fiscal_year', 'Unknown')
-                        logger.info(
-                            f"✅ Computed Q4 for FY ending {fy.get('period_end_date')} (fiscal_year={fiscal_year_display}). "
-                            f"OCF: {q4_computed.get('cash_flow', {}).get('operating_cash_flow', 0)/1e6:.1f}M, "
-                            f"CapEx: {abs(q4_computed.get('cash_flow', {}).get('capital_expenditures', 0))/1e6:.1f}M"
-                        )
-                        computed_q4s.append(q4_computed)
-                    else:
-                        logger.info(f"[Q4_COMPUTE] ❌ compute_missing_quarter() returned None for FY={fy.get('fiscal_year')}")
+                if q4_computed:
+                    # Set period_end_date for computed Q4 (same as FY)
+                    q4_computed["period_end_date"] = fy.get("period_end_date")
+
+                    fiscal_year_display = fy.get("fiscal_year", "Unknown")
+                    logger.info(
+                        f"✅ Computed Q4 for FY ending {fy.get('period_end_date')} (fiscal_year={fiscal_year_display}). "
+                        f"OCF: {q4_computed.get('cash_flow', {}).get('operating_cash_flow', 0)/1e6:.1f}M, "
+                        f"CapEx: {abs(q4_computed.get('cash_flow', {}).get('capital_expenditures', 0))/1e6:.1f}M"
+                    )
+                    computed_q4s.append(q4_computed)
                 else:
-                    logger.info(f"[Q4_COMPUTE] ❌ Not enough quarters available (need >= 2, got {len(available_quarters)}) for FY={fy.get('fiscal_year')}")
+                    logger.info(
+                        f"[Q4_COMPUTE] ❌ compute_missing_quarter() returned None for FY={fy.get('fiscal_year')}"
+                    )
+            else:
+                logger.info(
+                    f"[Q4_COMPUTE] ❌ Not enough quarters available (need >= 2, got {len(available_quarters)}) for FY={fy.get('fiscal_year')}"
+                )
 
         # Add computed Q4s to quarterly periods and re-sort by fiscal_year + fiscal_period
         quarterly_periods.extend(computed_q4s)
         fiscal_service = get_fiscal_period_service()
-        quarterly_periods.sort(key=lambda p: (p.get('fiscal_year', 0), fiscal_service.get_period_sort_key(p.get('fiscal_period', ''))), reverse=True)
+        quarterly_periods.sort(
+            key=lambda p: (p.get("fiscal_year", 0), fiscal_service.get_period_sort_key(p.get("fiscal_period", ""))),
+            reverse=True,
+        )
 
-        logger.info(f"[Q4_COMPUTE] ✅ Computed {len(computed_q4s)} Q4 periods. Total quarterly periods after Q4 computation: {len(quarterly_periods)}")
+        logger.info(
+            f"[Q4_COMPUTE] ✅ Computed {len(computed_q4s)} Q4 periods. Total quarterly periods after Q4 computation: {len(quarterly_periods)}"
+        )
     else:
         logger.info(f"[Q4_COMPUTE] ❌ Skipping Q4 computation block (condition not met)")
 
@@ -1223,8 +1262,8 @@ def get_rolling_ttm_periods(
     # ytd_conversion_failed=True means conversion failed and data is still YTD (must skip)
     non_ytd_periods = []
     for period in quarterly_periods:
-        income_failed = period.get('income_statement', {}).get('ytd_conversion_failed', False)
-        cash_flow_failed = period.get('cash_flow', {}).get('ytd_conversion_failed', False)
+        income_failed = period.get("income_statement", {}).get("ytd_conversion_failed", False)
+        cash_flow_failed = period.get("cash_flow", {}).get("ytd_conversion_failed", False)
 
         if income_failed or cash_flow_failed:
             logger.warning(
@@ -1239,7 +1278,9 @@ def get_rolling_ttm_periods(
     # This ensures TTM periods are truly consecutive, not just by fiscal_year + fiscal_period
     non_ytd_periods.sort(key=lambda p: parse_date(p), reverse=True)
 
-    period_labels = [f"{p.get('fiscal_period')}-{p.get('fiscal_year')} ({p.get('period_end_date')})" for p in non_ytd_periods[:8]]
+    period_labels = [
+        f"{p.get('fiscal_period')}-{p.get('fiscal_year')} ({p.get('period_end_date')})" for p in non_ytd_periods[:8]
+    ]
     logger.info(
         f"[TTM_SELECT] After YTD filter and date sort: {len(non_ytd_periods)} periods available. "
         f"Periods: {period_labels}"
@@ -1263,8 +1304,7 @@ def get_rolling_ttm_periods(
 
 
 def analyze_quarterly_patterns(
-    quarters: List[Dict[str, Any]],
-    metric_key: str = 'operating_cash_flow'
+    quarters: List[Dict[str, Any]], metric_key: str = "operating_cash_flow"
 ) -> Dict[str, Any]:
     """
     Analyze quarterly patterns using TTM-based YoY comparison (fiscal-year agnostic).
@@ -1366,7 +1406,7 @@ def analyze_quarterly_patterns(
         else:
             # Safe to calculate 2-year CAGR
             # Formula: (final/initial)^(1/2) - 1 for 2-year period
-            cagr = (overall_ratio ** 0.5) - 1
+            cagr = (overall_ratio**0.5) - 1
             avg_yoy_growth = cagr * 100
             used_geometric_mean = True  # Keep flag name for backward compatibility
 
@@ -1426,8 +1466,8 @@ def analyze_quarterly_patterns(
     mean_val = sum(recent_4q) / 4 if recent_4q else 0
     if mean_val > 0:
         variance = sum((v - mean_val) ** 2 for v in recent_4q) / 4
-        std_dev = variance ** 0.5
-        seasonality_variance = (std_dev / mean_val * 100)
+        std_dev = variance**0.5
+        seasonality_variance = std_dev / mean_val * 100
     else:
         seasonality_variance = 0
 
@@ -1442,13 +1482,15 @@ def analyze_quarterly_patterns(
         avg_yoy_growth = 0  # Force to real number
 
     if avg_yoy_growth > 10:
-        trend = 'accelerating'
+        trend = "accelerating"
     elif avg_yoy_growth < -5:
-        trend = 'decelerating'
+        trend = "decelerating"
     else:
-        trend = 'stable'
+        trend = "stable"
 
-    seasonality_classification = "high" if seasonality_variance >= 25 else "moderate" if seasonality_variance >= 10 else "low"
+    seasonality_classification = (
+        "high" if seasonality_variance >= 25 else "moderate" if seasonality_variance >= 10 else "low"
+    )
     yoy_growth_payload = {
         "ttm_pct": avg_yoy_growth,
         "method": "cagr" if used_geometric_mean else "simple",
@@ -1457,26 +1499,27 @@ def analyze_quarterly_patterns(
     }
 
     return {
-        'metric': metric_key,
-        'avg_yoy_growth': avg_yoy_growth,
-        'avg_sequential_growth': avg_sequential_growth,
-        'seasonality_variance': seasonality_variance,
-        'seasonality': {
-            'classification': seasonality_classification,
-            'variance_pct': seasonality_variance,
+        "metric": metric_key,
+        "avg_yoy_growth": avg_yoy_growth,
+        "avg_sequential_growth": avg_sequential_growth,
+        "seasonality_variance": seasonality_variance,
+        "seasonality": {
+            "classification": seasonality_classification,
+            "variance_pct": seasonality_variance,
         },
-        'yoy_growth': yoy_growth_payload,
-        'trend': trend,
-        'current_ttm': current_ttm,
-        'prior_ttm': prior1_ttm,  # FIX: Use prior1_ttm (the actual variable name)
-        'quarters_analyzed': len(quarterly_only[:12]),  # Report actual quarters analyzed (up to 12 for geometric mean)
-        'used_geometric_mean': used_geometric_mean  # Flag to skip sector caps if True
+        "yoy_growth": yoy_growth_payload,
+        "trend": trend,
+        "current_ttm": current_ttm,
+        "prior_ttm": prior1_ttm,  # FIX: Use prior1_ttm (the actual variable name)
+        "quarters_analyzed": len(quarterly_only[:12]),  # Report actual quarters analyzed (up to 12 for geometric mean)
+        "used_geometric_mean": used_geometric_mean,  # Flag to skip sector caps if True
     }
 
 
 @dataclass
 class Q4ComputationResult:
     """Result of Q4 fallback calculation with quality metadata."""
+
     q4_data: Optional[Dict[str, Any]]
     method: str  # 'exact', 'proportional', 'annual_average', 'none'
     confidence: float  # 0.0-1.0
@@ -1485,14 +1528,14 @@ class Q4ComputationResult:
 
     def is_valid(self) -> bool:
         """Check if Q4 was successfully computed."""
-        return self.q4_data is not None and self.method != 'none'
+        return self.q4_data is not None and self.method != "none"
 
 
 def calculate_q4_with_fallback(
     fy_data: Dict[str, Any],
     q1_data: Optional[Dict[str, Any]] = None,
     q2_data: Optional[Dict[str, Any]] = None,
-    q3_data: Optional[Dict[str, Any]] = None
+    q3_data: Optional[Dict[str, Any]] = None,
 ) -> Q4ComputationResult:
     """
     Calculate Q4 with multi-strategy fallback chain.
@@ -1521,14 +1564,10 @@ def calculate_q4_with_fallback(
 
     if not fy_data:
         return Q4ComputationResult(
-            q4_data=None,
-            method='none',
-            confidence=0.0,
-            warnings=["No FY data provided"],
-            metrics_computed=[]
+            q4_data=None, method="none", confidence=0.0, warnings=["No FY data provided"], metrics_computed=[]
         )
 
-    fiscal_year = fy_data.get('fiscal_year')
+    fiscal_year = fy_data.get("fiscal_year")
 
     # Strategy 1: Exact calculation (highest confidence)
     if len(available_quarters) >= 2:
@@ -1538,19 +1577,19 @@ def calculate_q4_with_fallback(
             confidence = 0.95 if len(available_quarters) == 3 else 0.85
 
             # Check for data quality issues
-            cash_flow = q4_computed.get('cash_flow', {})
-            income = q4_computed.get('income_statement', {})
+            cash_flow = q4_computed.get("cash_flow", {})
+            income = q4_computed.get("income_statement", {})
 
             # Validate: negative revenue or unusually large values reduce confidence
-            if cash_flow.get('operating_cash_flow', 0) < 0:
+            if cash_flow.get("operating_cash_flow", 0) < 0:
                 warnings.append("Computed OCF is negative")
                 confidence *= 0.8
-            if income.get('total_revenue', 0) < 0:
+            if income.get("total_revenue", 0) < 0:
                 warnings.append("Computed revenue is negative")
                 confidence *= 0.7
 
-            metrics_computed = [k for k in cash_flow.keys() if k != 'is_ytd']
-            metrics_computed += [k for k in income.keys() if k != 'is_ytd']
+            metrics_computed = [k for k in cash_flow.keys() if k != "is_ytd"]
+            metrics_computed += [k for k in income.keys() if k != "is_ytd"]
 
             logger.info(
                 f"✅ Q4 computed via EXACT method for FY {fiscal_year} "
@@ -1559,17 +1598,17 @@ def calculate_q4_with_fallback(
 
             return Q4ComputationResult(
                 q4_data=q4_computed,
-                method='exact',
+                method="exact",
                 confidence=confidence,
                 warnings=warnings,
-                metrics_computed=metrics_computed
+                metrics_computed=metrics_computed,
             )
 
     # Strategy 2: Proportional estimation
     # Use available quarters to estimate Q4 proportionally
     if len(available_quarters) == 1:
         q_available = available_quarters[0]
-        q_period = q_available.get('fiscal_period', '')
+        q_period = q_available.get("fiscal_period", "")
 
         # Estimate based on single quarter pattern
         # Q4 is typically 25-30% of annual (some seasonality)
@@ -1587,10 +1626,10 @@ def calculate_q4_with_fallback(
 
             return Q4ComputationResult(
                 q4_data=q4_computed,
-                method='proportional',
+                method="proportional",
                 confidence=confidence,
                 warnings=warnings,
-                metrics_computed=list(q4_computed.get('cash_flow', {}).keys())
+                metrics_computed=list(q4_computed.get("cash_flow", {}).keys()),
             )
 
     # Strategy 3: Annual average (lowest confidence)
@@ -1609,25 +1648,24 @@ def calculate_q4_with_fallback(
 
             return Q4ComputationResult(
                 q4_data=q4_computed,
-                method='annual_average',
+                method="annual_average",
                 confidence=confidence,
                 warnings=warnings,
-                metrics_computed=list(q4_computed.get('cash_flow', {}).keys())
+                metrics_computed=list(q4_computed.get("cash_flow", {}).keys()),
             )
 
     # No valid computation possible
     return Q4ComputationResult(
         q4_data=None,
-        method='none',
+        method="none",
         confidence=0.0,
         warnings=["Could not compute Q4 with available data"],
-        metrics_computed=[]
+        metrics_computed=[],
     )
 
 
 def _estimate_q4_proportional(
-    fy_data: Dict[str, Any],
-    available_quarters: List[Dict[str, Any]]
+    fy_data: Dict[str, Any], available_quarters: List[Dict[str, Any]]
 ) -> Optional[Dict[str, Any]]:
     """
     Estimate Q4 proportionally from available quarters.
@@ -1637,19 +1675,19 @@ def _estimate_q4_proportional(
     if not available_quarters:
         return None
 
-    fiscal_year = fy_data.get('fiscal_year')
+    fiscal_year = fy_data.get("fiscal_year")
 
     # Calculate sum of available quarters
     quarter_sum = {}
     for q in available_quarters:
-        cf = q.get('cash_flow', {})
+        cf = q.get("cash_flow", {})
         for key, val in cf.items():
-            if key != 'is_ytd' and isinstance(val, (int, float)):
+            if key != "is_ytd" and isinstance(val, (int, float)):
                 quarter_sum[key] = quarter_sum.get(key, 0) + val
 
-        income = q.get('income_statement', {})
+        income = q.get("income_statement", {})
         for key, val in income.items():
-            if key != 'is_ytd' and isinstance(val, (int, float)):
+            if key != "is_ytd" and isinstance(val, (int, float)):
                 quarter_sum[key] = quarter_sum.get(key, 0) + val
 
     # Estimate Q4 = FY - sum of available quarters
@@ -1658,27 +1696,29 @@ def _estimate_q4_proportional(
     expected_proportion = num_quarters / 4.0
 
     q4_computed = {
-        'symbol': fy_data.get('symbol'),
-        'fiscal_year': fiscal_year,
-        'fiscal_period': 'Q4',
-        'computed': True,
-        'computation_method': 'proportional_estimate',
-        'cash_flow': {'is_ytd': False},
-        'income_statement': {'is_ytd': False},
+        "symbol": fy_data.get("symbol"),
+        "fiscal_year": fiscal_year,
+        "fiscal_period": "Q4",
+        "computed": True,
+        "computation_method": "proportional_estimate",
+        "cash_flow": {"is_ytd": False},
+        "income_statement": {"is_ytd": False},
     }
 
     # For each metric in FY, estimate Q4
-    fy_cf = fy_data.get('cash_flow', {})
+    fy_cf = fy_data.get("cash_flow", {})
     for key, fy_val in fy_cf.items():
-        if key != 'is_ytd' and isinstance(fy_val, (int, float)):
+        if key != "is_ytd" and isinstance(fy_val, (int, float)):
             q_sum = quarter_sum.get(key, 0)
             # Estimate remaining value for Q4
             # If q_sum represents expected_proportion of FY, scale accordingly
             if q_sum != 0:
                 remaining = fy_val - (q_sum / expected_proportion * expected_proportion)
-                q4_computed['cash_flow'][key] = remaining / (1 - expected_proportion) if expected_proportion < 1 else fy_val / 4
+                q4_computed["cash_flow"][key] = (
+                    remaining / (1 - expected_proportion) if expected_proportion < 1 else fy_val / 4
+                )
             else:
-                q4_computed['cash_flow'][key] = fy_val / 4
+                q4_computed["cash_flow"][key] = fy_val / 4
 
     return q4_computed
 
@@ -1689,28 +1729,28 @@ def _estimate_q4_annual_average(fy_data: Dict[str, Any]) -> Optional[Dict[str, A
 
     Lowest confidence method, used when no quarterly data available.
     """
-    fiscal_year = fy_data.get('fiscal_year')
+    fiscal_year = fy_data.get("fiscal_year")
 
     q4_computed = {
-        'symbol': fy_data.get('symbol'),
-        'fiscal_year': fiscal_year,
-        'fiscal_period': 'Q4',
-        'computed': True,
-        'computation_method': 'annual_average',
-        'cash_flow': {'is_ytd': False},
-        'income_statement': {'is_ytd': False},
+        "symbol": fy_data.get("symbol"),
+        "fiscal_year": fiscal_year,
+        "fiscal_period": "Q4",
+        "computed": True,
+        "computation_method": "annual_average",
+        "cash_flow": {"is_ytd": False},
+        "income_statement": {"is_ytd": False},
     }
 
     # Simply divide FY by 4
-    fy_cf = fy_data.get('cash_flow', {})
+    fy_cf = fy_data.get("cash_flow", {})
     for key, fy_val in fy_cf.items():
-        if key != 'is_ytd' and isinstance(fy_val, (int, float)):
-            q4_computed['cash_flow'][key] = fy_val / 4
+        if key != "is_ytd" and isinstance(fy_val, (int, float)):
+            q4_computed["cash_flow"][key] = fy_val / 4
 
-    fy_income = fy_data.get('income_statement', {})
+    fy_income = fy_data.get("income_statement", {})
     for key, fy_val in fy_income.items():
-        if key != 'is_ytd' and isinstance(fy_val, (int, float)):
-            q4_computed['income_statement'][key] = fy_val / 4
+        if key != "is_ytd" and isinstance(fy_val, (int, float)):
+            q4_computed["income_statement"][key] = fy_val / 4
 
     return q4_computed
 
@@ -1718,6 +1758,7 @@ def _estimate_q4_annual_average(fy_data: Dict[str, Any]) -> Optional[Dict[str, A
 @dataclass
 class TTMResult:
     """Result of weighted TTM calculation with quality metadata."""
+
     ttm_data: Dict[str, float]
     quarters_used: int
     quality_score: float  # 0-100
@@ -1729,10 +1770,7 @@ class TTMResult:
         return self.quarters_used >= 4 and not self.scaling_applied
 
 
-def calculate_ttm_weighted(
-    quarters: List[Dict[str, Any]],
-    weights: Optional[List[float]] = None
-) -> TTMResult:
+def calculate_ttm_weighted(quarters: List[Dict[str, Any]], weights: Optional[List[float]] = None) -> TTMResult:
     """
     Calculate TTM with weighted quarters and quality scoring.
 
@@ -1762,11 +1800,7 @@ def calculate_ttm_weighted(
 
     if not quarters:
         return TTMResult(
-            ttm_data={},
-            quarters_used=0,
-            quality_score=0.0,
-            scaling_applied=False,
-            warnings=["No quarters provided"]
+            ttm_data={}, quarters_used=0, quality_score=0.0, scaling_applied=False, warnings=["No quarters provided"]
         )
 
     num_quarters = min(4, len(quarters))
@@ -1788,16 +1822,23 @@ def calculate_ttm_weighted(
 
     # Key metrics to aggregate
     aggregate_keys = [
-        'operating_cash_flow', 'free_cash_flow', 'capital_expenditures',
-        'total_revenue', 'net_income', 'operating_income', 'gross_profit',
-        'dividends_paid', 'financing_cash_flow', 'investing_cash_flow'
+        "operating_cash_flow",
+        "free_cash_flow",
+        "capital_expenditures",
+        "total_revenue",
+        "net_income",
+        "operating_income",
+        "gross_profit",
+        "dividends_paid",
+        "financing_cash_flow",
+        "investing_cash_flow",
     ]
 
     for i, quarter in enumerate(quarters[:num_quarters]):
         weight = weights[i] if i < len(weights) else 1.0
 
         # Process cash_flow metrics
-        cf = quarter.get('cash_flow', {})
+        cf = quarter.get("cash_flow", {})
         for key in aggregate_keys:
             if key in cf and isinstance(cf[key], (int, float)):
                 val = cf[key] * weight
@@ -1805,7 +1846,7 @@ def calculate_ttm_weighted(
                 metric_counts[key] = metric_counts.get(key, 0) + 1
 
         # Process income_statement metrics
-        income = quarter.get('income_statement', {})
+        income = quarter.get("income_statement", {})
         for key in aggregate_keys:
             if key in income and isinstance(income[key], (int, float)):
                 val = income[key] * weight
@@ -1825,9 +1866,7 @@ def calculate_ttm_weighted(
         )
 
     # Calculate quality score
-    quality_score = _calculate_ttm_quality_score(
-        num_quarters, metric_counts, scaling_applied
-    )
+    quality_score = _calculate_ttm_quality_score(num_quarters, metric_counts, scaling_applied)
 
     # Add quality warnings
     if quality_score < 70:
@@ -1842,15 +1881,11 @@ def calculate_ttm_weighted(
         quarters_used=num_quarters,
         quality_score=quality_score,
         scaling_applied=scaling_applied,
-        warnings=warnings
+        warnings=warnings,
     )
 
 
-def _calculate_ttm_quality_score(
-    quarters_used: int,
-    metric_counts: Dict[str, int],
-    scaling_applied: bool
-) -> float:
+def _calculate_ttm_quality_score(quarters_used: int, metric_counts: Dict[str, int], scaling_applied: bool) -> float:
     """Calculate quality score for TTM calculation."""
     # Base score from quarters used
     quarter_score = quarters_used / 4.0 * 100  # 25 per quarter
@@ -1866,19 +1901,13 @@ def _calculate_ttm_quality_score(
         completeness_score = 0
 
     # Weighted average: 50% quarters, 30% completeness, 20% no-scaling
-    quality = (
-        0.50 * quarter_score +
-        0.30 * completeness_score +
-        0.20 * (100 - scaling_penalty * 5)
-    )
+    quality = 0.50 * quarter_score + 0.30 * completeness_score + 0.20 * (100 - scaling_penalty * 5)
 
     return max(0, min(100, quality))
 
 
 def validate_computed_quarter(
-    computed: Dict[str, Any],
-    fy_data: Dict[str, Any],
-    reported_quarters: List[Dict[str, Any]]
+    computed: Dict[str, Any], fy_data: Dict[str, Any], reported_quarters: List[Dict[str, Any]]
 ) -> Tuple[bool, List[str]]:
     """
     Validate computed Q4 against business logic rules.
@@ -1894,21 +1923,21 @@ def validate_computed_quarter(
     warnings = []
 
     # Check for negative values in metrics that shouldn't be negative
-    non_negative_keys = ['revenue', 'operating_cash_flow']
+    non_negative_keys = ["revenue", "operating_cash_flow"]
     for key in non_negative_keys:
         val = computed.get(key, 0)
         if val and val < 0:
             warnings.append(f"Computed {key} is negative: {val/1e6:.1f}M")
 
     # Check Q4 < FY for all metrics
-    for key in ['revenue', 'operating_cash_flow', 'net_income']:
+    for key in ["revenue", "operating_cash_flow", "net_income"]:
         q4_val = computed.get(key, 0)
         fy_val = extract_nested_value(fy_data, key)
         if q4_val and fy_val and q4_val > fy_val:
             warnings.append(f"Computed Q4 {key} ({q4_val/1e6:.1f}M) > FY ({fy_val/1e6:.1f}M)")
 
     # Validate sum: Q1+Q2+Q3+Q4 ≈ FY
-    for key in ['operating_cash_flow', 'revenue']:
+    for key in ["operating_cash_flow", "revenue"]:
         q4_val = computed.get(key, 0)
         fy_val = extract_nested_value(fy_data, key)
 

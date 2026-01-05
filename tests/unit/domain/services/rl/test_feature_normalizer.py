@@ -2,11 +2,12 @@
 Unit tests for FeatureNormalizer.
 """
 
-import pytest
-import numpy as np
-import tempfile
 import os
+import tempfile
 from datetime import date
+
+import numpy as np
+import pytest
 
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
 from investigator.domain.services.rl.models import ValuationContext

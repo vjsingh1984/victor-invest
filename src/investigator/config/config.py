@@ -8,7 +8,7 @@ Common Configuration Module
 Handles all configuration settings for the Investment AI system
 """
 
-import yaml
+import json
 import logging
 import os
 import re
@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+
+import yaml
 
 
 @dataclass
@@ -1940,9 +1942,9 @@ class Config:
                 "ticker_cache_file": "./data/ticker_cik_map.txt",
                 "max_retries": 3,
                 "timeout": 30,
-                "require_submissions": true,
+                "require_submissions": True,
                 "max_periods_to_analyze": 8,
-                "include_amended_filings": true,
+                "include_amended_filings": True,
             },
             "email": {
                 "enabled": True,

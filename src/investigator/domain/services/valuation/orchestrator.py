@@ -20,18 +20,18 @@ import logging
 import math
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from investigator.domain.services.valuation.models.company_profile import CompanyProfile
-from investigator.domain.services.weight_normalizer import WeightNormalizer
 from investigator.domain.services.model_agreement_scorer import (
-    ModelAgreementScorer,
     AgreementConfig,
     AgreementLevel,
+    ModelAgreementScorer,
 )
 from investigator.domain.services.valuation.bounds_checker import (
     BoundsChecker,
-    get_bounds_checker,
     ValidationSeverity,
+    get_bounds_checker,
 )
+from investigator.domain.services.valuation.models.company_profile import CompanyProfile
+from investigator.domain.services.weight_normalizer import WeightNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class MultiModelValuationOrchestrator:
         self,
         divergence_threshold: float = 0.35,
         agreement_config: Optional[Dict[str, Any]] = None,
-        bounds_config: Optional[Dict[str, Any]] = None
+        bounds_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.divergence_threshold = divergence_threshold
         self.weight_normalizer = WeightNormalizer(rounding_increment=5)
@@ -194,9 +194,9 @@ class MultiModelValuationOrchestrator:
         )
 
         # Enhanced blended valuation logging for visibility
-        symbol = company_profile.symbol if hasattr(company_profile, 'symbol') else 'UNKNOWN'
-        sector = company_profile.sector if hasattr(company_profile, 'sector') else 'N/A'
-        industry = company_profile.industry if hasattr(company_profile, 'industry') else None
+        symbol = company_profile.symbol if hasattr(company_profile, "symbol") else "UNKNOWN"
+        sector = company_profile.sector if hasattr(company_profile, "sector") else "N/A"
+        industry = company_profile.industry if hasattr(company_profile, "industry") else None
 
         logger.info(f"💰 {symbol} - Blended Valuation Breakdown:")
         logger.info(f"   Tier: {tier_classification or 'N/A'} | Sector: {sector} | Industry: {industry or 'N/A'}")
@@ -233,22 +233,18 @@ class MultiModelValuationOrchestrator:
             if model.get("fair_value_per_share") is not None
         }
         model_weights_for_agreement = {
-            model.get("model"): model.get("weight", 0.0) * 100  # Convert to percentage
-            for model in applicable
+            model.get("model"): model.get("weight", 0.0) * 100 for model in applicable  # Convert to percentage
         }
 
         agreement_result = self.agreement_scorer.analyze(
-            model_fair_values=model_fair_values,
-            symbol=symbol,
-            model_weights=model_weights_for_agreement
+            model_fair_values=model_fair_values, symbol=symbol, model_weights=model_weights_for_agreement
         )
 
         # Apply outlier penalties if enabled
         effective_weights = model_weights_for_agreement
         if self.apply_outlier_penalties and agreement_result.outlier_models:
             effective_weights = self.agreement_scorer.apply_outlier_penalty(
-                model_weights_for_agreement,
-                agreement_result.outlier_models
+                model_weights_for_agreement, agreement_result.outlier_models
             )
 
             # Re-apply adjusted weights to models
@@ -278,10 +274,7 @@ class MultiModelValuationOrchestrator:
 
         notes: List[str] = []
         if missing_weight_targets:
-            notes.append(
-                "Tier targets ignored for missing fair values → "
-                + ", ".join(missing_weight_targets)
-            )
+            notes.append("Tier targets ignored for missing fair values → " + ", ".join(missing_weight_targets))
         if divergence_flag:
             notes.append(
                 f"Model fair values diverge beyond threshold "
@@ -301,10 +294,7 @@ class MultiModelValuationOrchestrator:
             notes.append("Overall confidence below 0.5; consider gathering additional data before acting.")
         if fallback_applied:
             applied_keys = [key for key, value in applied_weights.items() if value > 0]
-            notes.append(
-                "Applied fallback weights from configuration to models: "
-                + ", ".join(applied_keys)
-            )
+            notes.append("Applied fallback weights from configuration to models: " + ", ".join(applied_keys))
 
         # Add agreement scorer notes
         notes.extend(agreement_result.notes)
@@ -312,13 +302,10 @@ class MultiModelValuationOrchestrator:
         # Validate blended fair value against bounds (M7)
         bounds_validation = None
         if self.validate_outputs and blended_fair_value is not None:
-            current_price = getattr(company_profile, 'current_price', None)
+            current_price = getattr(company_profile, "current_price", None)
             if current_price and current_price > 0:
                 bounds_validation = self.bounds_checker.validate_output(
-                    fair_value=blended_fair_value,
-                    current_price=current_price,
-                    model_type='blended',
-                    symbol=symbol
+                    fair_value=blended_fair_value, current_price=current_price, model_type="blended", symbol=symbol
                 )
 
                 # Add validation issues to notes

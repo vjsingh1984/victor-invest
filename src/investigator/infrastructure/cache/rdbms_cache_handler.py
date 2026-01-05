@@ -587,7 +587,9 @@ class RdbmsCacheStorageHandler(CacheStorageHandler):
 
             elif self.cache_type == CacheType.QUARTERLY_METRICS:
                 # DEPRECATED: quarterly_metrics table - use sec_companyfacts_processed instead
-                logger.info(f"Symbol cleanup [RDBMS-QM]: DEPRECATED - skipping (use sec_companyfacts_processed cleanup)")
+                logger.info(
+                    f"Symbol cleanup [RDBMS-QM]: DEPRECATED - skipping (use sec_companyfacts_processed cleanup)"
+                )
                 # # Delete quarterly metrics for this symbol
                 # from investigator.infrastructure.database.db import get_quarterly_metrics_dao
                 #

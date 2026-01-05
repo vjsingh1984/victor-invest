@@ -9,8 +9,8 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from investigator.config import get_config
 from investigator.domain.agents.base import InvestmentAgent
@@ -100,8 +100,9 @@ class SECAnalysisAgent(InvestmentAgent):
         symbol = task.context.get("symbol")
 
         # Check if processed data exists in database
-        from investigator.infrastructure.database.db import get_db_manager
         from sqlalchemy import text
+
+        from investigator.infrastructure.database.db import get_db_manager
 
         db_manager = get_db_manager()
         with db_manager.engine.connect() as conn:
@@ -252,10 +253,11 @@ class SECAnalysisAgent(InvestmentAgent):
         Returns:
             Raw CompanyFacts data with us-gaap structure intact
         """
-        from investigator.infrastructure.database.db import get_db_manager
-        from investigator.infrastructure.sec.data_processor import SECDataProcessor
-        from investigator.infrastructure.database.ticker_mapper import TickerCIKMapper
         from sqlalchemy import text
+
+        from investigator.infrastructure.database.db import get_db_manager
+        from investigator.infrastructure.database.ticker_mapper import TickerCIKMapper
+        from investigator.infrastructure.sec.data_processor import SECDataProcessor
 
         # Step 1: Check if we have fresh cached data in sec_companyfacts_raw
         db_manager = get_db_manager()
@@ -352,8 +354,8 @@ class SECAnalysisAgent(InvestmentAgent):
             "facts": api_data.get("facts", {}),
         }
 
-        import json
         import hashlib
+        import json
 
         new_data_json = json.dumps(raw_data_dict, sort_keys=True)
         new_data_hash = hashlib.sha256(new_data_json.encode()).hexdigest()

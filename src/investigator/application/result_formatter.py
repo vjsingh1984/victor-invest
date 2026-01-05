@@ -14,10 +14,10 @@ Usage:
     formatted = format_analysis_output(raw_results, OutputDetailLevel.STANDARD)
 """
 
-from enum import Enum
-from typing import Dict, Any, Optional, List
 import copy
 import logging
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 

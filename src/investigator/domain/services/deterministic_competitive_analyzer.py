@@ -19,10 +19,10 @@ Design Principles (SOLID):
 - Dependency Inversion: Depends on abstractions, not concretions
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol
-import logging
 
 logger = logging.getLogger(__name__)
 

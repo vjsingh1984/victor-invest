@@ -2,18 +2,19 @@
 Unit tests for RL policies.
 """
 
-import pytest
-import numpy as np
-import tempfile
 import os
+import tempfile
 from datetime import date
 from unittest.mock import MagicMock
 
+import numpy as np
+import pytest
+
+from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
+from investigator.domain.services.rl.models import GrowthStage, ValuationContext
 from investigator.domain.services.rl.policy.base import RLPolicy, UniformPolicy
 from investigator.domain.services.rl.policy.contextual_bandit import ContextualBanditPolicy
 from investigator.domain.services.rl.policy.hybrid import HybridPolicy
-from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
-from investigator.domain.services.rl.models import ValuationContext, GrowthStage
 
 
 class TestUniformPolicy:

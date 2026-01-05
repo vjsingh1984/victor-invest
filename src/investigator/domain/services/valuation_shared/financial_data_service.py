@@ -122,8 +122,7 @@ class FinancialDataService:
                 LIMIT :num_quarters
             """
             results = session.execute(
-                text(query),
-                {"symbol": symbol, "as_of_date": as_of_date, "num_quarters": num_quarters}
+                text(query), {"symbol": symbol, "as_of_date": as_of_date, "num_quarters": num_quarters}
             ).fetchall()
 
             quarterly_metrics = []
@@ -132,38 +131,40 @@ class FinancialDataService:
                 depreciation = self._to_float(row[23])
                 ebitda = operating_income + depreciation if operating_income else None
 
-                quarterly_metrics.append({
-                    "fiscal_year": row[1],
-                    "fiscal_period": row[2],
-                    "filed_date": row[3],
-                    "income_statement": {
-                        "total_revenue": self._to_float(row[4]),
-                        "net_income": self._to_float(row[5]),
-                        "gross_profit": self._to_float(row[6]),
-                        "operating_income": operating_income,
-                        "interest_expense": self._to_float(row[21]),
-                        "income_tax_expense": self._to_float(row[22]),
-                        "ebitda": ebitda,
-                    },
-                    "cash_flow": {
-                        "operating_cash_flow": self._to_float(row[8]),
-                        "free_cash_flow": self._to_float(row[9]),
-                        "capital_expenditures": self._to_float(row[10]),
-                        "dividends_paid": self._to_float(row[11]),
-                    },
-                    "balance_sheet": {
-                        "total_assets": self._to_float(row[12]),
-                        "total_liabilities": self._to_float(row[13]),
-                        "stockholders_equity": self._to_float(row[14]),
-                        "cash_and_equivalents": self._to_float(row[15]),
-                        "long_term_debt": self._to_float(row[16]),
-                        "short_term_debt": self._to_float(row[17]),
-                        "current_assets": self._to_float(row[18]),
-                        "current_liabilities": self._to_float(row[19]),
-                    },
-                    "shares_outstanding": self._to_float(row[20]),
-                    "roe": self._to_float(row[24]),
-                })
+                quarterly_metrics.append(
+                    {
+                        "fiscal_year": row[1],
+                        "fiscal_period": row[2],
+                        "filed_date": row[3],
+                        "income_statement": {
+                            "total_revenue": self._to_float(row[4]),
+                            "net_income": self._to_float(row[5]),
+                            "gross_profit": self._to_float(row[6]),
+                            "operating_income": operating_income,
+                            "interest_expense": self._to_float(row[21]),
+                            "income_tax_expense": self._to_float(row[22]),
+                            "ebitda": ebitda,
+                        },
+                        "cash_flow": {
+                            "operating_cash_flow": self._to_float(row[8]),
+                            "free_cash_flow": self._to_float(row[9]),
+                            "capital_expenditures": self._to_float(row[10]),
+                            "dividends_paid": self._to_float(row[11]),
+                        },
+                        "balance_sheet": {
+                            "total_assets": self._to_float(row[12]),
+                            "total_liabilities": self._to_float(row[13]),
+                            "stockholders_equity": self._to_float(row[14]),
+                            "cash_and_equivalents": self._to_float(row[15]),
+                            "long_term_debt": self._to_float(row[16]),
+                            "short_term_debt": self._to_float(row[17]),
+                            "current_assets": self._to_float(row[18]),
+                            "current_liabilities": self._to_float(row[19]),
+                        },
+                        "shares_outstanding": self._to_float(row[20]),
+                        "roe": self._to_float(row[24]),
+                    }
+                )
 
             return quarterly_metrics
 
@@ -206,28 +207,29 @@ class FinancialDataService:
                 LIMIT :num_years
             """
             results = session.execute(
-                text(query),
-                {"symbol": symbol, "as_of_date": as_of_date, "num_years": num_years}
+                text(query), {"symbol": symbol, "as_of_date": as_of_date, "num_years": num_years}
             ).fetchall()
 
             multi_year_data = []
             for row in results:
-                multi_year_data.append({
-                    "fiscal_year": row[1],
-                    "fiscal_period": row[2],
-                    "total_revenue": self._to_float(row[3]),
-                    "net_income": self._to_float(row[4]),
-                    "gross_profit": self._to_float(row[5]),
-                    "operating_income": self._to_float(row[6]),
-                    "operating_cash_flow": self._to_float(row[7]),
-                    "free_cash_flow": self._to_float(row[8]),
-                    "capital_expenditures": self._to_float(row[9]),
-                    "dividends_paid": self._to_float(row[10]),
-                    "total_assets": self._to_float(row[11]),
-                    "total_liabilities": self._to_float(row[12]),
-                    "stockholders_equity": self._to_float(row[13]),
-                    "shares_outstanding": self._to_float(row[14]),
-                })
+                multi_year_data.append(
+                    {
+                        "fiscal_year": row[1],
+                        "fiscal_period": row[2],
+                        "total_revenue": self._to_float(row[3]),
+                        "net_income": self._to_float(row[4]),
+                        "gross_profit": self._to_float(row[5]),
+                        "operating_income": self._to_float(row[6]),
+                        "operating_cash_flow": self._to_float(row[7]),
+                        "free_cash_flow": self._to_float(row[8]),
+                        "capital_expenditures": self._to_float(row[9]),
+                        "dividends_paid": self._to_float(row[10]),
+                        "total_assets": self._to_float(row[11]),
+                        "total_liabilities": self._to_float(row[12]),
+                        "stockholders_equity": self._to_float(row[13]),
+                        "shares_outstanding": self._to_float(row[14]),
+                    }
+                )
 
             # Reverse to chronological order (oldest first)
             return list(reversed(multi_year_data))

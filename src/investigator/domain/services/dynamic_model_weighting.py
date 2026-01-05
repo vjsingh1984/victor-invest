@@ -13,31 +13,30 @@ Updated: 2025-12-29 (added auto manufacturing valuation tier P1-A)
 """
 
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from investigator.domain.models.market_context import MarketContext
 from investigator.domain.services.company_metadata_service import CompanyMetadataService
 from investigator.domain.services.model_applicability import ModelApplicabilityRules
-from investigator.domain.services.weight_normalizer import WeightNormalizer
-from investigator.domain.services.weight_bounds import (
-    BoundedMultiplierApplicator,
-    BoundConfig,
-)
-from investigator.domain.services.weight_audit_trail import (
-    WeightAuditTrail,
-    WeightAdjustment,
-)
-from investigator.domain.services.threshold_registry import (
-    ThresholdRegistry,
-    get_threshold_registry,
-    PELevel,
-)
 from investigator.domain.services.profitability_classifier import (
     ProfitabilityClassifier,
-    get_profitability_classifier,
     ProfitabilityStage,
+    get_profitability_classifier,
 )
-
+from investigator.domain.services.threshold_registry import (
+    PELevel,
+    ThresholdRegistry,
+    get_threshold_registry,
+)
+from investigator.domain.services.weight_audit_trail import (
+    WeightAdjustment,
+    WeightAuditTrail,
+)
+from investigator.domain.services.weight_bounds import (
+    BoundConfig,
+    BoundedMultiplierApplicator,
+)
+from investigator.domain.services.weight_normalizer import WeightNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -202,9 +201,11 @@ class DynamicModelWeightingService:
         # Extract stockholders equity for insurance tier classification
         stockholders_equity = financials.get("stockholders_equity") or 0
 
-        # For insurance companies, fetch stockholders_equity from DB if missing
+        # For insurance/managed care companies, fetch stockholders_equity from DB if missing
         # and update financials dict so applicability filters can use it
-        if sector == "Financials" and industry and "insur" in industry.lower():
+        # Note: Managed care companies are in Health Care sector, not Financials!
+        is_insurance_like = self._is_insurance_or_managed_care(sector, industry)
+        if is_insurance_like:
             if stockholders_equity <= 0:
                 try:
                     from investigator.domain.services.valuation.insurance_valuation import _fetch_from_database
@@ -413,6 +414,45 @@ class DynamicModelWeightingService:
                     metadata={"data_quality": data_quality},
                 )
 
+        # 9.5. Apply PS weight adjustment for low-margin industries
+        # This prevents PS model from dominating for businesses where revenue multiples are inappropriate
+        ps_weight_before = weights.get("ps", 0)
+        if ps_weight_before > 0:
+            # Calculate net margin if we have the data
+            net_margin = None
+            if revenue and revenue > 0 and net_income:
+                net_margin = net_income / revenue
+
+            ps_multiplier = self._get_ps_weight_adjustment(
+                sector=sector,
+                industry=industry,
+                net_margin=net_margin,
+                symbol=symbol,
+            )
+
+            if ps_multiplier < 1.0:
+                weights_before_ps_adj = weights.copy()
+                weights["ps"] = int(ps_weight_before * ps_multiplier)
+
+                # Audit: Capture PS adjustment
+                if audit_trail:
+                    step_number += 1
+                    audit_trail.capture(
+                        step_number=step_number,
+                        step_name="ps_margin_adjustment",
+                        weights_before=weights_before_ps_adj,
+                        weights_after=weights.copy(),
+                        adjustments=[
+                            WeightAdjustment(
+                                model="ps",
+                                source="margin_check",
+                                multiplier=ps_multiplier,
+                                reason=f"Low-margin industry adjustment (multiplier={ps_multiplier})",
+                            )
+                        ],
+                        metadata={"industry": industry, "net_margin": net_margin, "ps_multiplier": ps_multiplier},
+                    )
+
         # 10. Normalize and round using shared service
         weights_before_norm = weights.copy()
         try:
@@ -489,9 +529,10 @@ class DynamicModelWeightingService:
         Returns:
             (tier_name, sub_tier_name) tuple
         """
-        # TIER 0: INSURANCE COMPANIES - Special handling (check FIRST)
-        # Insurance companies should use P/BV valuation, not DCF
-        if sector == "Financials" and industry and "insur" in industry.lower():
+        # TIER 0: INSURANCE & MANAGED CARE COMPANIES - Special handling (check FIRST)
+        # Insurance and managed care companies should use P/BV valuation, not DCF or P/S
+        # Note: Managed care (CNC, UNH, HUM, CI) are in Health Care sector, not Financials!
+        if self._is_insurance_or_managed_care(sector, industry):
             # If stockholders_equity is missing, try to fetch from database
             if stockholders_equity <= 0 and symbol:
                 try:
@@ -1324,6 +1365,187 @@ class DynamicModelWeightingService:
         logger.info(f"🎯 {symbol} - Dynamic Weighting: {context_str} | Weights: {weights_str}")
 
     # =========================================================================
+    # INSURANCE & MANAGED CARE DETECTION
+    # =========================================================================
+
+    def _is_insurance_or_managed_care(self, sector: Optional[str], industry: Optional[str]) -> bool:
+        """
+        Check if the company is an insurance or managed care company.
+
+        Insurance companies use P/B valuation (not DCF or P/S) because:
+        - Revenue/sales multiples are meaningless for low-margin insurance businesses
+        - Book value (equity) is the key metric for underwriting capacity
+        - DCF is difficult due to reserve/claims volatility
+
+        Includes:
+        - Property/Casualty insurers (TRV, ALL, PGR) - Financials sector
+        - Life insurers (MET, PRU) - Financials sector
+        - Managed care / Health insurers (CNC, UNH, HUM, CI) - Health Care sector
+
+        Args:
+            sector: Sector name
+            industry: Industry name
+
+        Returns:
+            True if company should use insurance valuation
+        """
+        if not industry:
+            return False
+
+        industry_lower = industry.lower()
+
+        # Traditional insurance keywords (Financials sector)
+        insurance_terms = ["insurance", "insurers", "insurer", "reinsurance"]
+        if any(term in industry_lower for term in insurance_terms):
+            return True
+
+        # Managed care / Health insurance (Health Care sector)
+        # These companies have same economics as insurers: high revenue, thin margins
+        managed_care_terms = [
+            "managed health care",
+            "managed care",
+            "health maintenance",
+            "hmo",
+            "health plan",
+        ]
+        if sector and sector.lower() in ["health care", "healthcare"]:
+            if any(term in industry_lower for term in managed_care_terms):
+                return True
+
+        # Health care distribution (CAH, MCK) - drug distributors
+        # Same economics: ~$200B+ revenue, 1-2% net margins, PS model gives crazy FV
+        distribution_terms = [
+            "health care distribution",
+            "healthcare distribution",
+            "drug distribution",
+            "pharmaceutical distribution",
+        ]
+        if sector and sector.lower() in ["health care", "healthcare"]:
+            if any(term in industry_lower for term in distribution_terms):
+                return True
+
+        return False
+
+    def _is_low_margin_industry(self, sector: Optional[str], industry: Optional[str]) -> bool:
+        """
+        Check if industry is known to have structurally low margins (<5%).
+
+        These industries should have reduced or zero PS weight because:
+        - High revenue × any P/S multiple = absurdly high fair value
+        - P/E or EV/EBITDA are more appropriate for low-margin businesses
+
+        Returns:
+            True if industry is known low-margin (PS weight should be reduced)
+        """
+        if not industry:
+            return False
+
+        industry_lower = industry.lower()
+
+        # Low-margin industries (typically <5% net margin)
+        low_margin_industries = [
+            # Retail (1-3% margins)
+            "department",
+            "specialty retail",
+            "discount stores",
+            "warehouse clubs",
+            "food chains",
+            "grocery",
+            "supermarket",
+            "consumer electronics/video chains",
+            # Hardware/Manufacturing (3-8% margins for most)
+            "computer manufacturing",
+            "computer hardware",
+            # Contract manufacturing / EMS (2-4% margins)
+            "electrical products",  # FLEX, JBL - EMS companies
+            "electronic components",
+            # Airlines (2-5% margins, highly cyclical)
+            "air freight",
+            "airlines",
+            "airline",
+            # Food processing (3-5% margins)
+            "meat/poultry/fish",
+            "packaged foods",
+            "food processing",
+            "farm products",
+            "farming/seeds",
+            # Healthcare services with thin margins
+            "hospital",
+            "nursing",
+            "medical/nursing services",
+            # Telecom/Cable (can have high capex eating into margins)
+            "cable",
+            "pay television",
+            # Energy transmission
+            "oil/gas transmission",
+            "gas distribution",
+            # Beverages (varies, but many are low margin)
+            "beverages",
+        ]
+
+        for term in low_margin_industries:
+            if term in industry_lower:
+                return True
+
+        return False
+
+    def _get_ps_weight_adjustment(
+        self,
+        sector: Optional[str],
+        industry: Optional[str],
+        net_margin: Optional[float] = None,
+        symbol: Optional[str] = None,
+    ) -> float:
+        """
+        Get PS weight multiplier based on margin analysis.
+
+        RELAXED VERSION: Only applies hard suppression for cases where PS is
+        fundamentally inappropriate (insurance, managed care). For other low-margin
+        businesses, applies soft reduction and lets RL learn optimal weights.
+
+        The RL model has access to:
+        - net_margin: actual profit margin
+        - margin_bin: categorical (0=very_low, 1=low, 2=medium, 3=high)
+        - is_low_margin_industry: binary industry flag
+
+        Args:
+            sector: Sector name
+            industry: Industry name
+            net_margin: Net profit margin as decimal (e.g., 0.03 for 3%)
+            symbol: Symbol for logging
+
+        Returns:
+            Multiplier for PS weight (0.0 to 1.0)
+            - 0.0 = zero out PS weight (insurance, managed care only)
+            - 0.5 = soft reduction (extreme low margin <1%)
+            - 0.75 = minor reduction (low-margin industry hint for RL)
+            - 1.0 = no adjustment (let RL decide)
+        """
+        # Insurance and managed care: PS=0 (fundamentally inappropriate)
+        # These are not low-margin in the traditional sense - they process
+        # premiums/claims where revenue = premiums collected, not sales
+        if self._is_insurance_or_managed_care(sector, industry):
+            if symbol:
+                logger.info(f"{symbol} - PS adjustment: 0% (insurance/managed care - PS fundamentally inappropriate)")
+            return 0.0
+
+        # For other low-margin industries, only apply soft hint
+        # Let RL learn the optimal adjustment from margin features
+        if self._is_low_margin_industry(sector, industry):
+            if symbol:
+                logger.info(f"{symbol} - PS soft hint: 75% (low-margin industry: {industry}, RL has margin features)")
+            return 0.75  # Soft reduction, RL can learn to adjust further
+
+        # Only suppress for extreme cases where margin data confirms very low margin
+        if net_margin is not None and net_margin < 0.01:  # <1% margin (extreme)
+            if symbol:
+                logger.info(f"{symbol} - PS adjustment: 50% (extreme low margin={net_margin*100:.1f}%)")
+            return 0.5
+
+        # Normal business - let RL decide based on margin features
+        return 1.0
+
+    # =========================================================================
     # AUTO MANUFACTURING TIER METHODS (P1-A)
     # =========================================================================
 
@@ -1651,8 +1873,8 @@ class DynamicModelWeightingService:
     def _is_defense_contractor(self, industry: Optional[str], symbol: Optional[str]) -> bool:
         """Check if company is a defense contractor."""
         from investigator.domain.services.valuation.defense_valuation import (
-            KNOWN_DEFENSE_CONTRACTORS,
             DEFENSE_INDUSTRIES,
+            KNOWN_DEFENSE_CONTRACTORS,
         )
 
         if symbol and symbol.upper() in KNOWN_DEFENSE_CONTRACTORS:
@@ -1737,7 +1959,8 @@ class DynamicModelWeightingService:
                 )
             else:
                 # Try to detect from company name/industry
-                property_type = detect_reit_property_type(symbol or "", industry)
+                property_result = detect_reit_property_type(symbol or "", industry)
+                property_type = property_result.property_type  # Extract enum from result
                 logger.info(
                     f"{symbol or 'UNKNOWN'} - REIT tier (property_type={property_type.value}, "
                     f"detected from industry={industry})"

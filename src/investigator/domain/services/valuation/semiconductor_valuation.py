@@ -36,34 +36,38 @@ logger = logging.getLogger(__name__)
 # SEMICONDUCTOR CLASSIFICATION
 # ====================
 
+
 class ChipType(Enum):
     """Classification of semiconductor chip types for valuation purposes."""
-    LOGIC = "logic"              # Processors, GPUs, FPGAs (NVDA, AMD, INTC)
-    MEMORY = "memory"            # DRAM, NAND (MU, WDC)
-    ANALOG = "analog"            # Power, signal processing (TXN, ADI)
-    DISCRETE = "discrete"        # Transistors, diodes (ON, DIOD)
+
+    LOGIC = "logic"  # Processors, GPUs, FPGAs (NVDA, AMD, INTC)
+    MEMORY = "memory"  # DRAM, NAND (MU, WDC)
+    ANALOG = "analog"  # Power, signal processing (TXN, ADI)
+    DISCRETE = "discrete"  # Transistors, diodes (ON, DIOD)
     MIXED_SIGNAL = "mixed_signal"  # Analog + digital (MXIM, MCHP)
-    EQUIPMENT = "equipment"      # Semiconductor equipment (ASML, LRCX, AMAT)
+    EQUIPMENT = "equipment"  # Semiconductor equipment (ASML, LRCX, AMAT)
     UNKNOWN = "unknown"
 
 
 class CyclePosition(Enum):
     """Position in semiconductor industry cycle."""
-    PEAK = "peak"                    # Top of cycle - elevated margins, high inventory
+
+    PEAK = "peak"  # Top of cycle - elevated margins, high inventory
     PEAK_TO_NORMAL = "peak_to_normal"  # Declining from peak
-    NORMAL = "normal"                # Mid-cycle equilibrium
+    NORMAL = "normal"  # Mid-cycle equilibrium
     NORMAL_TO_TROUGH = "normal_to_trough"  # Declining toward trough
-    TROUGH = "trough"                # Bottom of cycle - depressed margins, low inventory
+    TROUGH = "trough"  # Bottom of cycle - depressed margins, low inventory
     UNKNOWN = "unknown"
 
 
 class GrowthProfile(Enum):
     """Growth profile classification for valuation purposes."""
-    HYPER_GROWTH = "hyper_growth"        # >50% revenue growth (AI leaders like NVDA)
-    HIGH_GROWTH = "high_growth"          # 25-50% revenue growth
+
+    HYPER_GROWTH = "hyper_growth"  # >50% revenue growth (AI leaders like NVDA)
+    HIGH_GROWTH = "high_growth"  # 25-50% revenue growth
     MODERATE_GROWTH = "moderate_growth"  # 10-25% revenue growth
-    LOW_GROWTH = "low_growth"            # <10% revenue growth
-    DECLINING = "declining"              # Negative growth
+    LOW_GROWTH = "low_growth"  # <10% revenue growth
+    DECLINING = "declining"  # Negative growth
     UNKNOWN = "unknown"
 
 
@@ -85,35 +89,31 @@ SEMICONDUCTOR_INDUSTRIES = [
 # Known semiconductor symbols for explicit chip type mapping
 KNOWN_SEMICONDUCTOR_COMPANIES: Dict[str, ChipType] = {
     # Logic/Processors
-    "NVDA": ChipType.LOGIC,    # NVIDIA - GPUs
-    "AMD": ChipType.LOGIC,     # AMD - CPUs, GPUs
-    "INTC": ChipType.LOGIC,    # Intel - CPUs
-    "AVGO": ChipType.LOGIC,    # Broadcom - networking chips
-    "QCOM": ChipType.LOGIC,    # Qualcomm - mobile processors
-    "MRVL": ChipType.LOGIC,    # Marvell - data center chips
-
+    "NVDA": ChipType.LOGIC,  # NVIDIA - GPUs
+    "AMD": ChipType.LOGIC,  # AMD - CPUs, GPUs
+    "INTC": ChipType.LOGIC,  # Intel - CPUs
+    "AVGO": ChipType.LOGIC,  # Broadcom - networking chips
+    "QCOM": ChipType.LOGIC,  # Qualcomm - mobile processors
+    "MRVL": ChipType.LOGIC,  # Marvell - data center chips
     # Memory
-    "MU": ChipType.MEMORY,     # Micron - DRAM, NAND
-    "WDC": ChipType.MEMORY,    # Western Digital - NAND
-    "STX": ChipType.MEMORY,    # Seagate - storage (memory-adjacent)
-
+    "MU": ChipType.MEMORY,  # Micron - DRAM, NAND
+    "WDC": ChipType.MEMORY,  # Western Digital - NAND
+    "STX": ChipType.MEMORY,  # Seagate - storage (memory-adjacent)
     # Analog
-    "TXN": ChipType.ANALOG,    # Texas Instruments - analog
-    "ADI": ChipType.ANALOG,    # Analog Devices - analog/mixed-signal
-    "MCHP": ChipType.ANALOG,   # Microchip - analog/MCU
-
+    "TXN": ChipType.ANALOG,  # Texas Instruments - analog
+    "ADI": ChipType.ANALOG,  # Analog Devices - analog/mixed-signal
+    "MCHP": ChipType.ANALOG,  # Microchip - analog/MCU
     # Mixed-Signal
     "NXPI": ChipType.MIXED_SIGNAL,  # NXP - automotive, IoT
-    "ON": ChipType.MIXED_SIGNAL,    # ON Semi - power/mixed-signal
+    "ON": ChipType.MIXED_SIGNAL,  # ON Semi - power/mixed-signal
     "SWKS": ChipType.MIXED_SIGNAL,  # Skyworks - RF chips
     "QRVO": ChipType.MIXED_SIGNAL,  # Qorvo - RF chips
-
     # Equipment
     "ASML": ChipType.EQUIPMENT,  # ASML - lithography
     "LRCX": ChipType.EQUIPMENT,  # Lam Research - etch
     "AMAT": ChipType.EQUIPMENT,  # Applied Materials - deposition
     "KLAC": ChipType.EQUIPMENT,  # KLA - inspection
-    "TER": ChipType.EQUIPMENT,   # Teradyne - test equipment
+    "TER": ChipType.EQUIPMENT,  # Teradyne - test equipment
 }
 
 
@@ -125,16 +125,16 @@ SEMICONDUCTOR_TIER = {
     "name": "semiconductor",
     "description": "Specialized tier for semiconductor companies with cycle-adjusted valuation",
     "weights": {
-        "ev_ebitda": 35,         # Primary multiple (accounts for capex intensity)
-        "pe": 25,                # P/E on normalized earnings
-        "dcf": 30,               # DCF with cycle-normalized margins
+        "ev_ebitda": 35,  # Primary multiple (accounts for capex intensity)
+        "pe": 25,  # P/E on normalized earnings
+        "dcf": 30,  # DCF with cycle-normalized margins
         "cycle_adjustment": 10,  # Explicit cycle position adjustment
     },
     "parameters": {
-        "terminal_growth": 0.04,      # Secular growth from AI/digitization
-        "peak_margin": 0.35,          # Peak cycle gross margin
-        "normal_margin": 0.25,        # Mid-cycle gross margin
-        "trough_margin": 0.15,        # Trough cycle gross margin
+        "terminal_growth": 0.04,  # Secular growth from AI/digitization
+        "peak_margin": 0.35,  # Peak cycle gross margin
+        "normal_margin": 0.25,  # Mid-cycle gross margin
+        "trough_margin": 0.15,  # Trough cycle gross margin
         "discount_rate_adjustment": 0.01,  # Higher risk premium for cyclicality
     },
     "industry_matches": SEMICONDUCTOR_INDUSTRIES,
@@ -150,17 +150,17 @@ GROWTH_ADJUSTED_PE_MULTIPLES = {
     # PEG target of 1.0 means P/E should equal growth rate
     # AI/semiconductor leaders can sustain PEG up to 1.5-2.0
     GrowthProfile.HYPER_GROWTH: {
-        "base_pe": 40.0,       # Base P/E for >50% growers
-        "max_pe": 80.0,        # Cap even for exceptional growth
-        "peg_target": 1.0,     # PEG = 1.0 (P/E = growth rate)
-        "peg_premium": 0.5,    # Allow up to 1.5 PEG for leaders
+        "base_pe": 40.0,  # Base P/E for >50% growers
+        "max_pe": 80.0,  # Cap even for exceptional growth
+        "peg_target": 1.0,  # PEG = 1.0 (P/E = growth rate)
+        "peg_premium": 0.5,  # Allow up to 1.5 PEG for leaders
         "forward_pe_discount": 0.6,  # Forward P/E typically 60% of trailing
     },
     GrowthProfile.HIGH_GROWTH: {
         "base_pe": 30.0,
         "max_pe": 50.0,
         "peg_target": 1.0,
-        "peg_premium": 0.3,    # Allow up to 1.3 PEG
+        "peg_premium": 0.3,  # Allow up to 1.3 PEG
         "forward_pe_discount": 0.7,
     },
     GrowthProfile.MODERATE_GROWTH: {
@@ -173,19 +173,19 @@ GROWTH_ADJUSTED_PE_MULTIPLES = {
     GrowthProfile.LOW_GROWTH: {
         "base_pe": 15.0,
         "max_pe": 25.0,
-        "peg_target": 1.2,     # Lower growth needs lower PEG
+        "peg_target": 1.2,  # Lower growth needs lower PEG
         "peg_premium": 0.0,
         "forward_pe_discount": 0.9,
     },
     GrowthProfile.DECLINING: {
         "base_pe": 10.0,
         "max_pe": 18.0,
-        "peg_target": None,    # PEG not applicable for declining
+        "peg_target": None,  # PEG not applicable for declining
         "peg_premium": 0.0,
         "forward_pe_discount": 1.0,
     },
     GrowthProfile.UNKNOWN: {
-        "base_pe": 18.0,       # Conservative default
+        "base_pe": 18.0,  # Conservative default
         "max_pe": 30.0,
         "peg_target": 1.0,
         "peg_premium": 0.0,
@@ -196,12 +196,12 @@ GROWTH_ADJUSTED_PE_MULTIPLES = {
 
 # Chip type growth premium adjustments
 CHIP_TYPE_GROWTH_PREMIUM = {
-    ChipType.LOGIC: 1.2,       # 20% premium for AI/GPU growth potential
-    ChipType.MEMORY: 0.8,      # 20% discount for cyclicality
-    ChipType.ANALOG: 1.0,      # No adjustment - stable
-    ChipType.DISCRETE: 0.9,    # Slight discount
+    ChipType.LOGIC: 1.2,  # 20% premium for AI/GPU growth potential
+    ChipType.MEMORY: 0.8,  # 20% discount for cyclicality
+    ChipType.ANALOG: 1.0,  # No adjustment - stable
+    ChipType.DISCRETE: 0.9,  # Slight discount
     ChipType.MIXED_SIGNAL: 1.0,
-    ChipType.EQUIPMENT: 1.1,   # Premium for enabling role
+    ChipType.EQUIPMENT: 1.1,  # Premium for enabling role
     ChipType.UNKNOWN: 1.0,
 }
 
@@ -210,9 +210,11 @@ CHIP_TYPE_GROWTH_PREMIUM = {
 # SEMICONDUCTOR METRICS
 # ====================
 
+
 @dataclass
 class SemiconductorMetrics:
     """Container for semiconductor-specific metrics."""
+
     inventory_days: Optional[float] = None
     book_to_bill: Optional[float] = None
     inventory_to_sales: Optional[float] = None
@@ -224,6 +226,7 @@ class SemiconductorMetrics:
 @dataclass
 class SemiconductorValuationResult:
     """Result from semiconductor company valuation."""
+
     fair_value: float
     cycle_position: CyclePosition
     chip_type: ChipType
@@ -237,6 +240,7 @@ class SemiconductorValuationResult:
 # ====================
 # XBRL METRIC EXTRACTION
 # ====================
+
 
 def extract_semiconductor_metrics_from_xbrl(
     symbol: str,
@@ -266,15 +270,15 @@ def extract_semiconductor_metrics_from_xbrl(
 
     # Define semiconductor-related canonical names to extract
     semiconductor_canonical_names = [
-        'inventory_days',
-        'book_to_bill_ratio',
-        'inventory_to_sales',
-        'inventory',
-        'revenues',
-        'cost_of_revenue',
+        "inventory_days",
+        "book_to_bill_ratio",
+        "inventory_to_sales",
+        "inventory",
+        "revenues",
+        "cost_of_revenue",
     ]
 
-    us_gaap = xbrl_data.get('facts', {}).get('us-gaap', {})
+    us_gaap = xbrl_data.get("facts", {}).get("us-gaap", {})
     if not us_gaap:
         logger.warning(f"{symbol} - No us-gaap data available for semiconductor metric extraction")
         return metrics
@@ -287,57 +291,51 @@ def extract_semiconductor_metrics_from_xbrl(
         for alias in aliases:
             if alias in us_gaap:
                 concept = us_gaap[alias]
-                units = concept.get('units', {})
+                units = concept.get("units", {})
 
                 # Check for USD or pure number units
                 data_sources = []
-                if 'USD' in units:
-                    data_sources = units.get('USD', [])
-                elif 'pure' in units:
-                    data_sources = units.get('pure', [])
+                if "USD" in units:
+                    data_sources = units.get("USD", [])
+                elif "pure" in units:
+                    data_sources = units.get("pure", [])
 
                 if data_sources:
                     # Get the latest annual value (10-K preferred, then 10-Q)
                     sorted_data = sorted(
-                        [d for d in data_sources if d.get('form') in ['10-K', '10-Q', '20-F']],
+                        [d for d in data_sources if d.get("form") in ["10-K", "10-Q", "20-F"]],
                         key=lambda x: (
-                            x.get('fy', 0),
-                            {'FY': 5, 'Q4': 4, 'Q3': 3, 'Q2': 2, 'Q1': 1}.get(x.get('fp', ''), 0)
+                            x.get("fy", 0),
+                            {"FY": 5, "Q4": 4, "Q3": 3, "Q2": 2, "Q1": 1}.get(x.get("fp", ""), 0),
                         ),
-                        reverse=True
+                        reverse=True,
                     )
 
                     if sorted_data:
-                        value = sorted_data[0].get('val')
+                        value = sorted_data[0].get("val")
                         if value is not None:
                             extracted_values[canonical_name] = float(value)
-                            logger.debug(
-                                f"{symbol} - Extracted {canonical_name} from {alias}: {float(value)}"
-                            )
+                            logger.debug(f"{symbol} - Extracted {canonical_name} from {alias}: {float(value)}")
                             break  # Found value, move to next canonical name
 
     # Calculate inventory days if we have inventory and COGS
-    inventory = extracted_values.get('inventory') or financials.get('inventory')
-    cost_of_revenue = extracted_values.get('cost_of_revenue') or financials.get('cost_of_revenue')
-    revenues = extracted_values.get('revenues') or financials.get('total_revenue') or financials.get('revenue')
+    inventory = extracted_values.get("inventory") or financials.get("inventory")
+    cost_of_revenue = extracted_values.get("cost_of_revenue") or financials.get("cost_of_revenue")
+    revenues = extracted_values.get("revenues") or financials.get("total_revenue") or financials.get("revenue")
 
     if inventory and cost_of_revenue and cost_of_revenue > 0:
         # Inventory days = (Inventory / COGS) * 365
         metrics.inventory_days = (inventory / cost_of_revenue) * 365
-        logger.info(
-            f"{symbol} - Calculated inventory days: {metrics.inventory_days:.1f} days"
-        )
+        logger.info(f"{symbol} - Calculated inventory days: {metrics.inventory_days:.1f} days")
 
     # Calculate inventory-to-sales ratio
     if inventory and revenues and revenues > 0:
         metrics.inventory_to_sales = inventory / revenues
-        logger.info(
-            f"{symbol} - Inventory-to-sales ratio: {metrics.inventory_to_sales:.2%}"
-        )
+        logger.info(f"{symbol} - Inventory-to-sales ratio: {metrics.inventory_to_sales:.2%}")
 
     # Book-to-bill ratio (if directly available from XBRL)
-    if 'book_to_bill_ratio' in extracted_values:
-        metrics.book_to_bill = extracted_values['book_to_bill_ratio']
+    if "book_to_bill_ratio" in extracted_values:
+        metrics.book_to_bill = extracted_values["book_to_bill_ratio"]
         logger.info(f"{symbol} - Book-to-bill ratio: {metrics.book_to_bill:.2f}")
 
     # Detect cycle position based on metrics
@@ -360,6 +358,7 @@ def extract_semiconductor_metrics_from_xbrl(
 # ====================
 # CYCLE POSITION DETECTION
 # ====================
+
 
 def _detect_cycle_position(metrics: SemiconductorMetrics) -> CyclePosition:
     """
@@ -442,15 +441,15 @@ def _detect_chip_type(symbol: str, xbrl_data: Dict) -> ChipType:
         return chip_type
 
     # Priority 2: Try to infer from company name or description in XBRL
-    entity_info = xbrl_data.get('entityName', '').lower()
+    entity_info = xbrl_data.get("entityName", "").lower()
 
-    if any(keyword in entity_info for keyword in ['memory', 'micron', 'flash', 'nand', 'dram']):
+    if any(keyword in entity_info for keyword in ["memory", "micron", "flash", "nand", "dram"]):
         return ChipType.MEMORY
-    elif any(keyword in entity_info for keyword in ['analog', 'power', 'signal']):
+    elif any(keyword in entity_info for keyword in ["analog", "power", "signal"]):
         return ChipType.ANALOG
-    elif any(keyword in entity_info for keyword in ['equipment', 'materials', 'asml', 'lam']):
+    elif any(keyword in entity_info for keyword in ["equipment", "materials", "asml", "lam"]):
         return ChipType.EQUIPMENT
-    elif any(keyword in entity_info for keyword in ['processor', 'gpu', 'nvidia', 'amd']):
+    elif any(keyword in entity_info for keyword in ["processor", "gpu", "nvidia", "amd"]):
         return ChipType.LOGIC
 
     return ChipType.UNKNOWN
@@ -459,6 +458,7 @@ def _detect_chip_type(symbol: str, xbrl_data: Dict) -> ChipType:
 # ====================
 # CYCLE ADJUSTMENT CALCULATION
 # ====================
+
 
 def calculate_cycle_adjustment(
     cycle_position: CyclePosition,
@@ -486,30 +486,18 @@ def calculate_cycle_adjustment(
         Tuple of (multiplier, reason_string)
     """
     adjustments = {
-        CyclePosition.PEAK: (
-            0.80,
-            f"Peak cycle adjustment: -20% (margins at {current_margin:.1%} will revert down)"
-        ),
+        CyclePosition.PEAK: (0.80, f"Peak cycle adjustment: -20% (margins at {current_margin:.1%} will revert down)"),
         CyclePosition.PEAK_TO_NORMAL: (
             0.90,
-            f"Peak-to-normal adjustment: -10% (margins still elevated at {current_margin:.1%})"
+            f"Peak-to-normal adjustment: -10% (margins still elevated at {current_margin:.1%})",
         ),
-        CyclePosition.NORMAL: (
-            1.00,
-            f"Normal cycle: no adjustment (margins at mid-cycle {current_margin:.1%})"
-        ),
+        CyclePosition.NORMAL: (1.00, f"Normal cycle: no adjustment (margins at mid-cycle {current_margin:.1%})"),
         CyclePosition.NORMAL_TO_TROUGH: (
             1.05,
-            f"Normal-to-trough adjustment: +5% (margins depressed at {current_margin:.1%})"
+            f"Normal-to-trough adjustment: +5% (margins depressed at {current_margin:.1%})",
         ),
-        CyclePosition.TROUGH: (
-            1.15,
-            f"Trough cycle adjustment: +15% (margins at {current_margin:.1%} will recover)"
-        ),
-        CyclePosition.UNKNOWN: (
-            1.00,
-            "Cycle position unknown: no adjustment applied"
-        ),
+        CyclePosition.TROUGH: (1.15, f"Trough cycle adjustment: +15% (margins at {current_margin:.1%} will recover)"),
+        CyclePosition.UNKNOWN: (1.00, "Cycle position unknown: no adjustment applied"),
     }
 
     multiplier, reason = adjustments.get(cycle_position, (1.00, "Unknown cycle position"))
@@ -522,6 +510,7 @@ def calculate_cycle_adjustment(
 # ====================
 # NORMALIZED MARGIN CALCULATION
 # ====================
+
 
 def calculate_normalized_margin(
     current_margin: float,
@@ -547,13 +536,13 @@ def calculate_normalized_margin(
     """
     # Chip type normal margin baselines
     chip_margins = {
-        ChipType.LOGIC: 0.35,       # Logic chips - moderate-high
-        ChipType.MEMORY: 0.25,      # Memory - highly cyclical
-        ChipType.ANALOG: 0.50,      # Analog - stable high margins
-        ChipType.DISCRETE: 0.30,    # Discrete - moderate
+        ChipType.LOGIC: 0.35,  # Logic chips - moderate-high
+        ChipType.MEMORY: 0.25,  # Memory - highly cyclical
+        ChipType.ANALOG: 0.50,  # Analog - stable high margins
+        ChipType.DISCRETE: 0.30,  # Discrete - moderate
         ChipType.MIXED_SIGNAL: 0.40,  # Mixed-signal - moderate-high
-        ChipType.EQUIPMENT: 0.40,   # Equipment - moderate
-        ChipType.UNKNOWN: 0.30,     # Conservative default
+        ChipType.EQUIPMENT: 0.40,  # Equipment - moderate
+        ChipType.UNKNOWN: 0.30,  # Conservative default
     }
 
     baseline = chip_margins.get(chip_type, 0.30)
@@ -580,6 +569,7 @@ def calculate_normalized_margin(
 # ====================
 # SEMICONDUCTOR INDUSTRY DETECTION
 # ====================
+
 
 def is_semiconductor_industry(industry: Optional[str]) -> bool:
     """
@@ -642,6 +632,7 @@ def classify_semiconductor_company(
 # MAIN VALUATION FUNCTION
 # ====================
 
+
 def value_semiconductor(
     symbol: str,
     financials: Dict,
@@ -698,13 +689,13 @@ def value_semiconductor(
 
     # Get current margin
     current_margin = 0.0
-    gross_profit = financials.get('gross_profit', 0)
-    revenue = financials.get('total_revenue') or financials.get('revenue', 0)
+    gross_profit = financials.get("gross_profit", 0)
+    revenue = financials.get("total_revenue") or financials.get("revenue", 0)
     if revenue > 0 and gross_profit > 0:
         current_margin = gross_profit / revenue
     else:
         # Try operating margin
-        operating_income = financials.get('operating_income', 0)
+        operating_income = financials.get("operating_income", 0)
         if revenue > 0 and operating_income > 0:
             current_margin = operating_income / revenue
         else:
@@ -727,14 +718,14 @@ def value_semiconductor(
 
     # Calculate base fair value from financials
     # Use P/E or EV/EBITDA as base, then apply cycle adjustment
-    eps = financials.get('eps_diluted') or financials.get('eps_basic', 0)
+    eps = financials.get("eps_diluted") or financials.get("eps_basic", 0)
     base_pe = 25.0  # Typical semiconductor P/E
 
     # Adjust P/E for chip type
     pe_adjustments = {
-        ChipType.LOGIC: 30.0,      # Premium for AI/GPU growth
-        ChipType.MEMORY: 15.0,     # Discount for cyclicality
-        ChipType.ANALOG: 25.0,     # Stable business
+        ChipType.LOGIC: 30.0,  # Premium for AI/GPU growth
+        ChipType.MEMORY: 15.0,  # Discount for cyclicality
+        ChipType.ANALOG: 25.0,  # Stable business
         ChipType.EQUIPMENT: 22.0,  # Cyclical but essential
         ChipType.MIXED_SIGNAL: 23.0,
         ChipType.DISCRETE: 18.0,
@@ -748,8 +739,8 @@ def value_semiconductor(
         base_fair_value = eps * base_pe
     else:
         # Fallback to book value
-        book_value = financials.get('stockholders_equity', 0)
-        shares = financials.get('shares_outstanding', 0)
+        book_value = financials.get("stockholders_equity", 0)
+        shares = financials.get("shares_outstanding", 0)
         if book_value > 0 and shares > 0:
             book_per_share = book_value / shares
             base_fair_value = book_per_share * 2.5  # 2.5x book for semiconductors
@@ -770,18 +761,20 @@ def value_semiconductor(
         final_confidence = "low"
 
     # Build details
-    details.update({
-        "chip_type": chip_type.value,
-        "cycle_position": metrics.cycle_position.value,
-        "inventory_days": metrics.inventory_days,
-        "book_to_bill": metrics.book_to_bill,
-        "inventory_to_sales": metrics.inventory_to_sales,
-        "current_margin": current_margin,
-        "normalized_margin": normalized_margin,
-        "base_fair_value": base_fair_value,
-        "tier_weights": SEMICONDUCTOR_TIER["weights"],
-        "tier_parameters": SEMICONDUCTOR_TIER["parameters"],
-    })
+    details.update(
+        {
+            "chip_type": chip_type.value,
+            "cycle_position": metrics.cycle_position.value,
+            "inventory_days": metrics.inventory_days,
+            "book_to_bill": metrics.book_to_bill,
+            "inventory_to_sales": metrics.inventory_to_sales,
+            "current_margin": current_margin,
+            "normalized_margin": normalized_margin,
+            "base_fair_value": base_fair_value,
+            "tier_weights": SEMICONDUCTOR_TIER["weights"],
+            "tier_parameters": SEMICONDUCTOR_TIER["parameters"],
+        }
+    )
 
     logger.info(
         f"{symbol} - Semiconductor valuation: "
@@ -806,6 +799,7 @@ def value_semiconductor(
 # UTILITY FUNCTIONS
 # ====================
 
+
 def get_semiconductor_tier_weights() -> Dict[str, float]:
     """
     Get the valuation model weights for semiconductor tier.
@@ -829,6 +823,7 @@ def get_semiconductor_tier_parameters() -> Dict[str, float]:
 # ====================
 # GROWTH PROFILE CLASSIFICATION
 # ====================
+
 
 def classify_growth_profile(
     revenue_growth: Optional[float] = None,
@@ -868,18 +863,20 @@ def classify_growth_profile(
 # GROWTH-ADJUSTED VALUATION FUNCTIONS
 # ====================
 
+
 @dataclass
 class GrowthAdjustedValuation:
     """Container for growth-adjusted fair value estimates."""
+
     # Individual fair value estimates
-    cycle_normalized_fv: float          # Traditional cycle-normalized P/E
-    peg_adjusted_fv: float              # PEG-based fair value
-    forward_pe_fv: Optional[float]      # Forward P/E based (if available)
-    ev_ebitda_fv: float                 # EV/EBITDA based
+    cycle_normalized_fv: float  # Traditional cycle-normalized P/E
+    peg_adjusted_fv: float  # PEG-based fair value
+    forward_pe_fv: Optional[float]  # Forward P/E based (if available)
+    ev_ebitda_fv: float  # EV/EBITDA based
 
     # Blended result
-    blended_fv: float                   # Weighted average of all methods
-    confidence: str                     # high, medium, low
+    blended_fv: float  # Weighted average of all methods
+    confidence: str  # high, medium, low
 
     # Metadata
     growth_profile: GrowthProfile
@@ -995,9 +992,7 @@ def calculate_forward_pe_fair_value(
     # Calculate fair value
     fair_value = forward_eps * forward_pe_target
 
-    explanation = (
-        f"Forward P/E: ${forward_eps:.2f} FY EPS × {forward_pe_target:.1f}x target P/E"
-    )
+    explanation = f"Forward P/E: ${forward_eps:.2f} FY EPS × {forward_pe_target:.1f}x target P/E"
 
     logger.info(f"Forward P/E calculation: {explanation} -> ${fair_value:.2f}")
 

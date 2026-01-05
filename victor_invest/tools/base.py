@@ -58,10 +58,10 @@ DESIGN PRINCIPLE: Tools are mode-agnostic. The orchestration layer
 See: docs/ARCHITECTURE_DECISION_DATA_ACCESS.md for full rationale.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,8 @@ class ToolResult:
 
     Attributes:
         success: Whether the tool execution succeeded
-        data: The result data if successful (can be any dict structure)
+        output: The result data if successful (can be any structure).
+               Named 'output' for compatibility with Victor framework.
         error: Error message if execution failed
         warnings: Optional list of non-fatal warnings encountered
         metadata: Optional metadata about the execution (timing, source, etc.)
@@ -84,7 +85,7 @@ class ToolResult:
         # Successful result
         result = ToolResult(
             success=True,
-            data={"fair_value": 150.25, "upside": 12.5},
+            output={"fair_value": 150.25, "upside": 12.5},
             metadata={"model": "DCF", "execution_time_ms": 234}
         )
 
@@ -95,8 +96,9 @@ class ToolResult:
             warnings=["Attempted cache lookup"]
         )
     """
+
     success: bool
-    data: Optional[Dict[str, Any]] = None
+    output: Optional[Any] = None  # Named 'output' for Victor framework compatibility
     error: Optional[str] = None
     warnings: Optional[List[str]] = field(default_factory=list)
     metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
@@ -108,11 +110,17 @@ class ToolResult:
         if self.metadata is None:
             self.metadata = {}
 
+    @property
+    def data(self) -> Optional[Any]:
+        """Alias for output (backward compatibility)."""
+        return self.output
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary for serialization."""
         return {
             "success": self.success,
-            "data": self.data,
+            "output": self.output,
+            "data": self.output,  # Backward compatibility
             "error": self.error,
             "warnings": self.warnings,
             "metadata": self.metadata,
@@ -120,33 +128,19 @@ class ToolResult:
 
     @classmethod
     def success_result(
-        cls,
-        data: Dict[str, Any],
-        warnings: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        cls, data: Dict[str, Any], warnings: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None
     ) -> "ToolResult":
         """Factory method for successful results."""
         return cls(
-            success=True,
-            data=data,
-            warnings=warnings or [],
-            metadata=metadata or {}
+            success=True, output=data, warnings=warnings or [], metadata=metadata or {}  # Map data arg to output field
         )
 
     @classmethod
     def error_result(
-        cls,
-        error: str,
-        warnings: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        cls, error: str, warnings: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None
     ) -> "ToolResult":
         """Factory method for error results."""
-        return cls(
-            success=False,
-            error=error,
-            warnings=warnings or [],
-            metadata=metadata or {}
-        )
+        return cls(success=False, error=error, warnings=warnings or [], metadata=metadata or {})
 
 
 class BaseTool(ABC):
@@ -205,10 +199,13 @@ class BaseTool(ABC):
             await self.initialize()
 
     @abstractmethod
-    async def execute(self, **kwargs) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs) -> ToolResult:
         """Execute the tool with provided parameters.
 
         Args:
+            _exec_ctx: Framework execution context (reserved name to avoid collision
+                      with tool parameters). Contains shared resources. This aligns
+                      with Victor framework's BaseTool signature for compatibility.
             **kwargs: Tool-specific parameters (documented in subclasses)
 
         Returns:
@@ -229,11 +226,7 @@ class BaseTool(ABC):
         Returns:
             JSON Schema dict describing tool parameters
         """
-        return {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        return {"type": "object", "properties": {}, "required": []}
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name='{self.name}'>"

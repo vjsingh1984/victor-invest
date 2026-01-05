@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from investigator.infrastructure.cache.file_cache_handler import FileCacheStorageHandler
 from investigator.infrastructure.cache.cache_types import CacheType
+from investigator.infrastructure.cache.file_cache_handler import FileCacheStorageHandler
 
 
 @pytest.fixture

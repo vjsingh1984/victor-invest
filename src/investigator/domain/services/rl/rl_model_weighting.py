@@ -27,17 +27,17 @@ import os
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
-from investigator.domain.services.rl.models import (
-    ValuationContext,
-    ABTestGroup,
-)
-from investigator.domain.services.rl.policy.base import RLPolicy
-from investigator.domain.services.rl.policy.hybrid import HybridPolicy
-from investigator.domain.services.rl.policy.contextual_bandit import ContextualBanditPolicy
-from investigator.domain.services.rl.policy.dual_policy import DualRLPolicy
 from investigator.domain.services.rl.feature_extractor import ValuationContextExtractor
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
+from investigator.domain.services.rl.models import (
+    ABTestGroup,
+    ValuationContext,
+)
 from investigator.domain.services.rl.outcome_tracker import OutcomeTracker
+from investigator.domain.services.rl.policy.base import RLPolicy
+from investigator.domain.services.rl.policy.contextual_bandit import ContextualBanditPolicy
+from investigator.domain.services.rl.policy.dual_policy import DualRLPolicy
+from investigator.domain.services.rl.policy.hybrid import HybridPolicy
 from investigator.domain.services.weight_audit_trail import WeightAuditTrail
 
 logger = logging.getLogger(__name__)
@@ -205,14 +205,9 @@ class RLModelWeightingService:
 
         # Decide whether to use RL (dual policy takes precedence)
         use_dual = self.dual_policy is not None
-        use_single = (
-            self.policy is not None
-            and self.policy.is_ready()
-        )
+        use_single = self.policy is not None and self.policy.is_ready()
         use_rl = (
-            self.rl_enabled
-            and (use_dual or use_single)
-            and (not self.ab_test_enabled or ab_group == ABTestGroup.RL)
+            self.rl_enabled and (use_dual or use_single) and (not self.ab_test_enabled or ab_group == ABTestGroup.RL)
         )
 
         if use_rl:

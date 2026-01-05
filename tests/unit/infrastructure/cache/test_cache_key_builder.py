@@ -1,9 +1,10 @@
+import pytest
+
 from investigator.infrastructure.cache.cache_key_builder import (
     CacheKeyBuilder,
     build_cache_key,
 )
 from investigator.infrastructure.cache.cache_types import CacheType
-import pytest
 
 
 def test_build_llm_response_key() -> None:
@@ -31,22 +32,26 @@ def test_build_company_facts_key_with_adsh_and_cik() -> None:
         cik="0000789019",
     )
 
+    # Implementation normalizes fiscal_period to include year (2024-Q3)
     assert key == {
         "symbol": "MSFT",
         "fiscal_year": 2024,
-        "fiscal_period": "Q3",
+        "fiscal_period": "2024-Q3",
         "adsh": "0000320193-25-000057",
         "cik": "0000789019",
     }
 
 
 def test_validate_required_fields() -> None:
+    # Missing analysis_type and fiscal_period should raise ValueError
     with pytest.raises(ValueError):
         CacheKeyBuilder.validate_key(CacheType.LLM_RESPONSE, {"symbol": "AAPL"})
 
+    # TD2 fix: fiscal_period is now required for LLM_RESPONSE
     valid_key = {
         "symbol": "AAPL",
         "analysis_type": "fundamental",
+        "fiscal_period": "2024-Q3",
     }
     assert CacheKeyBuilder.validate_key(CacheType.LLM_RESPONSE, valid_key)
 

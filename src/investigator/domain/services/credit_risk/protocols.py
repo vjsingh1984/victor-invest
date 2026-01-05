@@ -82,6 +82,7 @@ class FinancialData:
         # Prior Period Data (for year-over-year comparisons)
         prior_period: Optional prior period financial data
     """
+
     symbol: str
     fiscal_year: Optional[int] = None
     fiscal_period: Optional[str] = None
@@ -203,6 +204,7 @@ class CreditScoreResult:
         warnings: Any warnings or data quality issues
         metadata: Additional contextual information
     """
+
     symbol: str
     score: Optional[float] = None
     score_name: str = ""

@@ -48,13 +48,14 @@ LMCI_URL = "https://www.kansascityfed.org/~/media/files/publicat/research/indica
 
 class FinancialStressLevel(Enum):
     """Classification of financial stress."""
-    VERY_LOW = "very_low"      # < -1
-    LOW = "low"                # -1 to -0.5
+
+    VERY_LOW = "very_low"  # < -1
+    LOW = "low"  # -1 to -0.5
     BELOW_NORMAL = "below_normal"  # -0.5 to 0
-    NORMAL = "normal"          # 0 to 0.5
-    ELEVATED = "elevated"      # 0.5 to 1
-    HIGH = "high"              # 1 to 2
-    SEVERE = "severe"          # > 2
+    NORMAL = "normal"  # 0 to 0.5
+    ELEVATED = "elevated"  # 0.5 to 1
+    HIGH = "high"  # 1 to 2
+    SEVERE = "severe"  # > 2
 
 
 @dataclass
@@ -77,6 +78,7 @@ class KCManufacturing:
         future_composite: 6-month expectations composite
         future_production: 6-month production expectations
     """
+
     date: date
     composite_index: float
     production: Optional[float] = None
@@ -108,6 +110,7 @@ class KCFinancialStressIndex:
         one_month_change: Change over past month
         stress_level: Classified stress level
     """
+
     date: date
     kcfsi: float
     previous_week: Optional[float] = None
@@ -147,6 +150,7 @@ class LaborMarketConditions:
         lmci_level: Level of activity indicator
         lmci_momentum: Momentum indicator (rate of change)
     """
+
     date: date
     lmci_level: float
     lmci_momentum: Optional[float] = None
@@ -171,6 +175,7 @@ class KansasCityFedClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()
@@ -197,7 +202,9 @@ class KansasCityFedClient:
     def _parse_mfg_excel(self, content: bytes) -> Optional[KCManufacturing]:
         try:
             import io
+
             import pandas as pd
+
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
             if df.empty:
                 return None
@@ -227,7 +234,9 @@ class KansasCityFedClient:
     def _parse_kcfsi_excel(self, content: bytes) -> Optional[KCFinancialStressIndex]:
         try:
             import io
+
             import pandas as pd
+
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
             if df.empty:
                 return None
@@ -259,7 +268,9 @@ class KansasCityFedClient:
     def _parse_lmci_excel(self, content: bytes) -> Optional[LaborMarketConditions]:
         try:
             import io
+
             import pandas as pd
+
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
             if df.empty:
                 return None
@@ -276,6 +287,7 @@ class KansasCityFedClient:
 
     async def get_all_indicators(self) -> Dict[str, Any]:
         import asyncio
+
         mfg, kcfsi, lmci = await asyncio.gather(
             self.get_manufacturing_survey(),
             self.get_financial_stress_index(),

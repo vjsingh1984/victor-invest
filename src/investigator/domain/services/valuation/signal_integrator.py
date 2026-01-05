@@ -38,33 +38,37 @@ logger = logging.getLogger(__name__)
 
 class DistressTier(Enum):
     """Company distress tier based on credit risk models."""
-    HEALTHY = "healthy"              # No discount
-    WATCH = "watch"                  # 5% discount
-    CONCERN = "concern"              # 15% discount
-    DISTRESSED = "distressed"        # 30% discount
+
+    HEALTHY = "healthy"  # No discount
+    WATCH = "watch"  # 5% discount
+    CONCERN = "concern"  # 15% discount
+    DISTRESSED = "distressed"  # 30% discount
     SEVERE_DISTRESS = "severe_distress"  # 50% discount
 
 
 class InsiderSignal(Enum):
     """Insider trading sentiment signal."""
-    STRONG_BUY = "strong_buy"        # +10% confidence boost
-    BUY = "buy"                      # +5% confidence boost
-    NEUTRAL = "neutral"              # No adjustment
-    SELL = "sell"                    # -5% confidence
-    STRONG_SELL = "strong_sell"      # -10% confidence
+
+    STRONG_BUY = "strong_buy"  # +10% confidence boost
+    BUY = "buy"  # +5% confidence boost
+    NEUTRAL = "neutral"  # No adjustment
+    SELL = "sell"  # -5% confidence
+    STRONG_SELL = "strong_sell"  # -10% confidence
 
 
 class ShortInterestSignal(Enum):
     """Short interest signal."""
-    SQUEEZE_RISK = "squeeze_risk"    # High squeeze potential (contrarian bullish)
-    ELEVATED = "elevated"            # Warning flag
-    NORMAL = "normal"                # No signal
-    LOW = "low"                      # Low short interest
+
+    SQUEEZE_RISK = "squeeze_risk"  # High squeeze potential (contrarian bullish)
+    ELEVATED = "elevated"  # Warning flag
+    NORMAL = "normal"  # No signal
+    LOW = "low"  # Low short interest
 
 
 @dataclass
 class CreditRiskSignal:
     """Credit risk signal for valuation adjustment."""
+
     altman_zscore: Optional[float] = None
     altman_zone: Optional[str] = None  # "safe", "grey", "distress"
     beneish_mscore: Optional[float] = None
@@ -92,6 +96,7 @@ class CreditRiskSignal:
 @dataclass
 class InsiderSentimentSignal:
     """Insider sentiment signal for confidence adjustment."""
+
     signal: InsiderSignal = InsiderSignal.NEUTRAL
     buy_sell_ratio: Optional[float] = None
     net_shares_change: Optional[int] = None
@@ -115,6 +120,7 @@ class InsiderSentimentSignal:
 @dataclass
 class ShortInterestAdjustment:
     """Short interest signal for valuation."""
+
     signal: ShortInterestSignal = ShortInterestSignal.NORMAL
     short_percent_float: Optional[float] = None
     days_to_cover: Optional[float] = None
@@ -140,6 +146,7 @@ class ShortInterestAdjustment:
 @dataclass
 class MarketRegimeAdjustment:
     """Market regime adjustment for WACC and valuations."""
+
     credit_cycle_phase: str = "mid_cycle"
     volatility_regime: str = "normal"
     recession_probability: str = "low"
@@ -169,6 +176,7 @@ class MarketRegimeAdjustment:
 @dataclass
 class IntegratedValuationSignals:
     """Combined signals for valuation adjustment."""
+
     symbol: str
     base_fair_value: float
     adjusted_fair_value: float
@@ -256,9 +264,7 @@ class ValuationSignalIntegrator:
         self.config = config or {}
 
         # Override defaults from config if provided
-        self.distress_discounts = self.config.get(
-            "distress_discounts", self.DISTRESS_DISCOUNTS
-        )
+        self.distress_discounts = self.config.get("distress_discounts", self.DISTRESS_DISCOUNTS)
         self.insider_adjustments = self.config.get(
             "insider_confidence_adjustments", self.INSIDER_CONFIDENCE_ADJUSTMENTS
         )
@@ -495,14 +501,10 @@ class ValuationSignalIntegrator:
 
         # Generate interpretation
         interpretations = {
-            ShortInterestSignal.SQUEEZE_RISK:
-                "High short interest creates potential squeeze opportunity - contrarian bullish signal",
-            ShortInterestSignal.ELEVATED:
-                "Elevated short interest - market skepticism or hedging activity",
-            ShortInterestSignal.NORMAL:
-                "Short interest at normal levels - no significant signal",
-            ShortInterestSignal.LOW:
-                "Low short interest - limited bearish positioning",
+            ShortInterestSignal.SQUEEZE_RISK: "High short interest creates potential squeeze opportunity - contrarian bullish signal",
+            ShortInterestSignal.ELEVATED: "Elevated short interest - market skepticism or hedging activity",
+            ShortInterestSignal.NORMAL: "Short interest at normal levels - no significant signal",
+            ShortInterestSignal.LOW: "Low short interest - limited bearish positioning",
         }
 
         return ShortInterestAdjustment(
@@ -662,7 +664,7 @@ class ValuationSignalIntegrator:
 
             # Apply credit risk discount
             if credit_risk.discount_pct > 0:
-                total_adjustment_factor *= (1 - credit_risk.discount_pct)
+                total_adjustment_factor *= 1 - credit_risk.discount_pct
                 warnings.append(
                     f"Credit risk discount of {credit_risk.discount_pct*100:.0f}% applied "
                     f"({credit_risk.distress_tier.value})"

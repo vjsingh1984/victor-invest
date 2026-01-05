@@ -80,9 +80,11 @@ def load_config(config_file: str = "config.yaml") -> dict:
 
 def async_command(f: Callable) -> Callable:
     """Decorator to run async functions in Click commands"""
+
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         return asyncio.run(f(*args, **kwargs))
+
     return wrapper
 
 
@@ -100,6 +102,7 @@ def validate_date(ctx, param, value):
     if not value:
         return value
     from datetime import datetime
+
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
@@ -110,13 +113,11 @@ class MutuallyExclusiveOption(click.Option):
     """Click option that enforces mutual exclusivity with other options"""
 
     def __init__(self, *args, **kwargs):
-        self.mutually_exclusive = set(kwargs.pop('mutually_exclusive', []))
-        help_text = kwargs.get('help', '')
+        self.mutually_exclusive = set(kwargs.pop("mutually_exclusive", []))
+        help_text = kwargs.get("help", "")
         if self.mutually_exclusive:
-            ex_str = ', '.join(self.mutually_exclusive)
-            kwargs['help'] = help_text + (
-                f' (mutually exclusive with {ex_str})'
-            )
+            ex_str = ", ".join(self.mutually_exclusive)
+            kwargs["help"] = help_text + (f" (mutually exclusive with {ex_str})")
         super().__init__(*args, **kwargs)
 
     def handle_parse_result(self, ctx, opts, args):
@@ -131,8 +132,7 @@ class MutuallyExclusiveOption(click.Option):
 def print_table(headers: list, rows: list, widths: Optional[list] = None):
     """Print a formatted table to stdout"""
     if not widths:
-        widths = [max(len(str(h)), max(len(str(r[i])) for r in rows) if rows else 0) + 2
-                  for i, h in enumerate(headers)]
+        widths = [max(len(str(h)), max(len(str(r[i])) for r in rows) if rows else 0) + 2 for i, h in enumerate(headers)]
 
     # Header
     header_line = "".join(str(h).ljust(w) for h, w in zip(headers, widths))
@@ -183,11 +183,13 @@ def error_exit(message: str, code: int = 1):
 
 def require_database():
     """Decorator that ensures database is available"""
+
     def decorator(f: Callable) -> Callable:
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
             try:
                 from investigator.infrastructure.database.db import get_engine
+
                 engine = get_engine()
                 # Quick test connection
                 with engine.connect():
@@ -195,16 +197,20 @@ def require_database():
             except Exception as e:
                 error_exit(f"Database connection failed: {e}")
             return f(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 def require_ollama():
     """Decorator that ensures Ollama is available"""
+
     def decorator(f: Callable) -> Callable:
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
             import requests
+
             try:
                 resp = requests.get("http://localhost:11434/api/tags", timeout=5)
                 if resp.status_code != 200:
@@ -212,5 +218,7 @@ def require_ollama():
             except Exception as e:
                 error_exit(f"Ollama connection failed: {e}. Is Ollama running?")
             return f(*args, **kwargs)
+
         return wrapper
+
     return decorator

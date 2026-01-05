@@ -61,6 +61,7 @@ REGISTRY_PATH = CONFIG_DIR / "data_sources_registry.yaml"
 @dataclass
 class FetchResult:
     """Result of a data fetch operation."""
+
     success: bool
     data: Any = None
     source: str = ""  # "primary_url", "fallback_url_1", "fred"
@@ -83,6 +84,7 @@ class FetchResult:
 @dataclass
 class HealthStatus:
     """Health status of a data source."""
+
     source_id: str
     indicator_id: str
     is_healthy: bool
@@ -214,10 +216,12 @@ class ResilientParser:
             prev = df.iloc[-2] if len(df) > 1 else None
 
             # Find date column
-            date_col = ResilientParser._find_column(
-                df.columns,
-                hints.get("date_col_patterns", ["date", "month", "period", "time"])
-            ) or df.columns[0]
+            date_col = (
+                ResilientParser._find_column(
+                    df.columns, hints.get("date_col_patterns", ["date", "month", "period", "time"])
+                )
+                or df.columns[0]
+            )
 
             # Find value column(s)
             value_col_patterns = hints.get("value_col_patterns", ["value", "index", "rate"])
@@ -382,9 +386,12 @@ class ResilientParser:
         """Parse HTML page for data using patterns."""
         hints = hints or {}
         try:
-            patterns = hints.get("html_patterns", [
-                r'(-?\d+\.?\d*)\s*(?:percent|%)',
-            ])
+            patterns = hints.get(
+                "html_patterns",
+                [
+                    r"(-?\d+\.?\d*)\s*(?:percent|%)",
+                ],
+            )
             value_range = hints.get("value_range", [-100, 100])
 
             for pattern in patterns:
@@ -439,6 +446,7 @@ class DataFetcher:
         if self._session is None or self._session.closed:
             try:
                 import certifi
+
                 ssl_ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 ssl_ctx = ssl.create_default_context()
@@ -507,10 +515,7 @@ class DataFetcher:
         # Get configuration
         config = self.registry.get_source(source_id, indicator_id)
         if not config:
-            return FetchResult(
-                success=False,
-                error=f"Unknown source: {source_id}/{indicator_id}"
-            )
+            return FetchResult(success=False, error=f"Unknown source: {source_id}/{indicator_id}")
 
         urls = self.registry.get_urls(source_id, indicator_id)
         fred_series = self.registry.get_fred_series(source_id, indicator_id)
@@ -528,15 +533,10 @@ class DataFetcher:
 
         # Try URLs in order
         for idx, url in enumerate(urls):
-            result = await self._fetch_from_url(
-                url, parser_type, hints, source_id, indicator_id, idx
-            )
+            result = await self._fetch_from_url(url, parser_type, hints, source_id, indicator_id, idx)
             if result.success:
                 self._set_cache(source_id, indicator_id, result)
-                self._update_health(
-                    source_id, indicator_id, True,
-                    using_fallback=(idx > 0)
-                )
+                self._update_health(source_id, indicator_id, True, using_fallback=(idx > 0))
                 return result
 
         # Try FRED as final fallback
@@ -549,10 +549,7 @@ class DataFetcher:
 
         # All attempts failed
         self._update_health(source_id, indicator_id, False)
-        return FetchResult(
-            success=False,
-            error=f"All fetch attempts failed for {source_id}/{indicator_id}"
-        )
+        return FetchResult(success=False, error=f"All fetch attempts failed for {source_id}/{indicator_id}")
 
     async def _fetch_from_url(
         self,
@@ -569,11 +566,7 @@ class DataFetcher:
 
             async with session.get(url, timeout=30) as response:
                 if response.status != 200:
-                    return FetchResult(
-                        success=False,
-                        url_used=url,
-                        error=f"HTTP {response.status}"
-                    )
+                    return FetchResult(success=False, url_used=url, error=f"HTTP {response.status}")
 
                 content_type = response.headers.get("Content-Type", "")
 
@@ -594,9 +587,9 @@ class DataFetcher:
                     # Try Excel first, then JSON, then HTML
                     content = await response.read()
                     data = (
-                        ResilientParser.parse_excel(content, hints) or
-                        ResilientParser.parse_json(content, hints) or
-                        ResilientParser.parse_html(content.decode("utf-8", errors="ignore"), hints)
+                        ResilientParser.parse_excel(content, hints)
+                        or ResilientParser.parse_json(content, hints)
+                        or ResilientParser.parse_html(content.decode("utf-8", errors="ignore"), hints)
                     )
 
                 if data:
@@ -608,11 +601,7 @@ class DataFetcher:
                         url_used=url,
                     )
                 else:
-                    return FetchResult(
-                        success=False,
-                        url_used=url,
-                        error="Parsing failed"
-                    )
+                    return FetchResult(success=False, url_used=url, error="Parsing failed")
 
         except asyncio.TimeoutError:
             return FetchResult(success=False, url_used=url, error="Timeout")
@@ -632,16 +621,13 @@ class DataFetcher:
             if not api_key:
                 try:
                     from victor.config.api_keys import get_service_key
+
                     api_key = get_service_key("fred")
                 except ImportError:
                     api_key = os.environ.get("FRED_API_KEY")
 
             if not api_key:
-                return FetchResult(
-                    success=False,
-                    source="fred",
-                    error="FRED API key not available"
-                )
+                return FetchResult(success=False, source="fred", error="FRED API key not available")
 
             url = (
                 f"https://api.stlouisfed.org/fred/series/observations"
@@ -655,11 +641,7 @@ class DataFetcher:
             session = await self._get_session()
             async with session.get(url, timeout=30) as response:
                 if response.status != 200:
-                    return FetchResult(
-                        success=False,
-                        source="fred",
-                        error=f"FRED HTTP {response.status}"
-                    )
+                    return FetchResult(success=False, source="fred", error=f"FRED HTTP {response.status}")
 
                 data = await response.json()
                 observations = data.get("observations", [])
@@ -690,18 +672,10 @@ class DataFetcher:
                         url_used=f"FRED:{series_id}",
                     )
 
-                return FetchResult(
-                    success=False,
-                    source="fred",
-                    error="No observations"
-                )
+                return FetchResult(success=False, source="fred", error="No observations")
 
         except Exception as e:
-            return FetchResult(
-                success=False,
-                source="fred",
-                error=f"FRED error: {e}"
-            )
+            return FetchResult(success=False, source="fred", error=f"FRED error: {e}")
 
     def _update_health(
         self,

@@ -265,9 +265,7 @@ class TTMCalculator:
         recent_quarters = quarters[:4] if len(quarters) >= 4 else quarters
 
         if require_full_year and len(recent_quarters) < 4:
-            logger.warning(
-                f"Insufficient quarters for TTM: {len(recent_quarters)} < 4"
-            )
+            logger.warning(f"Insufficient quarters for TTM: {len(recent_quarters)} < 4")
             return {}
 
         # Sum flow metrics
@@ -300,10 +298,7 @@ class TTMCalculator:
         if "balance_sheet" in most_recent:
             ttm_balance_sheet = most_recent["balance_sheet"].copy()
         else:
-            ttm_balance_sheet = {
-                metric: most_recent.get(metric)
-                for metric in self.STOCK_METRICS["balance_sheet"]
-            }
+            ttm_balance_sheet = {metric: most_recent.get(metric) for metric in self.STOCK_METRICS["balance_sheet"]}
 
         return {
             "income_statement": ttm_income,

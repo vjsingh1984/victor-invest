@@ -21,7 +21,7 @@ The framework adjusts P/E multiples based on:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -30,22 +30,25 @@ logger = logging.getLogger(__name__)
 # GROWTH PROFILE CLASSIFICATION
 # ====================
 
+
 class GrowthProfile(Enum):
     """Universal growth profile classification."""
-    HYPER_GROWTH = "hyper_growth"        # >50% revenue growth
-    HIGH_GROWTH = "high_growth"          # 25-50% revenue growth
+
+    HYPER_GROWTH = "hyper_growth"  # >50% revenue growth
+    HIGH_GROWTH = "high_growth"  # 25-50% revenue growth
     MODERATE_GROWTH = "moderate_growth"  # 10-25% revenue growth
-    LOW_GROWTH = "low_growth"            # 0-10% revenue growth
-    STABLE = "stable"                    # ~0% but consistent
-    DECLINING = "declining"              # Negative growth
+    LOW_GROWTH = "low_growth"  # 0-10% revenue growth
+    STABLE = "stable"  # ~0% but consistent
+    DECLINING = "declining"  # Negative growth
     UNKNOWN = "unknown"
 
 
 class QualityTier(Enum):
     """Quality tier based on Rule of 40 and other metrics."""
-    EXCEPTIONAL = "exceptional"    # Rule of 40 > 60%
+
+    EXCEPTIONAL = "exceptional"  # Rule of 40 > 60%
     HIGH_QUALITY = "high_quality"  # Rule of 40 40-60%
-    AVERAGE = "average"            # Rule of 40 20-40%
+    AVERAGE = "average"  # Rule of 40 20-40%
     BELOW_AVERAGE = "below_average"  # Rule of 40 < 20%
     UNKNOWN = "unknown"
 
@@ -58,12 +61,12 @@ SECTOR_GROWTH_CHARACTERISTICS = {
     # Sector -> (base_pe_premium, max_pe, peg_ceiling, supports_rule_of_40)
     # Updated for current market environment (2024-2025)
     "Technology": {
-        "base_pe_premium": 1.4,      # 40% premium for tech leadership
-        "max_pe": 100.0,             # Allow high multiples for hyper-growth
-        "peg_ceiling": 2.0,          # Can sustain high PEG
+        "base_pe_premium": 1.4,  # 40% premium for tech leadership
+        "max_pe": 100.0,  # Allow high multiples for hyper-growth
+        "peg_ceiling": 2.0,  # Can sustain high PEG
         "supports_rule_of_40": True,
-        "growth_sensitivity": 1.3,   # High sensitivity to growth
-        "quality_premium": 1.2,      # Premium for quality/moat
+        "growth_sensitivity": 1.3,  # High sensitivity to growth
+        "quality_premium": 1.2,  # Premium for quality/moat
     },
     "Consumer Cyclical": {
         "base_pe_premium": 1.2,
@@ -79,7 +82,7 @@ SECTOR_GROWTH_CHARACTERISTICS = {
         "peg_ceiling": 1.3,
         "supports_rule_of_40": False,
         "growth_sensitivity": 0.9,
-        "quality_premium": 1.2,      # Premium for stable brands (KO, PG)
+        "quality_premium": 1.2,  # Premium for stable brands (KO, PG)
     },
     "Industrials": {
         "base_pe_premium": 1.1,
@@ -98,7 +101,7 @@ SECTOR_GROWTH_CHARACTERISTICS = {
         "quality_premium": 1.15,
     },
     "Financials": {
-        "base_pe_premium": 1.0,      # Near market for quality banks
+        "base_pe_premium": 1.0,  # Near market for quality banks
         "max_pe": 25.0,
         "peg_ceiling": 1.2,
         "supports_rule_of_40": False,
@@ -118,7 +121,7 @@ SECTOR_GROWTH_CHARACTERISTICS = {
         "max_pe": 25.0,
         "peg_ceiling": 1.0,
         "supports_rule_of_40": False,
-        "growth_sensitivity": 0.6,   # Cyclical, less growth-dependent
+        "growth_sensitivity": 0.6,  # Cyclical, less growth-dependent
         "quality_premium": 1.05,
     },
     "Materials": {
@@ -134,7 +137,7 @@ SECTOR_GROWTH_CHARACTERISTICS = {
         "max_pe": 25.0,
         "peg_ceiling": 0.9,
         "supports_rule_of_40": False,
-        "growth_sensitivity": 0.5,   # Low growth, dividend focus
+        "growth_sensitivity": 0.5,  # Low growth, dividend focus
         "quality_premium": 1.1,
     },
     "Communication Services": {
@@ -167,10 +170,10 @@ DEFAULT_SECTOR_CHARACTERISTICS = {
 # Key insight: High growth rates are unsustainable, so we apply sustainability discounts
 GROWTH_PROFILE_PE_MULTIPLES = {
     GrowthProfile.HYPER_GROWTH: {
-        "base_pe": 35.0,         # Lower base - growth already reflected in PEG
-        "peg_target": 0.8,       # Discount for unsustainability (was 1.0)
-        "peg_premium": 0.2,      # Modest premium for exceptional (was 0.5)
-        "peg_pe_cap": 50.0,      # Hard cap on PEG-implied P/E (was 100)
+        "base_pe": 35.0,  # Lower base - growth already reflected in PEG
+        "peg_target": 0.8,  # Discount for unsustainability (was 1.0)
+        "peg_premium": 0.2,  # Modest premium for exceptional (was 0.5)
+        "peg_pe_cap": 50.0,  # Hard cap on PEG-implied P/E (was 100)
         "forward_pe_ratio": 0.70,  # Forward P/E ~70% of trailing
         "sustainability_discount": 0.85,  # 15% discount for growth deceleration
     },
@@ -183,7 +186,7 @@ GROWTH_PROFILE_PE_MULTIPLES = {
         "sustainability_discount": 0.90,
     },
     GrowthProfile.MODERATE_GROWTH: {
-        "base_pe": 25.0,         # Near market P/E
+        "base_pe": 25.0,  # Near market P/E
         "peg_target": 1.0,
         "peg_premium": 0.15,
         "peg_pe_cap": 40.0,
@@ -191,8 +194,8 @@ GROWTH_PROFILE_PE_MULTIPLES = {
         "sustainability_discount": 0.95,
     },
     GrowthProfile.LOW_GROWTH: {
-        "base_pe": 20.0,         # Slight discount to market
-        "peg_target": 1.2,       # Higher PEG target for low growth
+        "base_pe": 20.0,  # Slight discount to market
+        "peg_target": 1.2,  # Higher PEG target for low growth
         "peg_premium": 0.0,
         "peg_pe_cap": 30.0,
         "forward_pe_ratio": 0.88,
@@ -200,7 +203,7 @@ GROWTH_PROFILE_PE_MULTIPLES = {
     },
     GrowthProfile.STABLE: {
         "base_pe": 18.0,
-        "peg_target": None,      # PEG not meaningful for 0% growth
+        "peg_target": None,  # PEG not meaningful for 0% growth
         "peg_premium": 0.0,
         "peg_pe_cap": 25.0,
         "forward_pe_ratio": 0.92,
@@ -229,9 +232,11 @@ GROWTH_PROFILE_PE_MULTIPLES = {
 # DATA CLASSES
 # ====================
 
+
 @dataclass
 class GrowthMetrics:
     """Container for growth-related metrics."""
+
     revenue_growth: Optional[float] = None
     earnings_growth: Optional[float] = None
     fcf_margin: Optional[float] = None
@@ -243,9 +248,10 @@ class GrowthMetrics:
 @dataclass
 class ConfidenceInterval:
     """Fair value confidence interval."""
-    low: float          # Bear case / pessimistic
-    mid: float          # Base case / expected
-    high: float         # Bull case / optimistic
+
+    low: float  # Bear case / pessimistic
+    mid: float  # Base case / expected
+    high: float  # Bull case / optimistic
     confidence_pct: int  # Confidence level (e.g., 80 = 80% CI)
 
     def __str__(self) -> str:
@@ -255,10 +261,11 @@ class ConfidenceInterval:
 @dataclass
 class GrowthAdjustedResult:
     """Result from growth-adjusted valuation."""
+
     # Fair value estimates (required fields first)
-    base_fair_value: float              # Using sector baseline P/E
-    peg_fair_value: float               # PEG-adjusted
-    blended_fair_value: float           # Blended result
+    base_fair_value: float  # Using sector baseline P/E
+    peg_fair_value: float  # PEG-adjusted
+    blended_fair_value: float  # Blended result
     confidence: str
     growth_profile: GrowthProfile
     quality_tier: QualityTier
@@ -280,13 +287,13 @@ class GrowthAdjustedResult:
 
 # Uncertainty ranges by growth profile (higher growth = more uncertainty)
 GROWTH_PROFILE_UNCERTAINTY = {
-    GrowthProfile.HYPER_GROWTH: 0.35,     # ±35% range (high uncertainty)
-    GrowthProfile.HIGH_GROWTH: 0.25,      # ±25% range
+    GrowthProfile.HYPER_GROWTH: 0.35,  # ±35% range (high uncertainty)
+    GrowthProfile.HIGH_GROWTH: 0.25,  # ±25% range
     GrowthProfile.MODERATE_GROWTH: 0.18,  # ±18% range
-    GrowthProfile.LOW_GROWTH: 0.12,       # ±12% range
-    GrowthProfile.STABLE: 0.10,           # ±10% range (lowest uncertainty)
-    GrowthProfile.DECLINING: 0.20,        # ±20% (turnaround uncertainty)
-    GrowthProfile.UNKNOWN: 0.25,          # ±25% (default uncertainty)
+    GrowthProfile.LOW_GROWTH: 0.12,  # ±12% range
+    GrowthProfile.STABLE: 0.10,  # ±10% range (lowest uncertainty)
+    GrowthProfile.DECLINING: 0.20,  # ±20% (turnaround uncertainty)
+    GrowthProfile.UNKNOWN: 0.25,  # ±25% (default uncertainty)
 }
 
 
@@ -316,9 +323,7 @@ def calculate_confidence_interval(
         ConfidenceInterval with low/mid/high estimates
     """
     # 1. Base uncertainty from growth profile
-    base_uncertainty = GROWTH_PROFILE_UNCERTAINTY.get(
-        growth_profile, GROWTH_PROFILE_UNCERTAINTY[GrowthProfile.UNKNOWN]
-    )
+    base_uncertainty = GROWTH_PROFILE_UNCERTAINTY.get(growth_profile, GROWTH_PROFILE_UNCERTAINTY[GrowthProfile.UNKNOWN])
 
     # 2. Calculate dispersion of component valuations
     valid_components = [v for v in component_values if v > 0]
@@ -357,6 +362,7 @@ def calculate_confidence_interval(
 # ====================
 # CLASSIFICATION FUNCTIONS
 # ====================
+
 
 def classify_growth_profile(
     revenue_growth: Optional[float] = None,
@@ -421,9 +427,7 @@ def calculate_rule_of_40(
     # Convert to percentages and add
     rule_of_40 = (revenue_growth * 100) + (margin * 100)
 
-    logger.debug(
-        f"Rule of 40: {revenue_growth*100:.1f}% growth + {margin*100:.1f}% margin = {rule_of_40:.1f}"
-    )
+    logger.debug(f"Rule of 40: {revenue_growth*100:.1f}% growth + {margin*100:.1f}% margin = {rule_of_40:.1f}")
 
     return rule_of_40
 
@@ -454,6 +458,7 @@ def classify_quality_tier(rule_of_40: Optional[float]) -> QualityTier:
 # ====================
 # VALUATION FUNCTIONS
 # ====================
+
 
 def calculate_peg_fair_value(
     eps: float,
@@ -488,9 +493,7 @@ def calculate_peg_fair_value(
         return 0.0, 0.0, "PEG not applicable: non-positive growth"
 
     # Get growth profile parameters
-    params = GROWTH_PROFILE_PE_MULTIPLES.get(
-        growth_profile, GROWTH_PROFILE_PE_MULTIPLES[GrowthProfile.UNKNOWN]
-    )
+    params = GROWTH_PROFILE_PE_MULTIPLES.get(growth_profile, GROWTH_PROFILE_PE_MULTIPLES[GrowthProfile.UNKNOWN])
     peg_target = params.get("peg_target")
     peg_premium = params.get("peg_premium", 0)
     peg_pe_cap = params.get("peg_pe_cap", 50.0)  # Profile-specific cap
@@ -500,9 +503,7 @@ def calculate_peg_fair_value(
         return 0.0, 0.0, "PEG not applicable for this growth profile"
 
     # Get sector characteristics
-    sector_chars = SECTOR_GROWTH_CHARACTERISTICS.get(
-        sector, DEFAULT_SECTOR_CHARACTERISTICS
-    )
+    sector_chars = SECTOR_GROWTH_CHARACTERISTICS.get(sector, DEFAULT_SECTOR_CHARACTERISTICS)
     peg_ceiling = sector_chars["peg_ceiling"]
     growth_sensitivity = sector_chars["growth_sensitivity"]
 
@@ -560,16 +561,12 @@ def calculate_forward_pe_fair_value(
         return 0.0, 0.0, "Forward P/E not applicable: no positive forward EPS"
 
     # Get base parameters
-    params = GROWTH_PROFILE_PE_MULTIPLES.get(
-        growth_profile, GROWTH_PROFILE_PE_MULTIPLES[GrowthProfile.UNKNOWN]
-    )
+    params = GROWTH_PROFILE_PE_MULTIPLES.get(growth_profile, GROWTH_PROFILE_PE_MULTIPLES[GrowthProfile.UNKNOWN])
     base_pe = params["base_pe"]
     forward_ratio = params["forward_pe_ratio"]
 
     # Get sector adjustment
-    sector_chars = SECTOR_GROWTH_CHARACTERISTICS.get(
-        sector, DEFAULT_SECTOR_CHARACTERISTICS
-    )
+    sector_chars = SECTOR_GROWTH_CHARACTERISTICS.get(sector, DEFAULT_SECTOR_CHARACTERISTICS)
     sector_premium = sector_chars["base_pe_premium"]
     max_pe = sector_chars["max_pe"]
 
@@ -665,9 +662,9 @@ def calculate_rule_of_40_adjustment(
 
     # Base quality adjustment multipliers
     base_adjustments = {
-        QualityTier.EXCEPTIONAL: 1.10,    # +10% for exceptional (reduced from 15%)
-        QualityTier.HIGH_QUALITY: 1.05,   # +5% for high quality
-        QualityTier.AVERAGE: 1.00,        # No adjustment
+        QualityTier.EXCEPTIONAL: 1.10,  # +10% for exceptional (reduced from 15%)
+        QualityTier.HIGH_QUALITY: 1.05,  # +5% for high quality
+        QualityTier.AVERAGE: 1.00,  # No adjustment
         QualityTier.BELOW_AVERAGE: 0.90,  # -10% for below average
     }
 
@@ -698,6 +695,7 @@ def calculate_rule_of_40_adjustment(
 # ====================
 # MAIN VALUATION FUNCTION
 # ====================
+
 
 def calculate_growth_adjusted_valuation(
     symbol: str,
@@ -763,15 +761,11 @@ def calculate_growth_adjusted_valuation(
     details["quality_tier"] = quality_tier.value
 
     # 3. Get sector characteristics
-    sector_chars = SECTOR_GROWTH_CHARACTERISTICS.get(
-        sector, DEFAULT_SECTOR_CHARACTERISTICS
-    )
+    sector_chars = SECTOR_GROWTH_CHARACTERISTICS.get(sector, DEFAULT_SECTOR_CHARACTERISTICS)
     supports_rule_of_40 = sector_chars.get("supports_rule_of_40", False)
 
     # 4. Calculate base fair value (sector baseline P/E)
-    base_params = GROWTH_PROFILE_PE_MULTIPLES.get(
-        growth_profile, GROWTH_PROFILE_PE_MULTIPLES[GrowthProfile.UNKNOWN]
-    )
+    base_params = GROWTH_PROFILE_PE_MULTIPLES.get(growth_profile, GROWTH_PROFILE_PE_MULTIPLES[GrowthProfile.UNKNOWN])
     base_pe = base_params["base_pe"] * sector_chars["base_pe_premium"]
     base_fair_value = eps * base_pe if eps > 0 else 0
     details["base_pe"] = base_pe
@@ -938,8 +932,11 @@ def calculate_growth_adjusted_valuation(
         f"base=${base_fair_value:.2f}, peg=${peg_fair_value:.2f}, "
         f"blended=${blended_fv:.2f} (range: ${fair_value_range.low:.2f}-${fair_value_range.high:.2f}), "
         f"confidence={confidence}"
-        + (f", market_premium={market_premium_pct:+.0f}% ({market_premium_category})"
-           if market_premium_pct is not None else "")
+        + (
+            f", market_premium={market_premium_pct:+.0f}% ({market_premium_category})"
+            if market_premium_pct is not None
+            else ""
+        )
     )
 
     return GrowthAdjustedResult(
@@ -1030,52 +1027,24 @@ def _get_blending_weights(
     # Base weights by growth profile
     if has_forward_eps:
         weights_matrix = {
-            GrowthProfile.HYPER_GROWTH: {
-                "base": 0.10, "peg": 0.30, "forward": 0.40, "ev_ebitda": 0.20
-            },
-            GrowthProfile.HIGH_GROWTH: {
-                "base": 0.15, "peg": 0.30, "forward": 0.35, "ev_ebitda": 0.20
-            },
-            GrowthProfile.MODERATE_GROWTH: {
-                "base": 0.25, "peg": 0.25, "forward": 0.30, "ev_ebitda": 0.20
-            },
-            GrowthProfile.LOW_GROWTH: {
-                "base": 0.30, "peg": 0.15, "forward": 0.25, "ev_ebitda": 0.30
-            },
-            GrowthProfile.STABLE: {
-                "base": 0.35, "peg": 0.0, "forward": 0.30, "ev_ebitda": 0.35
-            },
-            GrowthProfile.DECLINING: {
-                "base": 0.30, "peg": 0.0, "forward": 0.30, "ev_ebitda": 0.40
-            },
-            GrowthProfile.UNKNOWN: {
-                "base": 0.30, "peg": 0.20, "forward": 0.25, "ev_ebitda": 0.25
-            },
+            GrowthProfile.HYPER_GROWTH: {"base": 0.10, "peg": 0.30, "forward": 0.40, "ev_ebitda": 0.20},
+            GrowthProfile.HIGH_GROWTH: {"base": 0.15, "peg": 0.30, "forward": 0.35, "ev_ebitda": 0.20},
+            GrowthProfile.MODERATE_GROWTH: {"base": 0.25, "peg": 0.25, "forward": 0.30, "ev_ebitda": 0.20},
+            GrowthProfile.LOW_GROWTH: {"base": 0.30, "peg": 0.15, "forward": 0.25, "ev_ebitda": 0.30},
+            GrowthProfile.STABLE: {"base": 0.35, "peg": 0.0, "forward": 0.30, "ev_ebitda": 0.35},
+            GrowthProfile.DECLINING: {"base": 0.30, "peg": 0.0, "forward": 0.30, "ev_ebitda": 0.40},
+            GrowthProfile.UNKNOWN: {"base": 0.30, "peg": 0.20, "forward": 0.25, "ev_ebitda": 0.25},
         }
     else:
         # Without forward EPS, redistribute weight
         weights_matrix = {
-            GrowthProfile.HYPER_GROWTH: {
-                "base": 0.15, "peg": 0.55, "forward": 0.0, "ev_ebitda": 0.30
-            },
-            GrowthProfile.HIGH_GROWTH: {
-                "base": 0.20, "peg": 0.50, "forward": 0.0, "ev_ebitda": 0.30
-            },
-            GrowthProfile.MODERATE_GROWTH: {
-                "base": 0.30, "peg": 0.35, "forward": 0.0, "ev_ebitda": 0.35
-            },
-            GrowthProfile.LOW_GROWTH: {
-                "base": 0.40, "peg": 0.15, "forward": 0.0, "ev_ebitda": 0.45
-            },
-            GrowthProfile.STABLE: {
-                "base": 0.45, "peg": 0.0, "forward": 0.0, "ev_ebitda": 0.55
-            },
-            GrowthProfile.DECLINING: {
-                "base": 0.40, "peg": 0.0, "forward": 0.0, "ev_ebitda": 0.60
-            },
-            GrowthProfile.UNKNOWN: {
-                "base": 0.35, "peg": 0.25, "forward": 0.0, "ev_ebitda": 0.40
-            },
+            GrowthProfile.HYPER_GROWTH: {"base": 0.15, "peg": 0.55, "forward": 0.0, "ev_ebitda": 0.30},
+            GrowthProfile.HIGH_GROWTH: {"base": 0.20, "peg": 0.50, "forward": 0.0, "ev_ebitda": 0.30},
+            GrowthProfile.MODERATE_GROWTH: {"base": 0.30, "peg": 0.35, "forward": 0.0, "ev_ebitda": 0.35},
+            GrowthProfile.LOW_GROWTH: {"base": 0.40, "peg": 0.15, "forward": 0.0, "ev_ebitda": 0.45},
+            GrowthProfile.STABLE: {"base": 0.45, "peg": 0.0, "forward": 0.0, "ev_ebitda": 0.55},
+            GrowthProfile.DECLINING: {"base": 0.40, "peg": 0.0, "forward": 0.0, "ev_ebitda": 0.60},
+            GrowthProfile.UNKNOWN: {"base": 0.35, "peg": 0.25, "forward": 0.0, "ev_ebitda": 0.40},
         }
 
     weights = weights_matrix.get(growth_profile, weights_matrix[GrowthProfile.UNKNOWN]).copy()
@@ -1136,6 +1105,7 @@ def _determine_confidence(
 # ====================
 # CONVENIENCE FUNCTIONS
 # ====================
+
 
 def get_growth_metrics(
     revenue_growth: Optional[float] = None,

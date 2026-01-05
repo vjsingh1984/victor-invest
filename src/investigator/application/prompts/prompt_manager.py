@@ -8,11 +8,16 @@ Prompt Manager for Jinja2 Templates
 Handles loading and rendering of LLM prompt templates with proper JSON response formatting
 """
 
-import logging
-from pathlib import Path
-from typing import Dict, Any, Optional
+from __future__ import annotations
+
 import json
+import logging
 from datetime import datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+if TYPE_CHECKING:
+    from utils.prompt_manager_enhanced import EnhancedPromptManager
 
 try:
     from jinja2 import Environment, FileSystemLoader, Template
@@ -135,8 +140,8 @@ class PromptManager:
             # Standardize period if not already in YYYY-QX format
             if not period_key.startswith(str(fiscal_year)):
                 # Import locally to avoid circular imports
-                import sys
                 import os
+                import sys
 
                 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 try:
@@ -558,7 +563,6 @@ Respond with valid JSON only."""
         # Fix common escape sequence issues - simplified approach
         # Handle embedded quotes in JSON string values
         # Look for patterns like: "key": "value with "quotes" and fix them
-
         # First, try to fix the most common case: missing comma between fields
         content = re.sub(r'(\w+": *"[^"]*") +("[\w_]+":)', r"\1, \2", content)
         content = re.sub(r'(\w+": *\d+(?:\.\d+)?) +("[\w_]+":)', r"\1, \2", content)

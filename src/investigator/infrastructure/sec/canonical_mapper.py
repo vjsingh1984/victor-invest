@@ -13,10 +13,10 @@ Author: InvestiGator Team
 Date: 2025-11-03
 """
 
-import logging
-from typing import Dict, List, Optional, Any, Tuple
-from pathlib import Path
 import json
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -52,33 +52,33 @@ class CanonicalKeyMapper:
         """
         self.mappings = self._load_mappings(mappings_path)
         self.sector_mappings = self._load_sector_mappings(sector_mappings_path)
-        self.stats = {
-            'extractions': 0,
-            'fallbacks_used': 0,
-            'failures': 0
-        }
+        self.stats = {"extractions": 0, "fallbacks_used": 0, "failures": 0}
 
     def _load_mappings(self, mappings_path: Optional[str]) -> Dict:
         """Load canonical key mappings from file or use defaults"""
 
         if mappings_path and Path(mappings_path).exists():
-            with open(mappings_path, 'r') as f:
+            with open(mappings_path, "r") as f:
                 return json.load(f)
 
         # Try to load comprehensive mappings with derivations from resources
         # Path resolution: src/investigator/infrastructure/sec/ → project root (5 levels up)
         project_root = Path(__file__).parent.parent.parent.parent.parent
-        comprehensive_with_derivations_path = project_root / 'resources' / 'xbrl_mappings' / 'comprehensive_canonical_mappings_with_derivations.json'
+        comprehensive_with_derivations_path = (
+            project_root / "resources" / "xbrl_mappings" / "comprehensive_canonical_mappings_with_derivations.json"
+        )
         if comprehensive_with_derivations_path.exists():
-            logger.info(f"Loading comprehensive canonical mappings with derivations from {comprehensive_with_derivations_path}")
-            with open(comprehensive_with_derivations_path, 'r') as f:
+            logger.info(
+                f"Loading comprehensive canonical mappings with derivations from {comprehensive_with_derivations_path}"
+            )
+            with open(comprehensive_with_derivations_path, "r") as f:
                 return json.load(f)
 
         # Try to load comprehensive mappings (without derivations) from resources
-        comprehensive_path = project_root / 'resources' / 'xbrl_mappings' / 'comprehensive_canonical_mappings.json'
+        comprehensive_path = project_root / "resources" / "xbrl_mappings" / "comprehensive_canonical_mappings.json"
         if comprehensive_path.exists():
             logger.info(f"Loading comprehensive canonical mappings from {comprehensive_path}")
-            with open(comprehensive_path, 'r') as f:
+            with open(comprehensive_path, "r") as f:
                 return json.load(f)
 
         # CRITICAL: Comprehensive mappings are required for production use
@@ -105,16 +105,16 @@ class CanonicalKeyMapper:
             Dict with sector/industry-specific mappings, or empty dict if not found
         """
         if sector_mappings_path and Path(sector_mappings_path).exists():
-            with open(sector_mappings_path, 'r') as f:
+            with open(sector_mappings_path, "r") as f:
                 return json.load(f)
 
         # Try to load from resources directory
         # Path resolution: src/investigator/infrastructure/sec/ → project root (5 levels up)
         project_root = Path(__file__).parent.parent.parent.parent.parent
-        default_path = project_root / 'resources' / 'xbrl_mappings' / 'sector_specific_mappings.json'
+        default_path = project_root / "resources" / "xbrl_mappings" / "sector_specific_mappings.json"
         if default_path.exists():
             logger.info(f"Loading sector-specific mappings from {default_path}")
-            with open(default_path, 'r') as f:
+            with open(default_path, "r") as f:
                 return json.load(f)
 
         logger.warning("Sector-specific mappings not found - sector/industry exclusions won't be applied")
@@ -128,134 +128,121 @@ class CanonicalKeyMapper:
         to generate comprehensive sector-specific mappings.
         """
         return {
-            'total_revenue': {
-                'description': 'Total Revenue/Sales',
-                'global_fallback': [
-                    'RevenueFromContractWithCustomerExcludingAssessedTax',
-                    'RevenueFromContractWithCustomerIncludingAssessedTax',
-                    'Revenues',
-                    'SalesRevenueNet',
+            "total_revenue": {
+                "description": "Total Revenue/Sales",
+                "global_fallback": [
+                    "RevenueFromContractWithCustomerExcludingAssessedTax",
+                    "RevenueFromContractWithCustomerIncludingAssessedTax",
+                    "Revenues",
+                    "SalesRevenueNet",
                 ],
-                'sector_specific': {
-                    'Utilities': [
-                        'RegulatedOperatingRevenue',
-                        'ElectricUtilityRevenue',
-                        'RevenuesExcludingInterestAndDividends',
-                        'Revenues',
+                "sector_specific": {
+                    "Utilities": [
+                        "RegulatedOperatingRevenue",
+                        "ElectricUtilityRevenue",
+                        "RevenuesExcludingInterestAndDividends",
+                        "Revenues",
                     ],
-                    'Financials': [
-                        'InterestAndDividendIncomeOperating',
-                        'InterestIncomeOperating',
-                        'Revenues',
+                    "Financials": [
+                        "InterestAndDividendIncomeOperating",
+                        "InterestIncomeOperating",
+                        "Revenues",
                     ],
-                    'Real Estate': [
-                        'RealEstateRevenueNet',
-                        'Revenues',
+                    "Real Estate": [
+                        "RealEstateRevenueNet",
+                        "Revenues",
                     ],
-                }
+                },
             },
-
-            'net_income': {
-                'description': 'Net Income',
-                'global_fallback': [
-                    'NetIncomeLoss',
-                    'NetIncomeLossAvailableToCommonStockholdersBasic',
-                    'ProfitLoss',
+            "net_income": {
+                "description": "Net Income",
+                "global_fallback": [
+                    "NetIncomeLoss",
+                    "NetIncomeLossAvailableToCommonStockholdersBasic",
+                    "ProfitLoss",
                 ],
-                'sector_specific': {}
+                "sector_specific": {},
             },
-
-            'operating_cash_flow': {
-                'description': 'Cash from Operations',
-                'global_fallback': [
-                    'NetCashProvidedByUsedInOperatingActivities',
-                    'NetCashFlowOperatingActivities',
+            "operating_cash_flow": {
+                "description": "Cash from Operations",
+                "global_fallback": [
+                    "NetCashProvidedByUsedInOperatingActivities",
+                    "NetCashFlowOperatingActivities",
                 ],
-                'sector_specific': {}
+                "sector_specific": {},
             },
-
-            'capital_expenditures': {
-                'description': 'Capital Expenditures',
-                'global_fallback': [
-                    'PaymentsToAcquirePropertyPlantAndEquipment',
-                    'CapitalExpendituresIncurredButNotYetPaid',
-                    'PaymentsForCapitalImprovements',
+            "capital_expenditures": {
+                "description": "Capital Expenditures",
+                "global_fallback": [
+                    "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "CapitalExpendituresIncurredButNotYetPaid",
+                    "PaymentsForCapitalImprovements",
                 ],
-                'sector_specific': {
-                    'Utilities': [
-                        'PaymentsToAcquirePropertyPlantAndEquipment',
-                        'CapitalExpendituresIncurredButNotYetPaid',
+                "sector_specific": {
+                    "Utilities": [
+                        "PaymentsToAcquirePropertyPlantAndEquipment",
+                        "CapitalExpendituresIncurredButNotYetPaid",
                     ],
-                }
+                },
             },
-
-            'dividends_paid': {
-                'description': 'Dividends Paid',
-                'global_fallback': [
-                    'PaymentsOfDividends',
-                    'PaymentsOfDividendsCommonStock',
-                    'PaymentsOfOrdinaryDividends',
-                    'DividendsCashOutflow',
+            "dividends_paid": {
+                "description": "Dividends Paid",
+                "global_fallback": [
+                    "PaymentsOfDividends",
+                    "PaymentsOfDividendsCommonStock",
+                    "PaymentsOfOrdinaryDividends",
+                    "DividendsCashOutflow",
                 ],
-                'sector_specific': {
-                    'Real Estate': [
-                        'PaymentsOfDistributionsToAffiliates',
-                        'PaymentsOfDividends',
+                "sector_specific": {
+                    "Real Estate": [
+                        "PaymentsOfDistributionsToAffiliates",
+                        "PaymentsOfDividends",
                     ],
-                }
+                },
             },
-
-            'total_assets': {
-                'description': 'Total Assets',
-                'global_fallback': [
-                    'Assets',
-                    'AssetsCurrent',  # Fallback if only current assets available
+            "total_assets": {
+                "description": "Total Assets",
+                "global_fallback": [
+                    "Assets",
+                    "AssetsCurrent",  # Fallback if only current assets available
                 ],
-                'sector_specific': {}
+                "sector_specific": {},
             },
-
-            'total_liabilities': {
-                'description': 'Total Liabilities',
-                'global_fallback': [
-                    'Liabilities',
-                    'LiabilitiesCurrent',  # Fallback
-                    'LiabilitiesAndStockholdersEquity',
-                    'LiabilitiesNoncurrent',
+            "total_liabilities": {
+                "description": "Total Liabilities",
+                "global_fallback": [
+                    "Liabilities",
+                    "LiabilitiesCurrent",  # Fallback
+                    "LiabilitiesAndStockholdersEquity",
+                    "LiabilitiesNoncurrent",
                 ],
-                'sector_specific': {},
-                'derived': {
-                    'enabled': True,
-                    'formula': 'total_assets - stockholders_equity',
-                    'required_fields': ['total_assets', 'stockholders_equity'],
-                    'description': 'Derive liabilities from Assets - Equity when direct tag missing'
-                }
+                "sector_specific": {},
+                "derived": {
+                    "enabled": True,
+                    "formula": "total_assets - stockholders_equity",
+                    "required_fields": ["total_assets", "stockholders_equity"],
+                    "description": "Derive liabilities from Assets - Equity when direct tag missing",
+                },
             },
-
-            'stockholders_equity': {
-                'description': 'Shareholders Equity',
-                'global_fallback': [
-                    'StockholdersEquity',
-                    'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest',
-                    'StockholdersEquityDeficit',
+            "stockholders_equity": {
+                "description": "Shareholders Equity",
+                "global_fallback": [
+                    "StockholdersEquity",
+                    "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+                    "StockholdersEquityDeficit",
                 ],
-                'sector_specific': {},
-                'derived': {
-                    'enabled': True,
-                    'formula': 'total_assets - total_liabilities',
-                    'required_fields': ['total_assets', 'total_liabilities'],
-                    'description': 'Fallback accounting identity when direct tag missing'
-                }
+                "sector_specific": {},
+                "derived": {
+                    "enabled": True,
+                    "formula": "total_assets - total_liabilities",
+                    "required_fields": ["total_assets", "total_liabilities"],
+                    "description": "Fallback accounting identity when direct tag missing",
+                },
             },
-
             # Add more canonical keys as needed...
         }
 
-    def get_tags(
-        self,
-        canonical_key: str,
-        sector: Optional[str] = None,
-        industry: Optional[str] = None
-    ) -> List[str]:
+    def get_tags(self, canonical_key: str, sector: Optional[str] = None, industry: Optional[str] = None) -> List[str]:
         """
         Get priority-ordered list of XBRL tags for a canonical key
 
@@ -274,7 +261,7 @@ class CanonicalKeyMapper:
         # PRIORITY 1: Industry-specific tags from sector_mappings (highest priority)
         if self.sector_mappings and sector and industry:
             sector_config = self.sector_mappings.get(sector, {})
-            tag_mappings = sector_config.get('tag_mappings', {})
+            tag_mappings = sector_config.get("tag_mappings", {})
 
             if canonical_key in tag_mappings:
                 mapping = tag_mappings[canonical_key]
@@ -289,15 +276,15 @@ class CanonicalKeyMapper:
                             f"(sector={sector}, industry={industry}): {industry_tags}"
                         )
                 # Fall back to sector's _default if no industry match
-                elif isinstance(mapping, dict) and '_default' in mapping:
-                    default_tags = mapping['_default']
+                elif isinstance(mapping, dict) and "_default" in mapping:
+                    default_tags = mapping["_default"]
                     if isinstance(default_tags, list):
                         tags.extend(default_tags)
 
         # PRIORITY 2: Sector-specific tags from sector_mappings
         if self.sector_mappings and sector and not tags:
             sector_config = self.sector_mappings.get(sector, {})
-            tag_mappings = sector_config.get('tag_mappings', {})
+            tag_mappings = sector_config.get("tag_mappings", {})
 
             if canonical_key in tag_mappings:
                 mapping = tag_mappings[canonical_key]
@@ -306,15 +293,15 @@ class CanonicalKeyMapper:
                 if isinstance(mapping, list):
                     tags.extend(mapping)
                 # If mapping has _default but no industry was provided
-                elif isinstance(mapping, dict) and '_default' in mapping:
-                    default_tags = mapping['_default']
+                elif isinstance(mapping, dict) and "_default" in mapping:
+                    default_tags = mapping["_default"]
                     if isinstance(default_tags, list):
                         tags.extend(default_tags)
 
         # PRIORITY 3: Global fallback from sector_mappings
         if self.sector_mappings and not tags:
-            global_config = self.sector_mappings.get('_global', {})
-            tag_mappings = global_config.get('tag_mappings', {})
+            global_config = self.sector_mappings.get("_global", {})
+            tag_mappings = global_config.get("tag_mappings", {})
 
             if canonical_key in tag_mappings:
                 global_tags = tag_mappings[canonical_key]
@@ -326,17 +313,16 @@ class CanonicalKeyMapper:
             mapping = self.mappings[canonical_key]
 
             # Add sector-specific tags from standard mappings
-            if sector and sector in mapping.get('sector_specific', {}):
-                tags.extend(mapping['sector_specific'][sector])
+            if sector and sector in mapping.get("sector_specific", {}):
+                tags.extend(mapping["sector_specific"][sector])
 
             # Add global fallback from standard mappings
-            tags.extend(mapping.get('global_fallback', []))
+            tags.extend(mapping.get("global_fallback", []))
 
         # If no tags found anywhere
         if not tags:
             logger.warning(
-                f"No tags found for canonical key '{canonical_key}' "
-                f"(sector={sector}, industry={industry})"
+                f"No tags found for canonical key '{canonical_key}' " f"(sector={sector}, industry={industry})"
             )
             return []
 
@@ -356,7 +342,7 @@ class CanonicalKeyMapper:
         json_data: Dict,
         sector: Optional[str] = None,
         fiscal_year: Optional[int] = None,
-        fiscal_period: Optional[str] = None
+        fiscal_period: Optional[str] = None,
     ) -> Tuple[Optional[float], Optional[str]]:
         """
         Extract value for canonical key from SEC CompanyFacts JSON
@@ -377,7 +363,7 @@ class CanonicalKeyMapper:
             logger.warning(f"No tags mapped for canonical key: {canonical_key}")
             return (None, None)
 
-        us_gaap = json_data.get('facts', {}).get('us-gaap', {})
+        us_gaap = json_data.get("facts", {}).get("us-gaap", {})
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
@@ -393,10 +379,10 @@ class CanonicalKeyMapper:
                 continue
 
             # Extract latest value for this tag
-            units = us_gaap[tag].get('units', {})
+            units = us_gaap[tag].get("units", {})
 
             # Try USD first, then other currencies
-            for currency in ['USD', 'EUR', 'GBP']:
+            for currency in ["USD", "EUR", "GBP"]:
                 if currency not in units:
                     continue
 
@@ -405,21 +391,22 @@ class CanonicalKeyMapper:
                 # Filter by fiscal period if specified
                 if fiscal_year or fiscal_period:
                     entries = [
-                        e for e in entries
-                        if (not fiscal_year or e.get('fy') == fiscal_year)
-                        and (not fiscal_period or e.get('fp') == fiscal_period)
+                        e
+                        for e in entries
+                        if (not fiscal_year or e.get("fy") == fiscal_year)
+                        and (not fiscal_period or e.get("fp") == fiscal_period)
                     ]
 
                 if not entries:
                     continue
 
                 # Sort by filed date (most recent first)
-                entries.sort(key=lambda x: x.get('filed', ''), reverse=True)
+                entries.sort(key=lambda x: x.get("filed", ""), reverse=True)
 
-                value = entries[0].get('val')
+                value = entries[0].get("val")
 
                 if value is not None:
-                    self.stats['extractions'] += 1
+                    self.stats["extractions"] += 1
                     logger.debug(
                         "✅ %s extracted using tag '%s' (attempt %d of %d)",
                         canonical_key,
@@ -428,27 +415,20 @@ class CanonicalKeyMapper:
                         len(tags),
                     )
                     if i > 0:
-                        self.stats['fallbacks_used'] += 1
+                        self.stats["fallbacks_used"] += 1
                         logger.debug(
-                            f"🎯 Fallback SUCCESS: {canonical_key} → {tag} "
-                            f"(tried {i} tags before success)"
+                            f"🎯 Fallback SUCCESS: {canonical_key} → {tag} " f"(tried {i} tags before success)"
                         )
 
                     return (float(value), tag)
 
         # No value found in any fallback
-        self.stats['failures'] += 1
-        logger.warning(
-            f"⚠️  Failed to extract {canonical_key} for sector {sector}. "
-            f"Tried tags: {tags}"
-        )
+        self.stats["failures"] += 1
+        logger.warning(f"⚠️  Failed to extract {canonical_key} for sector {sector}. " f"Tried tags: {tags}")
         return (None, None)
 
     def extract_from_bulk_table(
-        self,
-        canonical_key: str,
-        tag_values: Dict[str, float],
-        sector: Optional[str] = None
+        self, canonical_key: str, tag_values: Dict[str, float], sector: Optional[str] = None
     ) -> Tuple[Optional[float], Optional[str]]:
         """
         Extract value for canonical key from bulk table tag values
@@ -471,7 +451,7 @@ class CanonicalKeyMapper:
             if tag in tag_values and tag_values[tag] is not None:
                 value = tag_values[tag]
 
-                self.stats['extractions'] += 1
+                self.stats["extractions"] += 1
                 logger.debug(
                     "✅ %s extracted from bulk table using tag '%s' (attempt %d of %d)",
                     canonical_key,
@@ -480,16 +460,13 @@ class CanonicalKeyMapper:
                     len(tags),
                 )
                 if i > 0:
-                    self.stats['fallbacks_used'] += 1
-                    logger.debug(
-                        f"🎯 Bulk table fallback SUCCESS: {canonical_key} → {tag} "
-                        f"(tried {i} tags)"
-                    )
+                    self.stats["fallbacks_used"] += 1
+                    logger.debug(f"🎯 Bulk table fallback SUCCESS: {canonical_key} → {tag} " f"(tried {i} tags)")
 
                 return (float(value), tag)
 
         # No value found
-        self.stats['failures'] += 1
+        self.stats["failures"] += 1
         logger.warning(
             f"⚠️  Bulk table: Failed to extract {canonical_key}. "
             f"Tried tags: {tags}, Available tags: {list(tag_values.keys())}"
@@ -531,11 +508,7 @@ class CanonicalKeyMapper:
             logger.debug(f"Formula evaluation failed for '{formula}': {e}")
             return None
 
-    def calculate_derived_value(
-        self,
-        canonical_key: str,
-        values_dict: Dict[str, float]
-    ) -> Optional[float]:
+    def calculate_derived_value(self, canonical_key: str, values_dict: Dict[str, float]) -> Optional[float]:
         """
         Calculate derived value using formula from mapping
 
@@ -550,17 +523,17 @@ class CanonicalKeyMapper:
             return None
 
         mapping = self.mappings[canonical_key]
-        derived_config = mapping.get('derived', {})
+        derived_config = mapping.get("derived", {})
 
-        if not derived_config.get('enabled', False):
+        if not derived_config.get("enabled", False):
             return None
 
         # Try primary formula
-        formula = derived_config.get('formula')
+        formula = derived_config.get("formula")
         if formula:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
-                    "🧮 Attempting derivation for %s using formula \"%s\" with inputs: %s",
+                    '🧮 Attempting derivation for %s using formula "%s" with inputs: %s',
                     canonical_key,
                     formula,
                     {k: values_dict.get(k) for k in values_dict.keys()},
@@ -571,11 +544,11 @@ class CanonicalKeyMapper:
                 return result
 
         # Try alternative formula
-        formula_alt = derived_config.get('formula_alt')
+        formula_alt = derived_config.get("formula_alt")
         if formula_alt:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
-                    "🧮 Attempting derivation for %s using alternate formula \"%s\" with inputs: %s",
+                    '🧮 Attempting derivation for %s using alternate formula "%s" with inputs: %s',
                     canonical_key,
                     formula_alt,
                     {k: values_dict.get(k) for k in values_dict.keys()},
@@ -596,7 +569,7 @@ class CanonicalKeyMapper:
         sector: Optional[str] = None,
         fiscal_year: Optional[int] = None,
         fiscal_period: Optional[str] = None,
-        existing_values: Optional[Dict[str, float]] = None
+        existing_values: Optional[Dict[str, float]] = None,
     ) -> Tuple[Optional[float], Optional[str]]:
         """
         Extract value with automatic derivation fallback
@@ -619,16 +592,12 @@ class CanonicalKeyMapper:
         """
         # Try direct extraction first
         if json_data:
-            value, tag = self.extract_from_json(
-                canonical_key, json_data, sector, fiscal_year, fiscal_period
-            )
+            value, tag = self.extract_from_json(canonical_key, json_data, sector, fiscal_year, fiscal_period)
             if value is not None:
                 return (value, tag)
 
         if tag_values:
-            value, tag = self.extract_from_bulk_table(
-                canonical_key, tag_values, sector
-            )
+            value, tag = self.extract_from_bulk_table(canonical_key, tag_values, sector)
             if value is not None:
                 return (value, tag)
 
@@ -636,7 +605,7 @@ class CanonicalKeyMapper:
         if existing_values:
             derived_value = self.calculate_derived_value(canonical_key, existing_values)
             if derived_value is not None:
-                formula = self.mappings[canonical_key].get('derived', {}).get('formula', 'unknown')
+                formula = self.mappings[canonical_key].get("derived", {}).get("formula", "unknown")
                 return (derived_value, f"derived:{formula}")
 
         return (None, None)
@@ -648,7 +617,7 @@ class CanonicalKeyMapper:
         tag_values: Optional[Dict[str, float]] = None,
         sector: Optional[str] = None,
         fiscal_year: Optional[int] = None,
-        fiscal_period: Optional[str] = None
+        fiscal_period: Optional[str] = None,
     ) -> Dict[str, Tuple[Optional[float], Optional[str]]]:
         """
         Extract multiple canonical keys with automatic derivation
@@ -680,7 +649,7 @@ class CanonicalKeyMapper:
                 sector=sector,
                 fiscal_year=fiscal_year,
                 fiscal_period=fiscal_period,
-                existing_values=values_dict
+                existing_values=values_dict,
             )
 
             results[canonical_key] = (value, source)
@@ -692,17 +661,13 @@ class CanonicalKeyMapper:
             if results[canonical_key][0] is None:  # Not extracted in Pass 1
                 derived_value = self.calculate_derived_value(canonical_key, values_dict)
                 if derived_value is not None:
-                    formula = self.mappings.get(canonical_key, {}).get('derived', {}).get('formula', 'unknown')
+                    formula = self.mappings.get(canonical_key, {}).get("derived", {}).get("formula", "unknown")
                     results[canonical_key] = (derived_value, f"derived:{formula}")
                     values_dict[canonical_key] = derived_value
 
         return results
 
-    def is_metric_excluded(
-        self,
-        canonical_key: str,
-        sector: Optional[str] = None
-    ) -> bool:
+    def is_metric_excluded(self, canonical_key: str, sector: Optional[str] = None) -> bool:
         """
         Check if a metric should be excluded for a given sector
 
@@ -717,14 +682,12 @@ class CanonicalKeyMapper:
             return False
 
         sector_config = self.sector_mappings.get(sector, {})
-        excluded_metrics = sector_config.get('excluded_metrics', [])
+        excluded_metrics = sector_config.get("excluded_metrics", [])
 
         return canonical_key in excluded_metrics
 
     def is_ratio_excluded(
-        self,
-        ratio_name: str,
-        sector: Optional[str] = None
+        self, ratio_name: str, sector: Optional[str] = None
     ) -> Tuple[bool, Optional[str], Optional[List[str]]]:
         """
         Check if a ratio should be excluded for a given sector
@@ -743,22 +706,18 @@ class CanonicalKeyMapper:
             return (False, None, None)
 
         sector_config = self.sector_mappings.get(sector, {})
-        excluded_ratios = sector_config.get('excluded_ratios', {})
+        excluded_ratios = sector_config.get("excluded_ratios", {})
 
         if ratio_name not in excluded_ratios:
             return (False, None, None)
 
         exclusion_config = excluded_ratios[ratio_name]
-        reason = exclusion_config.get('reason')
-        alternatives = exclusion_config.get('alternative_metrics', [])
+        reason = exclusion_config.get("reason")
+        alternatives = exclusion_config.get("alternative_metrics", [])
 
         return (True, reason, alternatives)
 
-    def get_sector_specific_metrics(
-        self,
-        sector: Optional[str] = None,
-        industry: Optional[str] = None
-    ) -> List[str]:
+    def get_sector_specific_metrics(self, sector: Optional[str] = None, industry: Optional[str] = None) -> List[str]:
         """
         Get sector/industry-specific metrics that should be included in analysis
 
@@ -773,20 +732,16 @@ class CanonicalKeyMapper:
             return []
 
         sector_config = self.sector_mappings.get(sector, {})
-        sector_metrics = sector_config.get('sector_specific_metrics', {})
+        sector_metrics = sector_config.get("sector_specific_metrics", {})
 
         # Try industry-specific first
         if industry and industry in sector_metrics:
             return sector_metrics[industry]
 
         # Fall back to sector default
-        return sector_metrics.get('_default', [])
+        return sector_metrics.get("_default", [])
 
-    def get_all_tags_for_extraction(
-        self,
-        canonical_keys: List[str],
-        sector: Optional[str] = None
-    ) -> List[str]:
+    def get_all_tags_for_extraction(self, canonical_keys: List[str], sector: Optional[str] = None) -> List[str]:
         """
         Get unique list of ALL tags needed for a set of canonical keys
 
@@ -809,17 +764,19 @@ class CanonicalKeyMapper:
 
     def get_stats(self) -> Dict:
         """Get extraction statistics"""
-        total = self.stats['extractions'] + self.stats['failures']
-        success_rate = (self.stats['extractions'] / total * 100) if total > 0 else 0
-        fallback_rate = (self.stats['fallbacks_used'] / self.stats['extractions'] * 100) if self.stats['extractions'] > 0 else 0
+        total = self.stats["extractions"] + self.stats["failures"]
+        success_rate = (self.stats["extractions"] / total * 100) if total > 0 else 0
+        fallback_rate = (
+            (self.stats["fallbacks_used"] / self.stats["extractions"] * 100) if self.stats["extractions"] > 0 else 0
+        )
 
         return {
-            'total_extractions': total,
-            'successful': self.stats['extractions'],
-            'failed': self.stats['failures'],
-            'success_rate': f"{success_rate:.1f}%",
-            'fallbacks_used': self.stats['fallbacks_used'],
-            'fallback_rate': f"{fallback_rate:.1f}%",
+            "total_extractions": total,
+            "successful": self.stats["extractions"],
+            "failed": self.stats["failures"],
+            "success_rate": f"{success_rate:.1f}%",
+            "fallbacks_used": self.stats["fallbacks_used"],
+            "fallback_rate": f"{fallback_rate:.1f}%",
         }
 
 
@@ -828,8 +785,7 @@ _canonical_mapper = None
 
 
 def get_canonical_mapper(
-    mappings_path: Optional[str] = None,
-    sector_mappings_path: Optional[str] = None
+    mappings_path: Optional[str] = None, sector_mappings_path: Optional[str] = None
 ) -> CanonicalKeyMapper:
     """
     Get singleton CanonicalKeyMapper instance

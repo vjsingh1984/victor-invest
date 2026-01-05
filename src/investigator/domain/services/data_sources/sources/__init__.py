@@ -9,8 +9,6 @@ Each source follows SOLID principles:
 - Dependency Inversion: Depend on abstractions
 """
 
-from .fred import FredMacroSource
-from .treasury import TreasuryYieldSource
 from .cboe import CBOEVolatilitySource
 from .fed_districts import (
     AtlantaFedSource,
@@ -22,16 +20,18 @@ from .fed_districts import (
     PhiladelphiaFedSource,
     RichmondFedSource,
 )
+from .fred import FredMacroSource
+from .market import (
+    PriceHistorySource,
+    ShortInterestSource,
+    TechnicalIndicatorSource,
+)
 from .sec import (
     InsiderTransactionSource,
     InstitutionalHoldingsSource,
     SECQuarterlySource,
 )
-from .market import (
-    PriceHistorySource,
-    TechnicalIndicatorSource,
-    ShortInterestSource,
-)
+from .treasury import TreasuryYieldSource
 
 __all__ = [
     # FRED

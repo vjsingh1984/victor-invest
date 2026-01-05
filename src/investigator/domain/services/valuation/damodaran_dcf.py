@@ -30,6 +30,10 @@ import random
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from investigator.domain.services.valuation.cost_of_capital import (
+    IndustryCostOfCapital,
+    get_industry_cost_of_capital,
+)
 from investigator.domain.services.valuation.models.base import (
     BaseValuationModel,
     ModelDiagnostics,
@@ -38,10 +42,6 @@ from investigator.domain.services.valuation.models.base import (
     ValuationOutput,
 )
 from investigator.domain.services.valuation.models.company_profile import CompanyProfile
-from investigator.domain.services.valuation.cost_of_capital import (
-    IndustryCostOfCapital,
-    get_industry_cost_of_capital,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DCFPhase:
     """Configuration for a DCF phase."""
+
     name: str
     years: int
     growth_rate_start: float
@@ -60,6 +61,7 @@ class DCFPhase:
 @dataclass
 class DCFProjection:
     """Single year projection in DCF."""
+
     year: int
     phase: str
     revenue: float
@@ -73,6 +75,7 @@ class DCFProjection:
 @dataclass
 class MonteCarloResult:
     """Result of Monte Carlo sensitivity analysis."""
+
     mean_fair_value: float
     median_fair_value: float
     std_dev: float
@@ -105,11 +108,7 @@ class DamodaranDCFModel(BaseValuationModel):
     DEFAULT_TRANSITION_YEARS = 5
     DEFAULT_TERMINAL_GROWTH = 0.025  # 2.5% (long-term GDP)
 
-    def __init__(
-        self,
-        company_profile: CompanyProfile,
-        cost_of_capital: Optional[IndustryCostOfCapital] = None
-    ):
+    def __init__(self, company_profile: CompanyProfile, cost_of_capital: Optional[IndustryCostOfCapital] = None):
         """
         Initialize DCF model.
 
@@ -135,7 +134,7 @@ class DamodaranDCFModel(BaseValuationModel):
         run_monte_carlo: bool = False,
         monte_carlo_iterations: int = 1000,
         current_price: Optional[float] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> ValuationOutput:
         """
         Calculate intrinsic value using 3-stage DCF.
@@ -163,7 +162,7 @@ class DamodaranDCFModel(BaseValuationModel):
             return ModelNotApplicable(
                 model_name=self.model_name,
                 reason="Shares outstanding not available",
-                diagnostics=ModelDiagnostics(flags=["missing_shares"])
+                diagnostics=ModelDiagnostics(flags=["missing_shares"]),
             )
 
         # Determine if we can use FCF directly or need revenue bridge
@@ -173,7 +172,7 @@ class DamodaranDCFModel(BaseValuationModel):
                 return ModelNotApplicable(
                     model_name=self.model_name,
                     reason="Neither positive FCF nor revenue available",
-                    diagnostics=ModelDiagnostics(flags=["missing_fcf_and_revenue"])
+                    diagnostics=ModelDiagnostics(flags=["missing_fcf_and_revenue"]),
                 )
             use_revenue_bridge = True
             logger.info(
@@ -182,16 +181,12 @@ class DamodaranDCFModel(BaseValuationModel):
             )
 
         # Get cost of capital
-        industry = self.company_profile.industry or self.company_profile.sector or 'default'
-        coc_result = self.coc.calculate_wacc(
-            industry=industry,
-            debt_to_equity=debt_to_equity,
-            tax_rate=tax_rate
-        )
+        industry = self.company_profile.industry or self.company_profile.sector or "default"
+        coc_result = self.coc.calculate_wacc(industry=industry, debt_to_equity=debt_to_equity, tax_rate=tax_rate)
 
         # Get terminal growth rate
         if terminal_growth is None:
-            country = kwargs.get('country', 'US')
+            country = kwargs.get("country", "US")
             terminal_growth = self.coc.get_terminal_growth_rate(industry, country)
 
         # Normalize growth rate
@@ -217,7 +212,7 @@ class DamodaranDCFModel(BaseValuationModel):
                 terminal_growth=terminal_growth,
                 high_growth_years=high_growth_years,
                 transition_years=transition_years,
-                shares_outstanding=shares_outstanding
+                shares_outstanding=shares_outstanding,
             )
         else:
             result = self._calculate_fcf_dcf(
@@ -228,14 +223,14 @@ class DamodaranDCFModel(BaseValuationModel):
                 terminal_growth=terminal_growth,
                 high_growth_years=high_growth_years,
                 transition_years=transition_years,
-                shares_outstanding=shares_outstanding
+                shares_outstanding=shares_outstanding,
             )
 
         if result is None:
             return ModelNotApplicable(
                 model_name=self.model_name,
                 reason="DCF calculation failed",
-                diagnostics=ModelDiagnostics(flags=["calculation_error"])
+                diagnostics=ModelDiagnostics(flags=["calculation_error"]),
             )
 
         fair_value, projections, enterprise_value, terminal_value = result
@@ -255,7 +250,7 @@ class DamodaranDCFModel(BaseValuationModel):
                 transition_years=transition_years,
                 terminal_growth=terminal_growth,
                 iterations=monte_carlo_iterations,
-                use_revenue_bridge=use_revenue_bridge
+                use_revenue_bridge=use_revenue_bridge,
             )
 
         # Calculate upside/downside
@@ -265,47 +260,44 @@ class DamodaranDCFModel(BaseValuationModel):
 
         # Estimate confidence
         confidence = self._calculate_confidence(
-            use_revenue_bridge=use_revenue_bridge,
-            growth_rate=growth_rate,
-            fcf_margin=margin,
-            monte_carlo=monte_carlo
+            use_revenue_bridge=use_revenue_bridge, growth_rate=growth_rate, fcf_margin=margin, monte_carlo=monte_carlo
         )
 
         # Build assumptions
         assumptions = {
-            'wacc': coc_result.wacc,
-            'cost_of_equity': coc_result.cost_of_equity,
-            'levered_beta': coc_result.levered_beta,
-            'unlevered_beta': coc_result.unlevered_beta,
-            'risk_free_rate': coc_result.risk_free_rate,
-            'high_growth_years': high_growth_years,
-            'transition_years': transition_years,
-            'terminal_growth': terminal_growth,
-            'high_growth_rate': growth_rate,
-            'fcf_margin': margin,
-            'use_revenue_bridge': use_revenue_bridge,
+            "wacc": coc_result.wacc,
+            "cost_of_equity": coc_result.cost_of_equity,
+            "levered_beta": coc_result.levered_beta,
+            "unlevered_beta": coc_result.unlevered_beta,
+            "risk_free_rate": coc_result.risk_free_rate,
+            "high_growth_years": high_growth_years,
+            "transition_years": transition_years,
+            "terminal_growth": terminal_growth,
+            "high_growth_rate": growth_rate,
+            "fcf_margin": margin,
+            "use_revenue_bridge": use_revenue_bridge,
         }
 
         # Build metadata
         metadata = {
-            'enterprise_value': enterprise_value,
-            'terminal_value': terminal_value,
-            'terminal_value_pct_of_ev': terminal_value / enterprise_value * 100 if enterprise_value > 0 else 0,
-            'projection_summary': self._summarize_projections(projections),
+            "enterprise_value": enterprise_value,
+            "terminal_value": terminal_value,
+            "terminal_value_pct_of_ev": terminal_value / enterprise_value * 100 if enterprise_value > 0 else 0,
+            "projection_summary": self._summarize_projections(projections),
         }
 
         if monte_carlo:
-            metadata['monte_carlo'] = {
-                'mean': monte_carlo.mean_fair_value,
-                'median': monte_carlo.median_fair_value,
-                'std_dev': monte_carlo.std_dev,
-                'range_10_90': (monte_carlo.percentile_10, monte_carlo.percentile_90),
-                'iterations': monte_carlo.iterations,
+            metadata["monte_carlo"] = {
+                "mean": monte_carlo.mean_fair_value,
+                "median": monte_carlo.median_fair_value,
+                "std_dev": monte_carlo.std_dev,
+                "range_10_90": (monte_carlo.percentile_10, monte_carlo.percentile_90),
+                "iterations": monte_carlo.iterations,
             }
 
         if upside_potential is not None:
-            metadata['upside_potential_pct'] = upside_potential
-            metadata['current_price'] = current_price
+            metadata["upside_potential_pct"] = upside_potential
+            metadata["current_price"] = current_price
 
         logger.info(
             f"[{self.company_profile.symbol}] Damodaran DCF: "
@@ -321,18 +313,18 @@ class DamodaranDCFModel(BaseValuationModel):
             assumptions=assumptions,
             diagnostics=ModelDiagnostics(
                 data_quality_score=0.8 if not use_revenue_bridge else 0.6,
-                flags=["revenue_bridge"] if use_revenue_bridge else []
+                flags=["revenue_bridge"] if use_revenue_bridge else [],
             ),
-            metadata=metadata
+            metadata=metadata,
         )
 
     def estimate_confidence(self, raw_output: Dict[str, Any]) -> float:
         """Estimate confidence for DCF model."""
         return self._calculate_confidence(
-            use_revenue_bridge=raw_output.get('use_revenue_bridge', False),
-            growth_rate=raw_output.get('high_growth_rate', 0.10),
-            fcf_margin=raw_output.get('fcf_margin', 0.15),
-            monte_carlo=None
+            use_revenue_bridge=raw_output.get("use_revenue_bridge", False),
+            growth_rate=raw_output.get("high_growth_rate", 0.10),
+            fcf_margin=raw_output.get("fcf_margin", 0.15),
+            monte_carlo=None,
         )
 
     def _calculate_fcf_dcf(
@@ -344,7 +336,7 @@ class DamodaranDCFModel(BaseValuationModel):
         terminal_growth: float,
         high_growth_years: int,
         transition_years: int,
-        shares_outstanding: float
+        shares_outstanding: float,
     ) -> Optional[Tuple[float, List[DCFProjection], float, float]]:
         """Calculate DCF using FCF projections."""
         projections = []
@@ -360,16 +352,18 @@ class DamodaranDCFModel(BaseValuationModel):
             pv = fcf * discount_factor
             pv_sum += pv
 
-            projections.append(DCFProjection(
-                year=year,
-                phase='high_growth',
-                revenue=0,  # Not tracked in FCF approach
-                growth_rate=growth_rate,
-                fcf=fcf,
-                fcf_margin=fcf_margin,
-                discount_factor=discount_factor,
-                present_value=pv
-            ))
+            projections.append(
+                DCFProjection(
+                    year=year,
+                    phase="high_growth",
+                    revenue=0,  # Not tracked in FCF approach
+                    growth_rate=growth_rate,
+                    fcf=fcf,
+                    fcf_margin=fcf_margin,
+                    discount_factor=discount_factor,
+                    present_value=pv,
+                )
+            )
 
         # Phase 2: Transition
         for i in range(transition_years):
@@ -383,16 +377,18 @@ class DamodaranDCFModel(BaseValuationModel):
             pv = fcf * discount_factor
             pv_sum += pv
 
-            projections.append(DCFProjection(
-                year=year,
-                phase='transition',
-                revenue=0,
-                growth_rate=current_growth,
-                fcf=fcf,
-                fcf_margin=fcf_margin,
-                discount_factor=discount_factor,
-                present_value=pv
-            ))
+            projections.append(
+                DCFProjection(
+                    year=year,
+                    phase="transition",
+                    revenue=0,
+                    growth_rate=current_growth,
+                    fcf=fcf,
+                    fcf_margin=fcf_margin,
+                    discount_factor=discount_factor,
+                    present_value=pv,
+                )
+            )
 
         # Terminal Value (Gordon Growth Model)
         terminal_fcf = fcf * (1 + terminal_growth)
@@ -416,7 +412,7 @@ class DamodaranDCFModel(BaseValuationModel):
         terminal_growth: float,
         high_growth_years: int,
         transition_years: int,
-        shares_outstanding: float
+        shares_outstanding: float,
     ) -> Optional[Tuple[float, List[DCFProjection], float, float]]:
         """
         Calculate DCF using revenue bridge for negative FCF companies.
@@ -446,16 +442,18 @@ class DamodaranDCFModel(BaseValuationModel):
             pv = fcf * discount_factor
             pv_sum += pv
 
-            projections.append(DCFProjection(
-                year=year,
-                phase='high_growth',
-                revenue=revenue,
-                growth_rate=growth_rate,
-                fcf=fcf,
-                fcf_margin=margin,
-                discount_factor=discount_factor,
-                present_value=pv
-            ))
+            projections.append(
+                DCFProjection(
+                    year=year,
+                    phase="high_growth",
+                    revenue=revenue,
+                    growth_rate=growth_rate,
+                    fcf=fcf,
+                    fcf_margin=margin,
+                    discount_factor=discount_factor,
+                    present_value=pv,
+                )
+            )
 
         # Phase 2: Transition
         for i in range(transition_years):
@@ -470,16 +468,18 @@ class DamodaranDCFModel(BaseValuationModel):
             pv = fcf * discount_factor
             pv_sum += pv
 
-            projections.append(DCFProjection(
-                year=year,
-                phase='transition',
-                revenue=revenue,
-                growth_rate=current_growth,
-                fcf=fcf,
-                fcf_margin=target_fcf_margin,
-                discount_factor=discount_factor,
-                present_value=pv
-            ))
+            projections.append(
+                DCFProjection(
+                    year=year,
+                    phase="transition",
+                    revenue=revenue,
+                    growth_rate=current_growth,
+                    fcf=fcf,
+                    fcf_margin=target_fcf_margin,
+                    discount_factor=discount_factor,
+                    present_value=pv,
+                )
+            )
 
         # Terminal Value
         terminal_revenue = revenue * (1 + terminal_growth)
@@ -508,7 +508,7 @@ class DamodaranDCFModel(BaseValuationModel):
         transition_years: int,
         terminal_growth: float,
         iterations: int,
-        use_revenue_bridge: bool
+        use_revenue_bridge: bool,
     ) -> MonteCarloResult:
         """Run Monte Carlo sensitivity analysis."""
         fair_values = []
@@ -517,7 +517,7 @@ class DamodaranDCFModel(BaseValuationModel):
             # Random variation in key inputs (normal distribution)
             growth_var = random.gauss(0, 0.03)  # ±3% std dev
             margin_var = random.gauss(0, 0.02)  # ±2% std dev
-            wacc_var = random.gauss(0, 0.01)    # ±1% std dev
+            wacc_var = random.gauss(0, 0.01)  # ±1% std dev
 
             sim_growth = max(0, growth_rate + growth_var)
             sim_margin = max(0.01, fcf_margin + margin_var)
@@ -532,7 +532,7 @@ class DamodaranDCFModel(BaseValuationModel):
                     terminal_growth=terminal_growth,
                     high_growth_years=high_growth_years,
                     transition_years=transition_years,
-                    shares_outstanding=shares_outstanding
+                    shares_outstanding=shares_outstanding,
                 )
             else:
                 result = self._calculate_fcf_dcf(
@@ -543,7 +543,7 @@ class DamodaranDCFModel(BaseValuationModel):
                     terminal_growth=terminal_growth,
                     high_growth_years=high_growth_years,
                     transition_years=transition_years,
-                    shares_outstanding=shares_outstanding
+                    shares_outstanding=shares_outstanding,
                 )
 
             if result:
@@ -558,7 +558,7 @@ class DamodaranDCFModel(BaseValuationModel):
                 percentile_25=base_fair_value,
                 percentile_75=base_fair_value,
                 percentile_90=base_fair_value,
-                iterations=0
+                iterations=0,
             )
 
         fair_values.sort()
@@ -567,7 +567,7 @@ class DamodaranDCFModel(BaseValuationModel):
         mean_fv = sum(fair_values) / n
         median_fv = fair_values[n // 2]
         variance = sum((v - mean_fv) ** 2 for v in fair_values) / n
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         return MonteCarloResult(
             mean_fair_value=mean_fv,
@@ -577,34 +577,27 @@ class DamodaranDCFModel(BaseValuationModel):
             percentile_25=fair_values[int(n * 0.25)],
             percentile_75=fair_values[int(n * 0.75)],
             percentile_90=fair_values[int(n * 0.90)],
-            iterations=n
+            iterations=n,
         )
 
-    def _summarize_projections(
-        self,
-        projections: List[DCFProjection]
-    ) -> Dict[str, Any]:
+    def _summarize_projections(self, projections: List[DCFProjection]) -> Dict[str, Any]:
         """Summarize projections for metadata."""
         if not projections:
             return {}
 
-        high_growth = [p for p in projections if p.phase == 'high_growth']
-        transition = [p for p in projections if p.phase == 'transition']
+        high_growth = [p for p in projections if p.phase == "high_growth"]
+        transition = [p for p in projections if p.phase == "transition"]
 
         return {
-            'total_years': len(projections),
-            'high_growth_years': len(high_growth),
-            'transition_years': len(transition),
-            'final_fcf': projections[-1].fcf if projections else 0,
-            'total_pv_of_fcf': sum(p.present_value for p in projections),
+            "total_years": len(projections),
+            "high_growth_years": len(high_growth),
+            "transition_years": len(transition),
+            "final_fcf": projections[-1].fcf if projections else 0,
+            "total_pv_of_fcf": sum(p.present_value for p in projections),
         }
 
     def _calculate_confidence(
-        self,
-        use_revenue_bridge: bool,
-        growth_rate: float,
-        fcf_margin: float,
-        monte_carlo: Optional[MonteCarloResult]
+        self, use_revenue_bridge: bool, growth_rate: float, fcf_margin: float, monte_carlo: Optional[MonteCarloResult]
     ) -> float:
         """Calculate confidence score for DCF."""
         base = 0.70

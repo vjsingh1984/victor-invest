@@ -30,17 +30,17 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from investigator.domain.services.rl.models import ValuationContext, GrowthStage, CompanySize
-from investigator.domain.services.rl.policy.base import RLPolicy, VALUATION_MODELS
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
 from investigator.domain.services.rl.industry_weights import (
-    IndustryCategory,
     INDUSTRY_PROFILES,
+    IndustryCategory,
     classify_industry,
+    get_industry_holding_period,
     get_industry_profile,
     get_industry_weights,
-    get_industry_holding_period,
 )
+from investigator.domain.services.rl.models import CompanySize, GrowthStage, ValuationContext
+from investigator.domain.services.rl.policy.base import VALUATION_MODELS, RLPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -177,8 +177,14 @@ class FundamentalRLPolicy(RLPolicy):
 
         # Total features: fundamentals + sector + stage + size + industry + volatility + orientation + flags
         self.n_features = (
-            self.n_fundamental + self.n_sectors + self.n_stages + self.n_sizes +
-            self.n_industries + self.n_volatility + self.n_orientation + self.n_industry_flags
+            self.n_fundamental
+            + self.n_sectors
+            + self.n_stages
+            + self.n_sizes
+            + self.n_industries
+            + self.n_volatility
+            + self.n_orientation
+            + self.n_industry_flags
         )
 
         self.n_models = len(VALUATION_MODELS)
@@ -196,25 +202,15 @@ class FundamentalRLPolicy(RLPolicy):
         # Bayesian parameters for model weight adjustments
         # Each model has its own weight adjustment learned
         self.weight_mu = np.zeros((self.n_models, self.n_features))
-        self.weight_Lambda = np.array([
-            np.eye(self.n_features) / prior_variance
-            for _ in range(self.n_models)
-        ])
-        self.weight_Sigma = np.array([
-            np.eye(self.n_features) * prior_variance
-            for _ in range(self.n_models)
-        ])
+        self.weight_Lambda = np.array([np.eye(self.n_features) / prior_variance for _ in range(self.n_models)])
+        self.weight_Sigma = np.array([np.eye(self.n_features) * prior_variance for _ in range(self.n_models)])
 
         # Bayesian parameters for holding period
         self.holding_mu = np.zeros((self.n_holding_periods, self.n_features))
-        self.holding_Lambda = np.array([
-            np.eye(self.n_features) / prior_variance
-            for _ in range(self.n_holding_periods)
-        ])
-        self.holding_Sigma = np.array([
-            np.eye(self.n_features) * prior_variance
-            for _ in range(self.n_holding_periods)
-        ])
+        self.holding_Lambda = np.array(
+            [np.eye(self.n_features) / prior_variance for _ in range(self.n_holding_periods)]
+        )
+        self.holding_Sigma = np.array([np.eye(self.n_features) * prior_variance for _ in range(self.n_holding_periods)])
 
         # Statistics tracking
         self.model_update_counts = np.zeros(self.n_models)
@@ -232,19 +228,21 @@ class FundamentalRLPolicy(RLPolicy):
         """Extract fundamental features from context including industry-level granularity."""
         if isinstance(context, dict):
             # Fundamental features
-            fundamental = np.array([
-                context.get("profitability_score", 0.5),
-                context.get("pe_level", 0.5),
-                context.get("revenue_growth", 0.0),
-                context.get("fcf_margin", 0.0),
-                context.get("rule_of_40_score", 0.0),
-                context.get("payout_ratio", 0.0),
-                context.get("debt_to_equity", 0.0),
-                context.get("gross_margin", 0.0),
-                context.get("operating_margin", 0.0),
-                context.get("data_quality_score", 50.0) / 100.0,
-                min(context.get("quarters_available", 0) / 20.0, 1.0),
-            ])
+            fundamental = np.array(
+                [
+                    context.get("profitability_score", 0.5),
+                    context.get("pe_level", 0.5),
+                    context.get("revenue_growth", 0.0),
+                    context.get("fcf_margin", 0.0),
+                    context.get("rule_of_40_score", 0.0),
+                    context.get("payout_ratio", 0.0),
+                    context.get("debt_to_equity", 0.0),
+                    context.get("gross_margin", 0.0),
+                    context.get("operating_margin", 0.0),
+                    context.get("data_quality_score", 50.0) / 100.0,
+                    min(context.get("quarters_available", 0) / 20.0, 1.0),
+                ]
+            )
             sector = context.get("sector", "Unknown")
             industry = context.get("industry", "Unknown")
             stage = context.get("growth_stage", "mature")
@@ -254,19 +252,21 @@ class FundamentalRLPolicy(RLPolicy):
             if hasattr(size, "value"):
                 size = size.value
         else:
-            fundamental = np.array([
-                context.profitability_score,
-                context.pe_level,
-                context.revenue_growth,
-                context.fcf_margin,
-                context.rule_of_40_score,
-                context.payout_ratio,
-                context.debt_to_equity,
-                context.gross_margin,
-                context.operating_margin,
-                context.data_quality_score / 100.0,
-                min(context.quarters_available / 20.0, 1.0),
-            ])
+            fundamental = np.array(
+                [
+                    context.profitability_score,
+                    context.pe_level,
+                    context.revenue_growth,
+                    context.fcf_margin,
+                    context.rule_of_40_score,
+                    context.payout_ratio,
+                    context.debt_to_equity,
+                    context.gross_margin,
+                    context.operating_margin,
+                    context.data_quality_score / 100.0,
+                    min(context.quarters_available / 20.0, 1.0),
+                ]
+            )
             sector = context.sector
             industry = getattr(context, "industry", "Unknown")
             stage = context.growth_stage.value if hasattr(context.growth_stage, "value") else context.growth_stage
@@ -312,10 +312,12 @@ class FundamentalRLPolicy(RLPolicy):
                 orientation_onehot[ORIENTATION_TYPES.index(industry_profile.orientation)] = 1.0
 
             # Binary flags
-            industry_flags = np.array([
-                1.0 if industry_profile.cyclical else 0.0,
-                1.0 if industry_category != IndustryCategory.UNKNOWN else 0.0,  # is_known_industry
-            ])
+            industry_flags = np.array(
+                [
+                    1.0 if industry_profile.cyclical else 0.0,
+                    1.0 if industry_category != IndustryCategory.UNKNOWN else 0.0,  # is_known_industry
+                ]
+            )
 
             base_features.extend([industry_onehot, volatility_onehot, orientation_onehot, industry_flags])
 
@@ -498,8 +500,7 @@ class FundamentalRLPolicy(RLPolicy):
                 self.weight_Sigma[i] = np.linalg.inv(self.weight_Lambda[i])
                 self.weight_mu[i] = np.dot(
                     self.weight_Sigma[i],
-                    np.dot(self.weight_Lambda[i], self.weight_mu[i]) +
-                    features * model_reward / self.noise_variance
+                    np.dot(self.weight_Lambda[i], self.weight_mu[i]) + features * model_reward / self.noise_variance,
                 )
 
                 self.model_update_counts[i] += 1
@@ -533,8 +534,8 @@ class FundamentalRLPolicy(RLPolicy):
         self.holding_Sigma[period_idx] = np.linalg.inv(self.holding_Lambda[period_idx])
         self.holding_mu[period_idx] = np.dot(
             self.holding_Sigma[period_idx],
-            np.dot(self.holding_Lambda[period_idx], self.holding_mu[period_idx]) +
-            features * reward / self.noise_variance
+            np.dot(self.holding_Lambda[period_idx], self.holding_mu[period_idx])
+            + features * reward / self.noise_variance,
         )
 
         self.holding_update_counts[period_idx] += 1
@@ -621,11 +622,7 @@ class FundamentalRLPolicy(RLPolicy):
             }
 
         # Get top/bottom performing industries
-        sorted_industries = sorted(
-            industry_stats.items(),
-            key=lambda x: x[1]["avg_reward"],
-            reverse=True
-        )
+        sorted_industries = sorted(industry_stats.items(), key=lambda x: x[1]["avg_reward"], reverse=True)
 
         return {
             "enabled": True,

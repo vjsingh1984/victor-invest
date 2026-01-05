@@ -20,9 +20,14 @@ Updated: 2025-12-29 - Added defense contractor valuation tier (P2-B)
 Updated: 2025-12-30 - Integrated IndustryDatasetRegistry for metrics extraction
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from investigator.domain.services.valuation.insurance_valuation import InsuranceType
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ValuationResult:
     """Result from sector-specific valuation"""
+
     method: str  # e.g., "DCF", "P/BV", "DDM", "ROE_Multiple", "FFO_Multiple"
     fair_value: float
     current_price: float
@@ -49,33 +55,27 @@ class SectorValuationRouter:
     # Sector/industry routing map
     VALUATION_METHODS = {
         # Insurance companies - use P/BV and DDM
-        ('Financials', 'Insurance'): 'insurance',
-
+        ("Financials", "Insurance"): "insurance",
         # Banks - use ROE multiples
-        ('Financials', 'Banks'): 'bank',
-
+        ("Financials", "Banks"): "bank",
         # REITs - use FFO multiples
-        ('Real Estate', 'REITs'): 'reit',
-        ('Real Estate', None): 'reit',  # All Real Estate defaults to REIT
-
+        ("Real Estate", "REITs"): "reit",
+        ("Real Estate", None): "reit",  # All Real Estate defaults to REIT
         # Biotech (pre-revenue) - use pipeline probability-weighted valuation
-        ('Healthcare', 'Biotechnology'): 'biotech',
-        ('Healthcare', 'Biopharmaceuticals'): 'biotech',
-        ('Healthcare', 'Biological Products'): 'biotech',
-
+        ("Healthcare", "Biotechnology"): "biotech",
+        ("Healthcare", "Biopharmaceuticals"): "biotech",
+        ("Healthcare", "Biological Products"): "biotech",
         # Defense Contractors (P2-B) - use backlog-adjusted valuation
-        ('Industrials', 'Aerospace & Defense'): 'defense',
-        ('Industrials', 'Defense'): 'defense',
-        ('Industrials', 'Military/Government Technical'): 'defense',
-        ('Industrials', 'Government Services'): 'defense',
-        ('Industrials', 'Defense Primes'): 'defense',
-        ('Industrials', 'Defense Electronics'): 'defense',
-
+        ("Industrials", "Aerospace & Defense"): "defense",
+        ("Industrials", "Defense"): "defense",
+        ("Industrials", "Military/Government Technical"): "defense",
+        ("Industrials", "Government Services"): "defense",
+        ("Industrials", "Defense Primes"): "defense",
+        ("Industrials", "Defense Electronics"): "defense",
         # Technology - use DCF with high growth
-        ('Technology', None): 'dcf_growth',
-
+        ("Technology", None): "dcf_growth",
         # Default for other sectors
-        ('default', None): 'dcf_standard',
+        ("default", None): "dcf_standard",
     }
 
     def __init__(self):
@@ -89,7 +89,7 @@ class SectorValuationRouter:
         financials: Dict,
         current_price: float,
         database_url: Optional[str] = None,
-        xbrl_data: Optional[Dict] = None
+        xbrl_data: Optional[Dict] = None,
     ) -> ValuationResult:
         """
         Route to appropriate valuation method based on sector/industry
@@ -109,41 +109,36 @@ class SectorValuationRouter:
         # Flexible matching for insurance companies
         # Matches: "Insurance", "Property-Casualty Insurers", "Life Insurance", etc.
         # Database uses "Finance" sector, but some sources use "Financials"
-        is_financial_sector = sector in ('Finance', 'Financials', 'Financial Services')
-        if is_financial_sector and industry and 'insur' in industry.lower():
-            valuation_type = 'insurance'
+        is_financial_sector = sector in ("Finance", "Financials", "Financial Services")
+        if is_financial_sector and industry and "insur" in industry.lower():
+            valuation_type = "insurance"
         # Flexible matching for banks
         # Matches: "Banks", "Commercial Banks", "Regional Banks", etc.
-        elif is_financial_sector and industry and 'bank' in industry.lower():
-            valuation_type = 'bank'
+        elif is_financial_sector and industry and "bank" in industry.lower():
+            valuation_type = "bank"
         # Flexible matching for defense contractors (P2-B)
         # Matches: "Aerospace & Defense", "Defense", "Military/Government Technical", etc.
         elif self._is_defense_industry(industry, sector, symbol):
-            valuation_type = 'defense'
+            valuation_type = "defense"
         # Flexible matching for biotech companies (P2-A)
         # Matches: "Biotechnology", "Biopharmaceuticals", "Biological Products", etc.
         elif self._is_biotech_industry(industry, sector, financials):
-            valuation_type = 'biotech'
+            valuation_type = "biotech"
         # Flexible REIT matching - catches more variations
         # Matches: "REIT", "Real Estate Investment Trust", sector "Real Estate", etc.
         elif self._is_reit(sector, industry):
-            valuation_type = 'reit'
+            valuation_type = "reit"
         # Use exact dictionary matching for other sectors
         else:
             method_key = (sector, industry)
             valuation_type = self.VALUATION_METHODS.get(
-                method_key,
-                self.VALUATION_METHODS.get((sector, None),
-                                          self.VALUATION_METHODS[('default', None)])
+                method_key, self.VALUATION_METHODS.get((sector, None), self.VALUATION_METHODS[("default", None)])
             )
 
-        self.logger.info(
-            f"{symbol} - Routing to {valuation_type} valuation "
-            f"(sector={sector}, industry={industry})"
-        )
+        self.logger.info(f"{symbol} - Routing to {valuation_type} valuation " f"(sector={sector}, industry={industry})")
 
         # Route to appropriate method
-        if valuation_type == 'insurance':
+        if valuation_type == "insurance":
             # P1-B Enhanced: Pass XBRL data for combined ratio extraction
             return self._value_insurance(
                 symbol=symbol,
@@ -151,40 +146,40 @@ class SectorValuationRouter:
                 current_price=current_price,
                 database_url=database_url,
                 xbrl_data=xbrl_data,
-                industry=industry
+                industry=industry,
             )
-        elif valuation_type == 'bank':
+        elif valuation_type == "bank":
             return self._value_bank(symbol, financials, current_price)
-        elif valuation_type == 'reit':
+        elif valuation_type == "reit":
             # Extract company_name from financials if available
-            company_name = financials.get('company_name') or financials.get('entityName')
+            company_name = financials.get("company_name") or financials.get("entityName")
             return self._value_reit(
                 symbol=symbol,
                 financials=financials,
                 current_price=current_price,
                 company_name=company_name,
-                industry=industry
+                industry=industry,
             )
-        elif valuation_type == 'biotech':
+        elif valuation_type == "biotech":
             # P2-A: Pre-revenue biotech pipeline valuation
-            company_name = financials.get('company_name') or financials.get('entityName')
-            pipeline = financials.get('pipeline', [])  # Pipeline data if available
+            company_name = financials.get("company_name") or financials.get("entityName")
+            pipeline = financials.get("pipeline", [])  # Pipeline data if available
             return self._value_biotech(
                 symbol=symbol,
                 financials=financials,
                 current_price=current_price,
                 company_name=company_name,
                 industry=industry,
-                pipeline=pipeline
+                pipeline=pipeline,
             )
-        elif valuation_type == 'defense':
+        elif valuation_type == "defense":
             # P2-B: Defense contractor backlog-adjusted valuation
             return self._value_defense_contractor(
                 symbol=symbol,
                 financials=financials,
                 current_price=current_price,
                 xbrl_data=xbrl_data,
-                industry=industry
+                industry=industry,
             )
         else:
             # For non-special sectors (including dcf_growth, dcf_standard), return None
@@ -198,7 +193,7 @@ class SectorValuationRouter:
         current_price: float,
         database_url: Optional[str] = None,
         xbrl_data: Optional[Dict] = None,
-        industry: Optional[str] = None
+        industry: Optional[str] = None,
     ) -> ValuationResult:
         """
         Value insurance company using Price-to-Book (P/BV) method
@@ -212,8 +207,8 @@ class SectorValuationRouter:
         instead of using net margin as a proxy.
         """
         from investigator.domain.services.valuation.insurance_valuation import (
-            value_insurance_company,
             InsuranceType,
+            value_insurance_company,
         )
 
         # Detect insurance type from industry string
@@ -226,10 +221,10 @@ class SectorValuationRouter:
                 current_price=current_price,
                 database_url=database_url,
                 xbrl_data=xbrl_data,
-                insurance_type=insurance_type
+                insurance_type=insurance_type,
             )
 
-            upside = ((result['fair_value'] - current_price) / current_price) * 100
+            upside = ((result["fair_value"] - current_price) / current_price) * 100
 
             # Build method string with insurance type if known
             if insurance_type != InsuranceType.UNKNOWN:
@@ -239,35 +234,35 @@ class SectorValuationRouter:
 
             # Build enhanced details including P1-B combined ratio metrics
             details = {
-                'book_value_per_share': result.get('book_value_per_share'),
-                'target_pb_ratio': result.get('target_pb_ratio'),
-                'current_pb_ratio': result.get('current_pb_ratio'),
-                'roe': result.get('roe'),
-                'net_margin': result.get('net_margin'),
+                "book_value_per_share": result.get("book_value_per_share"),
+                "target_pb_ratio": result.get("target_pb_ratio"),
+                "current_pb_ratio": result.get("current_pb_ratio"),
+                "roe": result.get("roe"),
+                "net_margin": result.get("net_margin"),
                 # P1-B Enhanced: Actual combined ratio from XBRL
-                'combined_ratio': result.get('combined_ratio'),
-                'loss_ratio': result.get('loss_ratio'),
-                'expense_ratio': result.get('expense_ratio'),
-                'underwriting_quality': result.get('underwriting_quality'),
-                'underwriting_description': result.get('underwriting_description'),
-                'insurance_type': result.get('insurance_type'),
-                'target_combined_ratio': result.get('target_combined_ratio'),
+                "combined_ratio": result.get("combined_ratio"),
+                "loss_ratio": result.get("loss_ratio"),
+                "expense_ratio": result.get("expense_ratio"),
+                "underwriting_quality": result.get("underwriting_quality"),
+                "underwriting_description": result.get("underwriting_description"),
+                "insurance_type": result.get("insurance_type"),
+                "target_combined_ratio": result.get("target_combined_ratio"),
             }
 
             return ValuationResult(
                 method=method,
-                fair_value=result['fair_value'],
+                fair_value=result["fair_value"],
                 current_price=current_price,
                 upside_percent=upside,
-                confidence=result.get('confidence', 'medium'),
+                confidence=result.get("confidence", "medium"),
                 details=details,
-                warnings=result.get('warnings', [])
+                warnings=result.get("warnings", []),
             )
         except Exception as e:
             self.logger.warning(f"{symbol} - Insurance valuation failed: {e}")
             raise
 
-    def _detect_insurance_type(self, industry: Optional[str]) -> 'InsuranceType':
+    def _detect_insurance_type(self, industry: Optional[str]) -> "InsuranceType":
         """
         Detect insurance type from industry string.
 
@@ -285,45 +280,43 @@ class SectorValuationRouter:
         industry_lower = industry.lower()
 
         # Property & Casualty patterns
-        if any(pattern in industry_lower for pattern in [
-            'property', 'casualty', 'p&c', 'p/c', 'property-casualty',
-            'auto insur', 'home insur', 'workers comp'
-        ]):
+        if any(
+            pattern in industry_lower
+            for pattern in [
+                "property",
+                "casualty",
+                "p&c",
+                "p/c",
+                "property-casualty",
+                "auto insur",
+                "home insur",
+                "workers comp",
+            ]
+        ):
             return InsuranceType.PROPERTY_CASUALTY
 
         # Life insurance patterns
-        if any(pattern in industry_lower for pattern in [
-            'life insur', 'life & health', 'annuity', 'life insurance'
-        ]):
+        if any(pattern in industry_lower for pattern in ["life insur", "life & health", "annuity", "life insurance"]):
             return InsuranceType.LIFE
 
         # Health insurance patterns
-        if any(pattern in industry_lower for pattern in [
-            'health insur', 'health care insur', 'managed care',
-            'health maintenance', 'hmo', 'ppo'
-        ]):
+        if any(
+            pattern in industry_lower
+            for pattern in ["health insur", "health care insur", "managed care", "health maintenance", "hmo", "ppo"]
+        ):
             return InsuranceType.HEALTH
 
         # Reinsurance patterns
-        if any(pattern in industry_lower for pattern in [
-            'reinsur', 're-insur', 'reinsurance'
-        ]):
+        if any(pattern in industry_lower for pattern in ["reinsur", "re-insur", "reinsurance"]):
             return InsuranceType.REINSURANCE
 
         # Multi-line patterns
-        if any(pattern in industry_lower for pattern in [
-            'multi-line', 'multiline', 'diversified insur'
-        ]):
+        if any(pattern in industry_lower for pattern in ["multi-line", "multiline", "diversified insur"]):
             return InsuranceType.MULTI_LINE
 
         return InsuranceType.UNKNOWN
 
-    def _value_bank(
-        self,
-        symbol: str,
-        financials: Dict,
-        current_price: float
-    ) -> ValuationResult:
+    def _value_bank(self, symbol: str, financials: Dict, current_price: float) -> ValuationResult:
         """
         Value bank using ROE multiples method
 
@@ -336,9 +329,9 @@ class SectorValuationRouter:
 
         try:
             # Extract key metrics
-            stockholders_equity = financials.get('stockholders_equity', 0)
-            net_income = financials.get('net_income', 0)
-            shares_outstanding = financials.get('shares_outstanding', 0)
+            stockholders_equity = financials.get("stockholders_equity", 0)
+            net_income = financials.get("net_income", 0)
+            shares_outstanding = financials.get("shares_outstanding", 0)
 
             if not all([stockholders_equity, net_income, shares_outstanding]):
                 raise ValueError("Missing required metrics for bank valuation")
@@ -378,12 +371,12 @@ class SectorValuationRouter:
                 upside_percent=upside,
                 confidence=confidence,
                 details={
-                    'roe': roe,
-                    'book_value_per_share': book_value_per_share,
-                    'target_pb_ratio': target_pb,
-                    'current_pb_ratio': current_price / book_value_per_share if book_value_per_share > 0 else 0,
+                    "roe": roe,
+                    "book_value_per_share": book_value_per_share,
+                    "target_pb_ratio": target_pb,
+                    "current_pb_ratio": current_price / book_value_per_share if book_value_per_share > 0 else 0,
                 },
-                warnings=warnings
+                warnings=warnings,
             )
 
         except Exception as e:
@@ -396,7 +389,7 @@ class SectorValuationRouter:
         financials: Dict,
         current_price: float,
         company_name: Optional[str] = None,
-        industry: Optional[str] = None
+        industry: Optional[str] = None,
     ) -> ValuationResult:
         """
         Value REIT using property-type-specific FFO multiples with rate adjustment.
@@ -418,8 +411,8 @@ class SectorValuationRouter:
         - Lower yields = higher multiples
         """
         from investigator.domain.services.valuation.reit_valuation import (
-            value_reit,
             REITValuationResult,
+            value_reit,
         )
 
         try:
@@ -430,7 +423,7 @@ class SectorValuationRouter:
                 current_price=current_price,
                 company_name=company_name,
                 industry=industry,
-                use_rate_adjustment=True
+                use_rate_adjustment=True,
             )
 
             upside = ((reit_result.fair_value - current_price) / current_price) * 100
@@ -458,29 +451,24 @@ class SectorValuationRouter:
                 upside_percent=upside,
                 confidence=confidence,
                 details={
-                    'ffo_per_share': reit_result.ffo_per_share,
-                    'base_ffo_multiple': reit_result.base_ffo_multiple,
-                    'adjusted_ffo_multiple': reit_result.adjusted_ffo_multiple,
-                    'property_type': reit_result.property_type.value,
-                    'property_type_confidence': reit_result.property_type_confidence,
-                    'detection_method': reit_result.detection_method,
-                    'current_10yr_yield': reit_result.current_10yr_yield,
-                    'rate_adjustment': reit_result.rate_adjustment,
-                    'current_ffo_yield': (reit_result.ffo_per_share / current_price * 100) if current_price > 0 else 0,
+                    "ffo_per_share": reit_result.ffo_per_share,
+                    "base_ffo_multiple": reit_result.base_ffo_multiple,
+                    "adjusted_ffo_multiple": reit_result.adjusted_ffo_multiple,
+                    "property_type": reit_result.property_type.value,
+                    "property_type_confidence": reit_result.property_type_confidence,
+                    "detection_method": reit_result.detection_method,
+                    "current_10yr_yield": reit_result.current_10yr_yield,
+                    "rate_adjustment": reit_result.rate_adjustment,
+                    "current_ffo_yield": (reit_result.ffo_per_share / current_price * 100) if current_price > 0 else 0,
                 },
-                warnings=reit_result.warnings
+                warnings=reit_result.warnings,
             )
 
         except Exception as e:
             self.logger.warning(f"{symbol} - REIT valuation failed: {e}")
             raise
 
-    def _is_biotech_industry(
-        self,
-        industry: Optional[str],
-        sector: Optional[str],
-        financials: Dict
-    ) -> bool:
+    def _is_biotech_industry(self, industry: Optional[str], sector: Optional[str], financials: Dict) -> bool:
         """
         Determine if company should use biotech pre-revenue valuation.
 
@@ -504,8 +492,8 @@ class SectorValuationRouter:
             return False
 
         # Get revenue from financials
-        revenue = financials.get('revenue', 0) or financials.get('total_revenue', 0)
-        company_name = financials.get('company_name') or financials.get('entityName')
+        revenue = financials.get("revenue", 0) or financials.get("total_revenue", 0)
+        company_name = financials.get("company_name") or financials.get("entityName")
 
         is_biotech, reason = is_pre_revenue_biotech(
             industry=industry,
@@ -526,7 +514,7 @@ class SectorValuationRouter:
         current_price: float,
         company_name: Optional[str] = None,
         industry: Optional[str] = None,
-        pipeline: Optional[list] = None
+        pipeline: Optional[list] = None,
     ) -> ValuationResult:
         """
         Value pre-revenue biotech using pipeline probability-weighted valuation.
@@ -553,8 +541,8 @@ class SectorValuationRouter:
             ValuationResult with fair value and details
         """
         from investigator.domain.services.valuation.biotech_valuation import (
-            value_biotech,
             BiotechValuationResult,
+            value_biotech,
         )
 
         try:
@@ -592,31 +580,26 @@ class SectorValuationRouter:
                 upside_percent=upside,
                 confidence=confidence,
                 details={
-                    'pipeline_value': result.pipeline_value,
-                    'cash_value': result.cash_value,
-                    'total_enterprise_value': result.total_enterprise_value,
-                    'cash_runway_months': result.cash_runway.months,
-                    'cash_runway_risk': result.cash_runway.risk.value,
-                    'cash_runway_description': result.cash_runway.risk_description,
-                    'dilution_warning': result.cash_runway.dilution_warning,
-                    'pipeline_drugs_count': len(result.pipeline_details.drug_values),
-                    'probability_weighted_sales': result.pipeline_details.probability_weighted_sales,
-                    'methodology': result.methodology,
-                    'drug_details': result.pipeline_details.drug_values,
+                    "pipeline_value": result.pipeline_value,
+                    "cash_value": result.cash_value,
+                    "total_enterprise_value": result.total_enterprise_value,
+                    "cash_runway_months": result.cash_runway.months,
+                    "cash_runway_risk": result.cash_runway.risk.value,
+                    "cash_runway_description": result.cash_runway.risk_description,
+                    "dilution_warning": result.cash_runway.dilution_warning,
+                    "pipeline_drugs_count": len(result.pipeline_details.drug_values),
+                    "probability_weighted_sales": result.pipeline_details.probability_weighted_sales,
+                    "methodology": result.methodology,
+                    "drug_details": result.pipeline_details.drug_values,
                 },
-                warnings=result.warnings
+                warnings=result.warnings,
             )
 
         except Exception as e:
             self.logger.warning(f"{symbol} - Biotech valuation failed: {e}")
             raise
 
-    def _is_defense_industry(
-        self,
-        industry: Optional[str],
-        sector: Optional[str],
-        symbol: str
-    ) -> bool:
+    def _is_defense_industry(self, industry: Optional[str], sector: Optional[str], symbol: str) -> bool:
         """
         Determine if company should use defense contractor valuation.
 
@@ -650,11 +633,7 @@ class SectorValuationRouter:
 
         return classification.is_defense_contractor
 
-    def _is_reit(
-        self,
-        sector: Optional[str],
-        industry: Optional[str]
-    ) -> bool:
+    def _is_reit(self, sector: Optional[str], industry: Optional[str]) -> bool:
         """
         Determine if company should use REIT valuation.
 
@@ -683,7 +662,7 @@ class SectorValuationRouter:
         # Check if industry contains REIT-related keywords
         if industry:
             industry_lower = industry.lower()
-            reit_keywords = ['reit', 'real estate investment trust']
+            reit_keywords = ["reit", "real estate investment trust"]
             if any(kw in industry_lower for kw in reit_keywords):
                 self.logger.debug(f"REIT detected via industry keyword: {industry}")
                 return True
@@ -725,18 +704,16 @@ class SectorValuationRouter:
             ValuationResult with fair value and details
         """
         from investigator.domain.services.valuation.defense_valuation import (
-            value_defense_contractor,
             DefenseValuationResult,
-            get_defense_tier_weights,
             classify_defense_contractor,
+            get_defense_tier_weights,
+            value_defense_contractor,
         )
 
         try:
             # First, we need a base fair value from standard models
             # For now, use a simple EV/EBITDA approach as the base
-            base_fair_value = self._calculate_defense_base_value(
-                symbol, financials, current_price
-            )
+            base_fair_value = self._calculate_defense_base_value(symbol, financials, current_price)
 
             # Apply defense-specific adjustments
             result: DefenseValuationResult = value_defense_contractor(
@@ -751,19 +728,19 @@ class SectorValuationRouter:
             upside = ((result.fair_value - current_price) / current_price) * 100
 
             # Build method string
-            contractor_type = result.contractor_type.value.replace('_', ' ').title()
+            contractor_type = result.contractor_type.value.replace("_", " ").title()
             method = f"EV/EBITDA+Backlog (Defense - {contractor_type})"
 
             # Build details
             details = {
-                'base_fair_value': result.base_fair_value,
-                'backlog_premium': result.backlog_premium,
-                'contract_mix_adjustment': result.contract_mix_adjustment,
-                'total_backlog': result.total_backlog,
-                'backlog_ratio': result.backlog_ratio,
-                'backlog_value_npv': result.backlog_value,
-                'contractor_type': result.contractor_type.value,
-                'tier_weights': get_defense_tier_weights(),
+                "base_fair_value": result.base_fair_value,
+                "backlog_premium": result.backlog_premium,
+                "contract_mix_adjustment": result.contract_mix_adjustment,
+                "total_backlog": result.total_backlog,
+                "backlog_ratio": result.backlog_ratio,
+                "backlog_value_npv": result.backlog_value,
+                "contractor_type": result.contractor_type.value,
+                "tier_weights": get_defense_tier_weights(),
             }
 
             backlog_str = f"backlog_ratio={result.backlog_ratio:.2f}x" if result.backlog_ratio else "backlog_ratio=N/A"
@@ -782,19 +759,14 @@ class SectorValuationRouter:
                 upside_percent=upside,
                 confidence=result.confidence,
                 details=details,
-                warnings=result.warnings
+                warnings=result.warnings,
             )
 
         except Exception as e:
             self.logger.warning(f"{symbol} - Defense contractor valuation failed: {e}")
             raise
 
-    def _calculate_defense_base_value(
-        self,
-        symbol: str,
-        financials: Dict,
-        current_price: float
-    ) -> float:
+    def _calculate_defense_base_value(self, symbol: str, financials: Dict, current_price: float) -> float:
         """
         Calculate base fair value for defense contractor using EV/EBITDA.
 
@@ -814,22 +786,21 @@ class SectorValuationRouter:
             Base fair value per share
         """
         # Extract key metrics
-        ebitda = financials.get('ebitda', 0) or financials.get('operating_income', 0)
-        total_debt = financials.get('total_debt', 0) or financials.get('long_term_debt', 0)
-        cash = financials.get('cash_and_equivalents', 0) or financials.get('cash', 0)
-        shares_outstanding = financials.get('shares_outstanding', 0)
+        ebitda = financials.get("ebitda", 0) or financials.get("operating_income", 0)
+        total_debt = financials.get("total_debt", 0) or financials.get("long_term_debt", 0)
+        cash = financials.get("cash_and_equivalents", 0) or financials.get("cash", 0)
+        shares_outstanding = financials.get("shares_outstanding", 0)
 
         if not ebitda or not shares_outstanding:
             # Fallback to P/E if EBITDA not available
-            net_income = financials.get('net_income', 0)
+            net_income = financials.get("net_income", 0)
             if net_income and shares_outstanding:
                 eps = net_income / shares_outstanding
                 target_pe = 16.0  # Defense contractors typically trade at 14-18x P/E
                 return eps * target_pe
             else:
                 self.logger.warning(
-                    f"{symbol} - Insufficient data for defense base valuation, "
-                    "using current price as base"
+                    f"{symbol} - Insufficient data for defense base valuation, " "using current price as base"
                 )
                 return current_price
 
@@ -892,10 +863,10 @@ class SectorValuationRouter:
         """
         try:
             from investigator.domain.services.industry_datasets import (
-                extract_industry_metrics,
-                get_valuation_adjustments,
                 apply_adjustments_to_fair_value,
+                extract_industry_metrics,
                 get_industry_summary,
+                get_valuation_adjustments,
             )
 
             # Try to get cached metrics first
@@ -932,8 +903,7 @@ class SectorValuationRouter:
                         result.adjusted_fair_value = result.fair_value * total_factor
                         if result.current_price > 0:
                             result.upside_percent = (
-                                (result.adjusted_fair_value - result.current_price)
-                                / result.current_price
+                                (result.adjusted_fair_value - result.current_price) / result.current_price
                             ) * 100
 
                 return result
@@ -948,9 +918,7 @@ class SectorValuationRouter:
             )
 
             if not metrics:
-                self.logger.debug(
-                    f"{symbol} - No industry-specific metrics available"
-                )
+                self.logger.debug(f"{symbol} - No industry-specific metrics available")
                 return result
 
             # Store metrics in result
@@ -998,10 +966,7 @@ class SectorValuationRouter:
 
                     # Update upside based on adjusted value
                     if result.current_price > 0:
-                        result.upside_percent = (
-                            (adjusted_value - result.current_price)
-                            / result.current_price
-                        ) * 100
+                        result.upside_percent = ((adjusted_value - result.current_price) / result.current_price) * 100
 
                     self.logger.info(
                         f"{symbol} - Applied {len(adjustments)} industry adjustments: "
@@ -1023,14 +988,10 @@ class SectorValuationRouter:
             return result
 
         except ImportError:
-            self.logger.debug(
-                f"{symbol} - IndustryDatasetRegistry not available, skipping enhancement"
-            )
+            self.logger.debug(f"{symbol} - IndustryDatasetRegistry not available, skipping enhancement")
             return result
         except Exception as e:
-            self.logger.warning(
-                f"{symbol} - Failed to enhance with industry metrics: {e}"
-            )
+            self.logger.warning(f"{symbol} - Failed to enhance with industry metrics: {e}")
             return result
 
     def _get_cached_industry_metrics(self, symbol: str):
@@ -1060,14 +1021,10 @@ class SectorValuationRouter:
                 if entry.expires_at:
                     expires_at = datetime.fromisoformat(entry.expires_at)
                     if now > expires_at:
-                        self.logger.debug(
-                            f"{symbol} - Cache expired (expires_at={entry.expires_at})"
-                        )
+                        self.logger.debug(f"{symbol} - Cache expired (expires_at={entry.expires_at})")
                         return None, cache
                 elif age_days > 7:
-                    self.logger.debug(
-                        f"{symbol} - Cache too old ({age_days} days)"
-                    )
+                    self.logger.debug(f"{symbol} - Cache too old ({age_days} days)")
                     return None, cache
 
                 return entry, cache
@@ -1097,6 +1054,7 @@ class SectorValuationRouter:
                 from investigator.infrastructure.cache.industry_metrics_cache import (
                     IndustryMetricsCache,
                 )
+
                 cache = IndustryMetricsCache()
 
             # Get dataset info from metrics
@@ -1121,8 +1079,7 @@ class SectorValuationRouter:
 
             if success:
                 self.logger.info(
-                    f"{symbol} - Cached industry metrics "
-                    f"(quality={metrics.quality.value}, ttl={ttl_days}d)"
+                    f"{symbol} - Cached industry metrics " f"(quality={metrics.quality.value}, ttl={ttl_days}d)"
                 )
 
         except Exception as e:
@@ -1149,6 +1106,7 @@ class SectorValuationRouter:
                 existing = cache.get_industry_benchmarks(industry)
                 if existing:
                     from datetime import datetime, timezone
+
                     cached_at = datetime.fromisoformat(existing.cached_at)
                     age_days = (datetime.now(timezone.utc) - cached_at).days
                     # Only recompute if old or symbol count changed significantly
@@ -1159,8 +1117,7 @@ class SectorValuationRouter:
                 benchmarks = cache.compute_and_cache_industry_benchmarks(industry)
                 if benchmarks:
                     self.logger.info(
-                        f"Updated industry benchmarks for {industry} "
-                        f"({benchmarks.symbol_count} symbols)"
+                        f"Updated industry benchmarks for {industry} " f"({benchmarks.symbol_count} symbols)"
                     )
 
         except Exception as e:
@@ -1246,13 +1203,8 @@ class SectorValuationRouter:
             )
 
         except ImportError:
-            self.logger.debug(
-                f"{symbol} - IndustryDatasetRegistry not available"
-            )
+            self.logger.debug(f"{symbol} - IndustryDatasetRegistry not available")
             return None
         except Exception as e:
-            self.logger.warning(
-                f"{symbol} - Failed to get industry summary: {e}"
-            )
+            self.logger.warning(f"{symbol} - Failed to get industry summary: {e}")
             return None
-

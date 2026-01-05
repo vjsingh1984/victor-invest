@@ -43,10 +43,10 @@ Usage (Single Policy):
 
 from investigator.domain.services.rl.policy.base import RLPolicy
 from investigator.domain.services.rl.policy.contextual_bandit import ContextualBanditPolicy
+from investigator.domain.services.rl.policy.dual_policy import DualRLPolicy, load_dual_policy
+from investigator.domain.services.rl.policy.fundamental_policy import FundamentalRLPolicy
 from investigator.domain.services.rl.policy.hybrid import HybridPolicy
 from investigator.domain.services.rl.policy.technical_policy import TechnicalRLPolicy
-from investigator.domain.services.rl.policy.fundamental_policy import FundamentalRLPolicy
-from investigator.domain.services.rl.policy.dual_policy import DualRLPolicy, load_dual_policy
 
 __all__ = [
     # Base

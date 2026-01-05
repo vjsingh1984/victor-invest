@@ -26,11 +26,12 @@ Tests all compute handlers in investigator.domain.handlers:
 - TechnicalAnalysisHandler
 """
 
-import pytest
-from datetime import date, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any, Dict, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 # Mock victor framework imports for testing without victor-core
@@ -71,18 +72,22 @@ class MockWorkflowContext:
 @pytest.fixture
 def mock_victor_imports():
     """Mock victor framework imports."""
-    with patch.dict('sys.modules', {
-        'victor.workflows.executor': MagicMock(
-            NodeResult=MockNodeResult,
-            NodeStatus=MockNodeStatus,
-        ),
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "victor.workflows.executor": MagicMock(
+                NodeResult=MockNodeResult,
+                NodeStatus=MockNodeStatus,
+            ),
+        },
+    ):
         yield
 
 
 @pytest.fixture
 def mock_metadata_service():
     """Mock SymbolMetadataService."""
+
     @dataclass
     class MockMetadata:
         symbol: str = "AAPL"
@@ -185,11 +190,18 @@ class TestMetadataFetchHandler:
         from investigator.domain.handlers import MetadataFetchHandler
 
         # Patch both the service and the victor imports
-        with patch('investigator.domain.handlers._get_metadata_service', return_value=mock_metadata_service), \
-             patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-                 NodeResult=MockNodeResult,
-                 NodeStatus=MockNodeStatus,
-             )}):
+        with (
+            patch("investigator.domain.handlers._get_metadata_service", return_value=mock_metadata_service),
+            patch.dict(
+                "sys.modules",
+                {
+                    "victor.workflows.executor": MagicMock(
+                        NodeResult=MockNodeResult,
+                        NodeStatus=MockNodeStatus,
+                    )
+                },
+            ),
+        ):
             handler = MetadataFetchHandler()
             node = MockComputeNode(
                 id="fetch_metadata",
@@ -209,10 +221,15 @@ class TestMetadataFetchHandler:
         """Test metadata fetch fails with missing symbol."""
         from investigator.domain.handlers import MetadataFetchHandler
 
-        with patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-             NodeResult=MockNodeResult,
-             NodeStatus=MockNodeStatus,
-        )}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "victor.workflows.executor": MagicMock(
+                    NodeResult=MockNodeResult,
+                    NodeStatus=MockNodeStatus,
+                )
+            },
+        ):
             handler = MetadataFetchHandler()
             node = MockComputeNode(
                 id="fetch_metadata",
@@ -235,13 +252,20 @@ class TestPriceDataFetchHandler:
         """Test successful price fetch."""
         from investigator.domain.handlers import PriceDataFetchHandler
 
-        with patch('investigator.domain.handlers._get_price_service', return_value=mock_price_service), \
-             patch('investigator.domain.handlers._get_shares_service', return_value=mock_shares_service), \
-             patch('investigator.domain.handlers._get_metadata_service', return_value=mock_metadata_service), \
-             patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-                 NodeResult=MockNodeResult,
-                 NodeStatus=MockNodeStatus,
-             )}):
+        with (
+            patch("investigator.domain.handlers._get_price_service", return_value=mock_price_service),
+            patch("investigator.domain.handlers._get_shares_service", return_value=mock_shares_service),
+            patch("investigator.domain.handlers._get_metadata_service", return_value=mock_metadata_service),
+            patch.dict(
+                "sys.modules",
+                {
+                    "victor.workflows.executor": MagicMock(
+                        NodeResult=MockNodeResult,
+                        NodeStatus=MockNodeStatus,
+                    )
+                },
+            ),
+        ):
 
             handler = PriceDataFetchHandler()
             node = MockComputeNode(
@@ -271,11 +295,18 @@ class TestSECDataExtractHandler:
         """Test successful SEC data extraction."""
         from investigator.domain.handlers import SECDataExtractHandler
 
-        with patch('investigator.domain.handlers._get_financial_data_service', return_value=mock_financial_service), \
-             patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-                 NodeResult=MockNodeResult,
-                 NodeStatus=MockNodeStatus,
-             )}):
+        with (
+            patch("investigator.domain.handlers._get_financial_data_service", return_value=mock_financial_service),
+            patch.dict(
+                "sys.modules",
+                {
+                    "victor.workflows.executor": MagicMock(
+                        NodeResult=MockNodeResult,
+                        NodeStatus=MockNodeStatus,
+                    )
+                },
+            ),
+        ):
             handler = SECDataExtractHandler()
             node = MockComputeNode(
                 id="fetch_sec_data",
@@ -304,10 +335,15 @@ class TestBlendedValuationHandler:
         """Test successful valuation blending."""
         from investigator.domain.handlers import BlendedValuationHandler
 
-        with patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-             NodeResult=MockNodeResult,
-             NodeStatus=MockNodeStatus,
-        )}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "victor.workflows.executor": MagicMock(
+                    NodeResult=MockNodeResult,
+                    NodeStatus=MockNodeStatus,
+                )
+            },
+        ):
             handler = BlendedValuationHandler()
             node = MockComputeNode(
                 id="blend_valuations",
@@ -341,10 +377,15 @@ class TestBlendedValuationHandler:
         """Test blending with partial weights (some models missing)."""
         from investigator.domain.handlers import BlendedValuationHandler
 
-        with patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-             NodeResult=MockNodeResult,
-             NodeStatus=MockNodeStatus,
-        )}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "victor.workflows.executor": MagicMock(
+                    NodeResult=MockNodeResult,
+                    NodeStatus=MockNodeStatus,
+                )
+            },
+        ):
             handler = BlendedValuationHandler()
             node = MockComputeNode(
                 id="blend_valuations",
@@ -397,7 +438,7 @@ class TestHandlerRegistry:
 
     def test_get_handler(self):
         """Test get_handler function."""
-        from investigator.domain.handlers import get_handler, BlendedValuationHandler
+        from investigator.domain.handlers import BlendedValuationHandler, get_handler
 
         handler = get_handler("blended_valuation")
         assert handler is not None
@@ -421,10 +462,15 @@ class TestContextIntegration:
         """Test handler output is stored in context."""
         from investigator.domain.handlers import BlendedValuationHandler
 
-        with patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-             NodeResult=MockNodeResult,
-             NodeStatus=MockNodeStatus,
-        )}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "victor.workflows.executor": MagicMock(
+                    NodeResult=MockNodeResult,
+                    NodeStatus=MockNodeStatus,
+                )
+            },
+        ):
             handler = BlendedValuationHandler()
             node = MockComputeNode(
                 id="blend",
@@ -448,10 +494,15 @@ class TestContextIntegration:
         """Test handlers can read nested context values."""
         from investigator.domain.handlers import BlendedValuationHandler
 
-        with patch.dict('sys.modules', {'victor.workflows.executor': MagicMock(
-             NodeResult=MockNodeResult,
-             NodeStatus=MockNodeStatus,
-        )}):
+        with patch.dict(
+            "sys.modules",
+            {
+                "victor.workflows.executor": MagicMock(
+                    NodeResult=MockNodeResult,
+                    NodeStatus=MockNodeStatus,
+                )
+            },
+        ):
             handler = BlendedValuationHandler()
             node = MockComputeNode(
                 id="blend",
@@ -461,10 +512,12 @@ class TestContextIntegration:
                 },
                 output_key="result",
             )
-            context = MockWorkflowContext({
-                "valuation_results": {"dcf": {"fair_value": 150.0}},
-                "model_weights": {"dcf": 1.0},
-            })
+            context = MockWorkflowContext(
+                {
+                    "valuation_results": {"dcf": {"fair_value": 150.0}},
+                    "model_weights": {"dcf": 1.0},
+                }
+            )
 
             result = await handler(node, context, None)
 

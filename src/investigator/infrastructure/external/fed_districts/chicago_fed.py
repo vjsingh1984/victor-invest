@@ -50,21 +50,23 @@ NFCI_URL = "https://www.chicagofed.org/~/media/publications/nfci/nfci-data-serie
 
 class EconomicCondition(Enum):
     """Classification of economic conditions from CFNAI."""
-    RECESSION = "recession"                    # MA3 < -0.7
-    CONTRACTION_RISK = "contraction_risk"      # MA3 < -0.35
-    BELOW_TREND = "below_trend"                # MA3 < 0
-    TREND_GROWTH = "trend_growth"              # MA3 0 to 0.35
-    ABOVE_TREND = "above_trend"                # MA3 0.35 to 0.7
-    RECOVERY_END = "recovery_end"              # MA3 > 0.7
+
+    RECESSION = "recession"  # MA3 < -0.7
+    CONTRACTION_RISK = "contraction_risk"  # MA3 < -0.35
+    BELOW_TREND = "below_trend"  # MA3 < 0
+    TREND_GROWTH = "trend_growth"  # MA3 0 to 0.35
+    ABOVE_TREND = "above_trend"  # MA3 0.35 to 0.7
+    RECOVERY_END = "recovery_end"  # MA3 > 0.7
 
 
 class FinancialCondition(Enum):
     """Classification of financial conditions from NFCI."""
-    VERY_LOOSE = "very_loose"        # < -0.5
-    LOOSE = "loose"                  # -0.5 to 0
-    NEUTRAL = "neutral"              # 0 to 0.5
-    TIGHT = "tight"                  # 0.5 to 1.0
-    VERY_TIGHT = "very_tight"        # > 1.0
+
+    VERY_LOOSE = "very_loose"  # < -0.5
+    LOOSE = "loose"  # -0.5 to 0
+    NEUTRAL = "neutral"  # 0 to 0.5
+    TIGHT = "tight"  # 0.5 to 1.0
+    VERY_TIGHT = "very_tight"  # > 1.0
 
 
 @dataclass
@@ -92,6 +94,7 @@ class CFNAIData:
         condition: Classified economic condition
         recession_probability: Implied recession probability
     """
+
     date: date
     cfnai: float
     cfnai_ma3: float
@@ -132,6 +135,7 @@ class CFNAIData:
         """
         # Logistic approximation
         import math
+
         prob = 1 / (1 + math.exp(-((-self.cfnai_ma3 - 0.3) * 3)))
         return round(prob * 100, 1)
 
@@ -162,6 +166,7 @@ class NFCIData:
         leverage_subindex: Leverage subindex
         condition: Classified financial condition
     """
+
     date: date
     nfci: float
     anfci: Optional[float] = None
@@ -216,6 +221,7 @@ class ChicagoFedClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()
@@ -249,6 +255,7 @@ class ChicagoFedClient:
         """Parse CFNAI data from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -269,12 +276,12 @@ class ChicagoFedClient:
                         return col
                 return None
 
-            cfnai_col = find_col(['cfnai']) or df.columns[1]
-            ma3_col = find_col(['ma3']) or find_col(['moving'])
-            prod_col = find_col(['production'])
-            emp_col = find_col(['employ'])
-            cons_col = find_col(['consumption']) or find_col(['housing'])
-            sales_col = find_col(['sales']) or find_col(['orders'])
+            cfnai_col = find_col(["cfnai"]) or df.columns[1]
+            ma3_col = find_col(["ma3"]) or find_col(["moving"])
+            prod_col = find_col(["production"])
+            emp_col = find_col(["employ"])
+            cons_col = find_col(["consumption"]) or find_col(["housing"])
+            sales_col = find_col(["sales"]) or find_col(["orders"])
 
             cfnai = float(latest[cfnai_col])
             cfnai_ma3 = float(latest[ma3_col]) if ma3_col else cfnai  # Fallback to current
@@ -315,6 +322,7 @@ class ChicagoFedClient:
         """Parse NFCI data from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -335,11 +343,11 @@ class ChicagoFedClient:
                         return col
                 return None
 
-            nfci_col = find_col(['nfci']) or df.columns[1]
-            anfci_col = find_col(['anfci']) or find_col(['adjusted'])
-            risk_col = find_col(['risk'])
-            credit_col = find_col(['credit'])
-            leverage_col = find_col(['leverage'])
+            nfci_col = find_col(["nfci"]) or df.columns[1]
+            anfci_col = find_col(["anfci"]) or find_col(["adjusted"])
+            risk_col = find_col(["risk"])
+            credit_col = find_col(["credit"])
+            leverage_col = find_col(["leverage"])
 
             return NFCIData(
                 date=obs_date,

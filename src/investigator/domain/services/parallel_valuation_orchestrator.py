@@ -13,12 +13,12 @@ Author: Claude Code
 
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from investigator.domain.services.terminal_growth_calculator import TerminalGrowthCalculator
-from investigator.domain.services.valuation_framework_planner import ValuationFrameworkPlanner, FrameworkConfig
+from investigator.domain.services.valuation_framework_planner import FrameworkConfig, ValuationFrameworkPlanner
 
 logger = logging.getLogger(__name__)
 

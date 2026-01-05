@@ -44,19 +44,24 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 # Philadelphia Fed data URLs
-MANUFACTURING_URL = "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/mbos/historical-data/bos_historical_data.xlsx"
+MANUFACTURING_URL = (
+    "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/mbos/historical-data/bos_historical_data.xlsx"
+)
 LEADING_INDEX_URL = "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/sli/sli_historical_data.xlsx"
-COINCIDENT_INDEX_URL = "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/sci/sci_historical_data.xlsx"
+COINCIDENT_INDEX_URL = (
+    "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/sci/sci_historical_data.xlsx"
+)
 ADS_URL = "https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/ads/ads_index.xlsx"
 
 
 class ManufacturingOutlook(Enum):
     """Classification of manufacturing activity."""
+
     STRONG_CONTRACTION = "strong_contraction"  # < -20
-    CONTRACTION = "contraction"                # -20 to 0
-    WEAK_EXPANSION = "weak_expansion"          # 0 to 10
+    CONTRACTION = "contraction"  # -20 to 0
+    WEAK_EXPANSION = "weak_expansion"  # 0 to 10
     MODERATE_EXPANSION = "moderate_expansion"  # 10 to 25
-    STRONG_EXPANSION = "strong_expansion"      # > 25
+    STRONG_EXPANSION = "strong_expansion"  # > 25
 
 
 @dataclass
@@ -81,6 +86,7 @@ class ManufacturingSurvey:
         future_capex: Expected capital expenditures
         outlook: Classified activity level
     """
+
     date: date
     diffusion_index: float
     new_orders: Optional[float] = None
@@ -139,6 +145,7 @@ class LeadingIndex:
         six_month_change: Change over 6 months
         interpretation: Text interpretation
     """
+
     date: date
     state: str
     leading_index: float
@@ -172,6 +179,7 @@ class CoincidentIndex:
         three_month_change: 3-month change (annualized)
         twelve_month_change: Year-over-year change
     """
+
     date: date
     state: str
     coincident_index: float
@@ -197,6 +205,7 @@ class ADSIndex:
         ads_index: ADS index value
         interpretation: Text interpretation
     """
+
     date: date
     ads_index: float
 
@@ -237,6 +246,7 @@ class PhiladelphiaFedClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()
@@ -270,6 +280,7 @@ class PhiladelphiaFedClient:
         """Parse manufacturing survey from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -290,12 +301,12 @@ class PhiladelphiaFedClient:
                         return col
                 return None
 
-            diffusion_col = find_col(['diffusion']) or find_col(['index']) or df.columns[1]
-            orders_col = find_col(['new', 'order'])
-            ship_col = find_col(['shipment'])
-            emp_col = find_col(['employment'])
-            prices_paid_col = find_col(['prices', 'paid'])
-            future_col = find_col(['future', 'activity']) or find_col(['6', 'month'])
+            diffusion_col = find_col(["diffusion"]) or find_col(["index"]) or df.columns[1]
+            orders_col = find_col(["new", "order"])
+            ship_col = find_col(["shipment"])
+            emp_col = find_col(["employment"])
+            prices_paid_col = find_col(["prices", "paid"])
+            future_col = find_col(["future", "activity"]) or find_col(["6", "month"])
 
             return ManufacturingSurvey(
                 date=obs_date,
@@ -336,6 +347,7 @@ class PhiladelphiaFedClient:
         """Parse leading index from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -402,6 +414,7 @@ class PhiladelphiaFedClient:
         """Parse coincident index from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -433,7 +446,9 @@ class PhiladelphiaFedClient:
                 state=state.upper(),
                 coincident_index=value,
                 one_month_change=value - float(prev[state_col]) if prev is not None else None,
-                three_month_change=(value - float(three_month_ago[state_col])) * 4 if three_month_ago is not None else None,
+                three_month_change=(
+                    (value - float(three_month_ago[state_col])) * 4 if three_month_ago is not None else None
+                ),
                 twelve_month_change=value - float(year_ago[state_col]) if year_ago is not None else None,
             )
         except Exception as e:
@@ -463,6 +478,7 @@ class PhiladelphiaFedClient:
         """Parse ADS index from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)

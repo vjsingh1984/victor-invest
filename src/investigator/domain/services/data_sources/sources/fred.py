@@ -5,14 +5,11 @@ Provides access to 800,000+ economic time series from the St. Louis Fed.
 Free API with 120 requests/minute limit.
 """
 
+import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
-import logging
 
-from ..base import (
-    MacroDataSource, DataResult, SourceMetadata,
-    DataCategory, DataFrequency, DataQuality
-)
+from ..base import DataCategory, DataFrequency, DataQuality, DataResult, MacroDataSource, SourceMetadata
 from ..registry import register_source
 
 logger = logging.getLogger(__name__)
@@ -119,16 +116,19 @@ class FredMacroSource(MacroDataSource):
 
         try:
             from victor.config.api_keys import get_secret
+
             return get_secret("fred")
         except Exception:
             import os
+
             return os.environ.get("FRED_API_KEY", "")
 
     def _fetch_impl(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
         """Fetch all FRED series"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             data = {}
@@ -139,15 +139,17 @@ class FredMacroSource(MacroDataSource):
                     category_data = {}
                     for series_id, description in series_dict.items():
                         result = conn.execute(
-                            text("""
+                            text(
+                                """
                                 SELECT v.value, v.date
                                 FROM macro_indicator_values v
                                 JOIN macro_indicators i ON v.indicator_id = i.id
                                 WHERE i.series_id = :series_id
                                 ORDER BY v.date DESC
                                 LIMIT 1
-                            """),
-                            {"series_id": series_id}
+                            """
+                            ),
+                            {"series_id": series_id},
                         )
                         row = result.fetchone()
                         if row:
@@ -208,15 +210,13 @@ class FredMacroSource(MacroDataSource):
         return derived
 
     def fetch_series(
-        self,
-        series_id: str,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None
+        self, series_id: str, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> DataResult:
         """Fetch a specific FRED series"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
 

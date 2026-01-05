@@ -21,16 +21,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
 from investigator.domain.services.rl.models import (
-    TrainingMetrics,
     EvaluationMetrics,
+    TrainingMetrics,
 )
 from investigator.domain.services.rl.policy.base import RLPolicy, UniformPolicy
 from investigator.domain.services.rl.policy.contextual_bandit import ContextualBanditPolicy
 from investigator.domain.services.rl.policy.hybrid import HybridPolicy
 from investigator.domain.services.rl.training.experience_collector import ExperienceCollector
 from investigator.domain.services.rl.training.trainer import RLTrainer
-from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
 
 logger = logging.getLogger(__name__)
 

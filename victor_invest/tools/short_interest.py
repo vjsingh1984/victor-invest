@@ -110,6 +110,7 @@ Investment Signals:
             # Initialize DataSourceManager for unified data access
             try:
                 from investigator.domain.services.data_sources.manager import DataSourceManager
+
                 self._data_source_manager = DataSourceManager()
                 logger.debug("DataSourceManager initialized for short interest")
             except ImportError as e:
@@ -125,12 +126,13 @@ Investment Signals:
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "current",
         symbol: Optional[str] = None,
         periods: int = 12,
         days: int = 30,
         limit: int = 20,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute short interest query.
 
@@ -180,15 +182,13 @@ Investment Signals:
 
             else:
                 return ToolResult.error_result(
-                    f"Unknown action: {action}. Valid actions: "
-                    "current, history, volume, squeeze, most_shorted"
+                    f"Unknown action: {action}. Valid actions: " "current, history, volume, squeeze, most_shorted"
                 )
 
         except Exception as e:
             logger.error(f"ShortInterestTool execute error: {e}")
             return ToolResult.error_result(
-                f"Short interest query failed: {str(e)}",
-                metadata={"action": action, "symbol": symbol}
+                f"Short interest query failed: {str(e)}", metadata={"action": action, "symbol": symbol}
             )
 
     async def _get_current(self, symbol: str) -> ToolResult:
@@ -225,7 +225,7 @@ Investment Signals:
                     "symbol": symbol.upper(),
                     "message": "No short interest data found",
                 },
-                warnings=["No FINRA short interest data available for this symbol"]
+                warnings=["No FINRA short interest data available for this symbol"],
             )
 
         # Calculate signal
@@ -239,7 +239,7 @@ Investment Signals:
             metadata={
                 "source": source,
                 "signal_level": signal["level"],
-            }
+            },
         )
 
     async def _get_history(self, symbol: str, periods: int) -> ToolResult:
@@ -253,7 +253,7 @@ Investment Signals:
                     "history": [],
                     "message": "No historical short interest data found",
                 },
-                warnings=["Insufficient historical data for this symbol"]
+                warnings=["Insufficient historical data for this symbol"],
             )
 
         # Calculate trend
@@ -269,7 +269,7 @@ Investment Signals:
             metadata={
                 "source": "finra",
                 "trend": trend["direction"],
-            }
+            },
         )
 
     async def _get_volume(self, symbol: str, days: int) -> ToolResult:
@@ -283,7 +283,7 @@ Investment Signals:
                     "volume": [],
                     "message": "No short volume data found",
                 },
-                warnings=["No daily short volume data available for this symbol"]
+                warnings=["No daily short volume data available for this symbol"],
             )
 
         # Calculate average short volume ratio
@@ -299,7 +299,7 @@ Investment Signals:
             metadata={
                 "source": "finra",
                 "total_days": len(volume),
-            }
+            },
         )
 
     async def _get_squeeze_risk(self, symbol: str) -> ToolResult:
@@ -311,7 +311,7 @@ Investment Signals:
             metadata={
                 "source": "finra",
                 "risk_level": risk.risk_level,
-            }
+            },
         )
 
     async def _get_most_shorted(self, limit: int) -> ToolResult:
@@ -333,7 +333,7 @@ Investment Signals:
             },
             metadata={
                 "source": "finra",
-            }
+            },
         )
 
     def _convert_consolidated_to_data(self, symbol: str, current: Dict[str, Any]):
@@ -346,10 +346,11 @@ Investment Signals:
         Returns:
             ShortInterestData object compatible with existing signal calculation
         """
+        from datetime import date as dt_date
+
         from investigator.infrastructure.external.finra.short_interest import (
             ShortInterestData,
         )
-        from datetime import date as dt_date
 
         # Parse settlement date
         settlement_date = dt_date.today()
@@ -368,7 +369,9 @@ Investment Signals:
             short_interest=int(current.get("short_interest", 0) or 0),
             avg_daily_volume=int(current.get("avg_volume", 0) or 0),
             days_to_cover=float(current.get("days_to_cover", 0.0) or 0.0),
-            short_percent_float=float(current.get("short_pct_float") or 0.0) if current.get("short_pct_float") else None,
+            short_percent_float=(
+                float(current.get("short_pct_float") or 0.0) if current.get("short_pct_float") else None
+            ),
             short_percent_outstanding=None,  # Not available from DataSourceManager
             previous_short_interest=None,  # Not available from DataSourceManager
             change_from_previous=None,
@@ -446,19 +449,14 @@ Investment Signals:
             )
         elif signal["level"] == "covering":
             signal["interpretation"] = (
-                "Active short covering in progress. "
-                "Could support near-term price appreciation."
+                "Active short covering in progress. " "Could support near-term price appreciation."
             )
         elif signal["level"] == "increasing_short":
             signal["interpretation"] = (
-                "Short interest increasing rapidly. "
-                "Bears are building positions - watch for fundamental concerns."
+                "Short interest increasing rapidly. " "Bears are building positions - watch for fundamental concerns."
             )
         else:
-            signal["interpretation"] = (
-                "Normal short interest levels. "
-                "No significant short-driven dynamics expected."
-            )
+            signal["interpretation"] = "Normal short interest levels. " "No significant short-driven dynamics expected."
 
         return signal
 
@@ -518,8 +516,7 @@ Investment Signals:
         elif avg_change < -5:
             direction = "decreasing"
             interpretation = (
-                f"Short interest steadily decreasing ({avg_change:+.1f}% avg per period). "
-                f"Bears reducing positions."
+                f"Short interest steadily decreasing ({avg_change:+.1f}% avg per period). " f"Bears reducing positions."
             )
         else:
             direction = "stable"
@@ -546,27 +543,16 @@ Investment Signals:
                     "type": "string",
                     "enum": ["current", "history", "volume", "squeeze", "most_shorted"],
                     "description": "Type of short interest query",
-                    "default": "current"
+                    "default": "current",
                 },
-                "symbol": {
-                    "type": "string",
-                    "description": "Stock ticker symbol"
-                },
+                "symbol": {"type": "string", "description": "Stock ticker symbol"},
                 "periods": {
                     "type": "integer",
                     "description": "Number of bi-monthly periods for history",
-                    "default": 12
+                    "default": 12,
                 },
-                "days": {
-                    "type": "integer",
-                    "description": "Number of trading days for volume",
-                    "default": 30
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Number of stocks for most_shorted",
-                    "default": 20
-                }
+                "days": {"type": "integer", "description": "Number of trading days for volume", "default": 30},
+                "limit": {"type": "integer", "description": "Number of stocks for most_shorted", "default": 20},
             },
-            "required": []
+            "required": [],
         }

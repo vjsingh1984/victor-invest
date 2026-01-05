@@ -16,8 +16,12 @@ from investigator.domain.services.valuation.models.base import (
     ModelNotApplicable,
     ValuationModelResult,
 )
-from investigator.domain.services.valuation.models.company_profile import CompanyArchetype, CompanyProfile, DataQualityFlag
 from investigator.domain.services.valuation.models.common import baseline_multiple_context, clamp
+from investigator.domain.services.valuation.models.company_profile import (
+    CompanyArchetype,
+    CompanyProfile,
+    DataQualityFlag,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +99,7 @@ class PBMultipleModel(BaseValuationModel):
     def estimate_confidence(self, raw_output: Dict[str, Any]) -> float:
         diagnostics = self._build_diagnostics(target_multiple=raw_output.get("target_pb"))
         return clamp(
-            0.5 * diagnostics.data_quality_score
-            + 0.35 * diagnostics.fit_score
-            + 0.15 * diagnostics.calibration_score,
+            0.5 * diagnostics.data_quality_score + 0.35 * diagnostics.fit_score + 0.15 * diagnostics.calibration_score,
             0.0,
             1.0,
         )
@@ -114,7 +116,9 @@ class PBMultipleModel(BaseValuationModel):
             # Financials rely heavily on P/B; allow tangible book to influence if available
             if self.tangible_book_value_per_share and self.book_value_per_share:
                 tangible_ratio = self.tangible_book_value_per_share / self.book_value_per_share
-                candidates.append(clamp(self.sector_median_pb * tangible_ratio if self.sector_median_pb else tangible_ratio, 0.2, 2.0))
+                candidates.append(
+                    clamp(self.sector_median_pb * tangible_ratio if self.sector_median_pb else tangible_ratio, 0.2, 2.0)
+                )
         if not candidates:
             return None
         target = sum(candidates) / len(candidates)

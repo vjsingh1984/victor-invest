@@ -42,7 +42,7 @@ class DataQualityFlag(Enum):
     INCOMPLETE_DIVIDEND_HISTORY = auto()
 
 
-@dataclass(slots=True)
+@dataclass
 class CompanyProfile:
     """
     Classification snapshot for a company.

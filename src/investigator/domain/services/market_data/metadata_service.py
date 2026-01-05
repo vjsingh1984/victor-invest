@@ -71,16 +71,22 @@ class SymbolMetadataService:
 
     def __init__(
         self,
-        stock_db_url: str = "postgresql://stockuser:${STOCK_DB_PASSWORD}@${STOCK_DB_HOST}:5432/stock",
+        stock_db_url: str = None,
         cache_ttl_seconds: int = 3600,
     ):
         """
         Initialize SymbolMetadataService.
 
         Args:
-            stock_db_url: Connection string for stock database
+            stock_db_url: Connection string for stock database.
+                         If None, builds from environment variables.
             cache_ttl_seconds: Cache time-to-live in seconds (default: 1 hour)
         """
+        from investigator.domain.services.market_data import get_stock_db_url
+
+        if stock_db_url is None:
+            stock_db_url = get_stock_db_url()
+
         self.stock_engine = create_engine(
             stock_db_url,
             pool_size=5,

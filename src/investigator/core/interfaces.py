@@ -8,11 +8,11 @@ Design Pattern Interfaces and Abstract Classes
 Defines the contracts for the OOP-based fundamental analysis system
 """
 
+import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any, Protocol
 from dataclasses import dataclass
 from enum import Enum
-import logging
+from typing import Any, Dict, List, Optional, Protocol
 
 # ============================================================================
 # Data Models

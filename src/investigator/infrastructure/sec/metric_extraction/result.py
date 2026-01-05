@@ -17,27 +17,30 @@ from typing import Any, Dict, List, Optional
 
 class MatchMethod(Enum):
     """How a period match was achieved."""
-    BY_PERIOD_END = "by_period_end"          # Exact end date match (most reliable)
-    BY_DATE_RANGE = "by_date_range"          # Start/end date range match
-    BY_FRAME_FIELD = "by_frame_field"        # CY2024Q3 frame field match
-    BY_ADSH_FY_FP = "by_adsh_fy_fp"          # Legacy ADSH + fy + fp match
-    BY_ADSH_ONLY = "by_adsh_only"            # ADSH match without fy/fp filter
-    DERIVED = "derived"                       # Calculated from other metrics
-    NOT_FOUND = "not_found"                   # No match found
+
+    BY_PERIOD_END = "by_period_end"  # Exact end date match (most reliable)
+    BY_DATE_RANGE = "by_date_range"  # Start/end date range match
+    BY_FRAME_FIELD = "by_frame_field"  # CY2024Q3 frame field match
+    BY_ADSH_FY_FP = "by_adsh_fy_fp"  # Legacy ADSH + fy + fp match
+    BY_ADSH_ONLY = "by_adsh_only"  # ADSH match without fy/fp filter
+    DERIVED = "derived"  # Calculated from other metrics
+    NOT_FOUND = "not_found"  # No match found
 
 
 class ExtractionConfidence(Enum):
     """Confidence level in extracted value."""
-    HIGH = "high"           # Exact match on all criteria
-    MEDIUM = "medium"       # Partial match or fallback tag used
-    LOW = "low"             # Multiple fallbacks or fuzzy match
-    DERIVED = "derived"     # Value was calculated, not extracted
-    NONE = "none"           # No value found
+
+    HIGH = "high"  # Exact match on all criteria
+    MEDIUM = "medium"  # Partial match or fallback tag used
+    LOW = "low"  # Multiple fallbacks or fuzzy match
+    DERIVED = "derived"  # Value was calculated, not extracted
+    NONE = "none"  # No value found
 
 
 @dataclass
 class ExtractionAttempt:
     """Record of a single extraction attempt."""
+
     strategy_name: str
     tag_name: str
     matched: bool
@@ -55,6 +58,7 @@ class ExtractionAudit:
     Provides full traceability of which strategies and tags were tried,
     enabling debugging and quality assessment.
     """
+
     canonical_key: str
     target_period_end: Optional[str] = None
     target_fiscal_year: Optional[int] = None
@@ -112,6 +116,7 @@ class ExtractionResult:
         audit: Complete extraction audit trail
         error: Error message if extraction failed
     """
+
     success: bool
     value: Optional[float] = None
     source_tag: Optional[str] = None
@@ -137,18 +142,15 @@ class ExtractionResult:
 
     @classmethod
     def not_found(
-        cls,
-        canonical_key: str,
-        audit: Optional[ExtractionAudit] = None,
-        reason: str = "No matching entry found"
-    ) -> 'ExtractionResult':
+        cls, canonical_key: str, audit: Optional[ExtractionAudit] = None, reason: str = "No matching entry found"
+    ) -> "ExtractionResult":
         """Factory for failed extraction."""
         return cls(
             success=False,
             match_method=MatchMethod.NOT_FOUND,
             confidence=ExtractionConfidence.NONE,
             audit=audit,
-            error=reason
+            error=reason,
         )
 
     @classmethod
@@ -159,18 +161,19 @@ class ExtractionResult:
         entry: Dict,
         match_method: MatchMethod,
         confidence: ExtractionConfidence = ExtractionConfidence.HIGH,
-        audit: Optional[ExtractionAudit] = None
-    ) -> 'ExtractionResult':
+        audit: Optional[ExtractionAudit] = None,
+    ) -> "ExtractionResult":
         """Factory from SEC entry dict."""
         # Calculate duration
         duration_days = None
-        start = entry.get('start')
-        end = entry.get('end')
+        start = entry.get("start")
+        end = entry.get("end")
         if start and end:
             try:
                 from datetime import datetime as dt
-                start_date = dt.strptime(start, '%Y-%m-%d')
-                end_date = dt.strptime(end, '%Y-%m-%d')
+
+                start_date = dt.strptime(start, "%Y-%m-%d")
+                end_date = dt.strptime(end, "%Y-%m-%d")
                 duration_days = (end_date - start_date).days
             except ValueError:
                 pass
@@ -181,26 +184,22 @@ class ExtractionResult:
             source_tag=source_tag,
             match_method=match_method,
             confidence=confidence,
-            period_end=entry.get('end'),
-            period_start=entry.get('start'),
+            period_end=entry.get("end"),
+            period_start=entry.get("start"),
             duration_days=duration_days,
-            form=entry.get('form'),
-            filed_date=entry.get('filed'),
-            accn=entry.get('accn'),
-            sec_fy=entry.get('fy'),
-            sec_fp=entry.get('fp'),
+            form=entry.get("form"),
+            filed_date=entry.get("filed"),
+            accn=entry.get("accn"),
+            sec_fy=entry.get("fy"),
+            sec_fp=entry.get("fp"),
             entry=entry,
-            audit=audit
+            audit=audit,
         )
 
     @classmethod
     def derived(
-        cls,
-        value: float,
-        formula: str,
-        components: Dict[str, float],
-        audit: Optional[ExtractionAudit] = None
-    ) -> 'ExtractionResult':
+        cls, value: float, formula: str, components: Dict[str, float], audit: Optional[ExtractionAudit] = None
+    ) -> "ExtractionResult":
         """Factory for derived/calculated values."""
         return cls(
             success=True,
@@ -208,7 +207,7 @@ class ExtractionResult:
             source_tag=f"derived:{formula}",
             match_method=MatchMethod.DERIVED,
             confidence=ExtractionConfidence.DERIVED,
-            audit=audit
+            audit=audit,
         )
 
     def __repr__(self) -> str:

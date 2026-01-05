@@ -38,8 +38,8 @@ Example:
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from .valuation_config_service import ValuationConfigService
 from .sector_multiples_service import SectorMultiplesService
+from .valuation_config_service import ValuationConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -320,20 +320,52 @@ class FairValueService:
         self,
         fair_values: Dict[str, Optional[float]],
         weights: Dict[str, float],
+        current_price: Optional[float] = None,
+        max_upside_multiple: float = 3.0,
+        min_downside_multiple: float = 0.2,
+        tier: Optional[str] = None,
     ) -> Tuple[float, Dict[str, Any]]:
         """
-        Calculate weighted blended fair value.
+        Calculate weighted blended fair value with sanity checks.
 
         Args:
             fair_values: Dict mapping model name to fair value
             weights: Dict mapping model name to weight (0-100 or 0.0-1.0)
+            current_price: Current stock price for sanity capping (optional)
+            max_upside_multiple: Max fair value as multiple of price (default 3x = 200% upside)
+            min_downside_multiple: Min fair value as multiple of price (default 0.2x = -80%)
+            tier: Optional tier classification for tier-aware capping
 
         Returns:
             Tuple of (blended fair value, audit dict)
         """
+        # Tier-aware upside caps (growth stocks get more leeway)
+        if tier:
+            tier_lower = tier.lower()
+            if any(t in tier_lower for t in ["high_growth", "pre_profit", "early_stage"]):
+                max_upside_multiple = max(max_upside_multiple, 5.0)  # 400% max for growth
+            elif any(t in tier_lower for t in ["mature", "dividend", "stable", "balanced"]):
+                max_upside_multiple = min(max_upside_multiple, 3.0)  # 200% max for mature
+
+        # Special handling for PS model on low-margin businesses
+        # If PS fair value is >10x other models, it's likely a low-margin business
+        # where P/S is not a meaningful metric (e.g., managed care, retail)
+        ps_fv = fair_values.get("ps")
+        other_fvs = [v for k, v in fair_values.items() if k != "ps" and v is not None and v > 0]
+        if ps_fv and other_fvs:
+            median_other = sorted(other_fvs)[len(other_fvs) // 2]
+            if ps_fv > median_other * 5:  # PS is 5x more than median of other models
+                logger.info(
+                    f"PS fair value ${ps_fv:.2f} is 5x+ higher than median of other models "
+                    f"(${median_other:.2f}). Capping PS to 2x median."
+                )
+                fair_values = dict(fair_values)  # Make a copy
+                fair_values["ps"] = median_other * 2  # Cap PS to 2x median
+
         total_weight = 0
         weighted_sum = 0
         models_used = []
+        models_capped = []
 
         # Normalize weights if they sum to 100
         weight_sum = sum(weights.values())
@@ -343,17 +375,38 @@ class FairValueService:
             fair_value = fair_values.get(model)
 
             if fair_value is not None and fair_value > 0 and weight > 0:
+                # Apply sanity cap if current_price is provided
+                original_fv = fair_value
+                if current_price is not None and current_price > 0:
+                    max_fv = current_price * max_upside_multiple
+                    min_fv = current_price * min_downside_multiple
+                    fair_value = max(min_fv, min(fair_value, max_fv))
+                    if fair_value != original_fv:
+                        models_capped.append(
+                            {
+                                "model": model,
+                                "original": original_fv,
+                                "capped": fair_value,
+                            }
+                        )
+                        logger.debug(
+                            f"Capped {model} fair value: ${original_fv:.2f} → ${fair_value:.2f} "
+                            f"(price: ${current_price:.2f}, max: {max_upside_multiple}x)"
+                        )
+
                 # Normalize weight if needed
                 w = weight / 100 if normalize else weight
 
                 weighted_sum += fair_value * w
                 total_weight += w
-                models_used.append({
-                    "model": model,
-                    "fair_value": fair_value,
-                    "weight": w,
-                    "contribution": fair_value * w,
-                })
+                models_used.append(
+                    {
+                        "model": model,
+                        "fair_value": fair_value,
+                        "weight": w,
+                        "contribution": fair_value * w,
+                    }
+                )
 
         if total_weight > 0:
             blended = weighted_sum / total_weight
@@ -365,6 +418,7 @@ class FairValueService:
             "total_weight": total_weight,
             "models_used": models_used,
             "models_skipped": [m for m in weights if fair_values.get(m) is None or fair_values.get(m) <= 0],
+            "models_capped": models_capped,
         }
 
         return blended, audit

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS short_interest (
     avg_daily_volume INTEGER,
     days_to_cover REAL,
     short_interest_ratio REAL,
+    short_percent_float REAL,  -- Short interest as % of float
     shares_outstanding INTEGER,
     squeeze_potential INTEGER DEFAULT 0,
     short_interest_change_pct REAL,
@@ -41,6 +42,8 @@ CREATE TABLE IF NOT EXISTS form4_filings (
     -- Owner information (aligned with data source code expectations)
     owner_name TEXT,  -- Used by insider_transactions data source
     owner_title TEXT,  -- Used by insider_transactions data source
+    reporting_owner_name TEXT,  -- Alternative column name (legacy code)
+    reporting_owner_title TEXT,  -- Alternative column name (legacy code)
     insider_name TEXT,  -- Alternative column name
     insider_title TEXT,  -- Alternative column name
     -- Role flags
@@ -53,6 +56,8 @@ CREATE TABLE IF NOT EXISTS form4_filings (
     price_per_share REAL,
     total_value REAL,
     shares_owned_after REAL,
+    transaction_data TEXT,  -- JSON blob for detailed transaction data
+    is_significant INTEGER DEFAULT 0,  -- Flagged as significant transaction
     -- Filing metadata
     accession_number TEXT,
     form_type TEXT DEFAULT '4',
@@ -130,10 +135,15 @@ CREATE TABLE IF NOT EXISTS form13f_holdings (
     filing_id INTEGER REFERENCES form13f_filings(id),
     symbol TEXT,
     cusip TEXT,
+    issuer_name TEXT,  -- Issuer company name
+    class_title TEXT,  -- Security class (e.g., "COM", "CL A")
     shares INTEGER,
     value_thousands INTEGER,
     put_call TEXT,
     investment_discretion TEXT,
+    -- Denormalized columns for efficient queries
+    filer_cik TEXT,  -- CIK of the filing institution
+    report_date TEXT,  -- Quarter end date
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     UNIQUE (filing_id, cusip)
@@ -141,6 +151,22 @@ CREATE TABLE IF NOT EXISTS form13f_holdings (
 
 CREATE INDEX IF NOT EXISTS idx_13f_holdings_symbol ON form13f_holdings(symbol);
 CREATE INDEX IF NOT EXISTS idx_13f_holdings_filing ON form13f_holdings(filing_id);
+CREATE INDEX IF NOT EXISTS idx_13f_holdings_filer_cik ON form13f_holdings(filer_cik);
+CREATE INDEX IF NOT EXISTS idx_13f_holdings_report_date ON form13f_holdings(report_date DESC);
+
+-- ============================================================================
+-- FORM 13F FILERS (Alternative to institutions, used by legacy code)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS form13f_filers (
+    cik TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    filing_date TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_13f_filers_name ON form13f_filers(name);
 
 -- ============================================================================
 -- INSTITUTIONAL OWNERSHIP (Aggregated)
@@ -161,4 +187,4 @@ CREATE INDEX IF NOT EXISTS idx_inst_ownership_symbol ON institutional_ownership(
 
 -- Insert version
 INSERT OR IGNORE INTO schema_version (version, description)
-VALUES ('7.0.2', 'Sentiment tables - short_interest, form4, form13f, insider_sentiment');
+VALUES ('7.0.3', 'Sentiment tables - short_interest, form4, form13f, form13f_filers, insider_sentiment');

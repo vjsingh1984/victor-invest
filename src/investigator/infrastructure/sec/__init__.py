@@ -27,18 +27,23 @@ def __getattr__(name):
     """
     if name == "SECQuarterlyProcessor":
         from investigator.infrastructure.sec.quarterly_processor import SECQuarterlyProcessor
+
         return SECQuarterlyProcessor
     elif name == "SECDataProcessor":
         from investigator.infrastructure.sec.data_processor import SECDataProcessor
+
         return SECDataProcessor
     elif name == "SECCompanyFactsExtractor":
         from investigator.infrastructure.sec.companyfacts_extractor import SECCompanyFactsExtractor
+
         return SECCompanyFactsExtractor
     elif name == "SECApiClient":
         from investigator.infrastructure.sec.sec_api import SECApiClient
+
         return SECApiClient
     elif name == "SECAPIClient":  # Backwards compatibility alias
         from investigator.infrastructure.sec.sec_api import SECApiClient
+
         return SECApiClient
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

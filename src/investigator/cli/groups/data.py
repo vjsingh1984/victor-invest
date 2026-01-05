@@ -27,9 +27,11 @@ def data(ctx):
 
 
 @data.command("list")
-@click.option("--category", "-c",
+@click.option(
+    "--category",
+    "-c",
     type=click.Choice(["market", "fundamental", "macro", "sentiment", "volatility", "fixed_income"]),
-    help="Filter by category"
+    help="Filter by category",
 )
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @click.pass_context
@@ -38,8 +40,8 @@ def list_sources(ctx, category, json_output):
 
     Shows registered data sources with their status and metadata.
     """
-    from investigator.domain.services.data_sources.manager import get_data_source_manager
     from investigator.domain.services.data_sources.base import DataCategory
+    from investigator.domain.services.data_sources.manager import get_data_source_manager
 
     manager = get_data_source_manager()
     sources = manager.list_sources()
@@ -99,8 +101,9 @@ def fetch(ctx, symbol, source, as_of_date, json_output):
         investigator data fetch _MACRO --source fred_macro
         investigator data fetch AAPL --source insider_transactions --json
     """
-    from investigator.domain.services.data_sources.manager import get_data_source_manager
     from datetime import datetime
+
+    from investigator.domain.services.data_sources.manager import get_data_source_manager
 
     manager = get_data_source_manager()
     data_source = manager.get_source(source)
@@ -148,8 +151,9 @@ def summary(ctx, symbol, as_of_date, json_output):
         investigator data summary AAPL
         investigator data summary MSFT --json
     """
-    from investigator.domain.services.data_sources.manager import get_data_source_manager
     from datetime import datetime
+
+    from investigator.domain.services.data_sources.manager import get_data_source_manager
 
     manager = get_data_source_manager()
 
@@ -280,8 +284,9 @@ def rl_features(ctx, symbol, as_of_date, json_output):
     Examples:
         investigator data rl-features AAPL
     """
-    from investigator.domain.services.data_sources.manager import get_rl_features
     from datetime import datetime
+
+    from investigator.domain.services.data_sources.manager import get_rl_features
 
     target_date = None
     if as_of_date:
@@ -317,6 +322,7 @@ def refresh(ctx, source, symbol, refresh_all):
 
     if refresh_all:
         from investigator.domain.services.data_sources.registry import get_registry
+
         registry = get_registry()
         registry.invalidate_all_caches()
         click.echo("All caches invalidated")

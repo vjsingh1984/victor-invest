@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 
 class DataSourceType(Enum):
     """Types of data sources."""
+
     INSIDER_SENTIMENT = "insider_sentiment"
     INSTITUTIONAL_HOLDINGS = "institutional_holdings"
     SHORT_INTEREST = "short_interest"
@@ -44,6 +45,7 @@ class DataSourceType(Enum):
 @dataclass
 class DataSourceResult:
     """Result from a data source query."""
+
     source_type: DataSourceType
     symbol: Optional[str] = None
     as_of_date: Optional[date] = None

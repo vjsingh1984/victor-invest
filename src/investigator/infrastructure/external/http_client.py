@@ -37,6 +37,7 @@ def get_ssl_context() -> ssl.SSLContext:
     """
     try:
         import certifi
+
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         return ssl_context
     except ImportError:

@@ -29,9 +29,11 @@ def cache(ctx):
 @click.option("--db", "clean_db", is_flag=True, help="Clean database cache only")
 @click.option("--disk", "clean_disk", is_flag=True, help="Clean disk cache only")
 @click.option("--symbol", "-s", help="Clean cache for specific symbol")
-@click.option("--type", "cache_type",
+@click.option(
+    "--type",
+    "cache_type",
     type=click.Choice(["llm", "sec", "technical", "market_context"]),
-    help="Clean specific cache type"
+    help="Clean specific cache type",
 )
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation")
 @click.pass_context
@@ -252,11 +254,7 @@ def warm(ctx, symbols, symbols_file, parallel):
         symbol_list = [s.strip().upper() for s in symbols.split(",")]
     elif symbols_file:
         with open(symbols_file) as f:
-            symbol_list = [
-                line.strip().upper()
-                for line in f
-                if line.strip() and not line.startswith("#")
-            ]
+            symbol_list = [line.strip().upper() for line in f if line.strip() and not line.startswith("#")]
     else:
         click.echo("Provide --symbols or --file", err=True)
         sys.exit(1)
@@ -265,9 +263,9 @@ def warm(ctx, symbols, symbols_file, parallel):
     click.echo(f"Parallel workers: {parallel}")
 
     async def warm_cache():
+        from investigator.domain.agents.sec import SECAnalysisAgent
         from investigator.infrastructure.cache import get_cache_manager
         from investigator.infrastructure.events import EventBus
-        from investigator.domain.agents.sec import SECAnalysisAgent
 
         cache_manager = get_cache_manager()
         event_bus = EventBus()

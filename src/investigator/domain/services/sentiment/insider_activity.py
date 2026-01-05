@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 class SentimentLevel(Enum):
     """Insider sentiment classification levels."""
+
     BULLISH = "bullish"
     SLIGHTLY_BULLISH = "slightly_bullish"
     NEUTRAL = "neutral"
@@ -62,6 +63,7 @@ class SentimentLevel(Enum):
 
 class ClusterType(Enum):
     """Types of coordinated insider activity."""
+
     BUYING_CLUSTER = "buying_cluster"
     SELLING_CLUSTER = "selling_cluster"
     MIXED_CLUSTER = "mixed_cluster"
@@ -89,6 +91,7 @@ class InsiderSentiment:
         confidence: Confidence in the sentiment signal (0-1)
         warnings: Any data quality warnings
     """
+
     symbol: str
     sentiment_score: float = 0.0
     sentiment_level: SentimentLevel = SentimentLevel.NO_DATA
@@ -147,10 +150,7 @@ class InsiderSentiment:
     @property
     def is_signal(self) -> bool:
         """Whether this represents an actionable signal."""
-        return (
-            self.confidence >= 0.5 and
-            self.sentiment_level not in (SentimentLevel.NEUTRAL, SentimentLevel.NO_DATA)
-        )
+        return self.confidence >= 0.5 and self.sentiment_level not in (SentimentLevel.NEUTRAL, SentimentLevel.NO_DATA)
 
     @property
     def signal_strength(self) -> str:
@@ -179,6 +179,7 @@ class ClusterActivity:
         insiders: List of insider names in cluster
         is_significant: Whether cluster meets significance thresholds
     """
+
     symbol: str
     cluster_type: ClusterType = ClusterType.NO_CLUSTER
     start_date: Optional[date] = None
@@ -236,14 +237,11 @@ class InsiderActivityService:
         """Lazy-load DAO to avoid circular imports."""
         if self._dao is None:
             from dao.insider_trading_dao import get_insider_trading_dao
+
             self._dao = get_insider_trading_dao()
         return self._dao
 
-    async def analyze_sentiment(
-        self,
-        symbol: str,
-        days: int = 90
-    ) -> InsiderSentiment:
+    async def analyze_sentiment(self, symbol: str, days: int = 90) -> InsiderSentiment:
         """Analyze insider sentiment for a symbol.
 
         Args:
@@ -258,20 +256,10 @@ class InsiderActivityService:
 
             # Get aggregated sentiment data from DAO
             loop = asyncio.get_event_loop()
-            raw_sentiment = await loop.run_in_executor(
-                None,
-                dao.get_insider_sentiment,
-                symbol,
-                days
-            )
+            raw_sentiment = await loop.run_in_executor(None, dao.get_insider_sentiment, symbol, days)
 
             # Get key insider transactions
-            key_transactions = await loop.run_in_executor(
-                None,
-                dao.get_key_insider_transactions,
-                symbol,
-                days
-            )
+            key_transactions = await loop.run_in_executor(None, dao.get_key_insider_transactions, symbol, days)
 
             # Build sentiment result
             sentiment = InsiderSentiment(
@@ -321,11 +309,7 @@ class InsiderActivityService:
             sentiment.warnings.append(f"Analysis error: {str(e)}")
             return sentiment
 
-    def _calculate_confidence(
-        self,
-        sentiment: InsiderSentiment,
-        key_transactions: List[Dict]
-    ) -> float:
+    def _calculate_confidence(self, sentiment: InsiderSentiment, key_transactions: List[Dict]) -> float:
         """Calculate confidence score for sentiment signal.
 
         Confidence is based on:
@@ -383,12 +367,7 @@ class InsiderActivityService:
 
         return min(confidence, 1.0)
 
-    async def detect_cluster_activity(
-        self,
-        symbol: str,
-        days: int = 30,
-        window_days: int = 7
-    ) -> List[ClusterActivity]:
+    async def detect_cluster_activity(self, symbol: str, days: int = 30, window_days: int = 7) -> List[ClusterActivity]:
         """Detect clusters of coordinated insider activity.
 
         A cluster is defined as multiple insiders transacting
@@ -408,11 +387,7 @@ class InsiderActivityService:
             # Get recent activity
             loop = asyncio.get_event_loop()
             filings = await loop.run_in_executor(
-                None,
-                dao.get_recent_activity,
-                symbol,
-                days,
-                False  # Include all filings, not just significant
+                None, dao.get_recent_activity, symbol, days, False  # Include all filings, not just significant
             )
 
             if not filings:
@@ -441,11 +416,7 @@ class InsiderActivityService:
             return []
 
     def _find_cluster(
-        self,
-        symbol: str,
-        filings: List[Dict],
-        window_days: int,
-        cluster_type: ClusterType
+        self, symbol: str, filings: List[Dict], window_days: int, cluster_type: ClusterType
     ) -> Optional[ClusterActivity]:
         """Find cluster activity in a list of filings.
 
@@ -462,10 +433,7 @@ class InsiderActivityService:
             return None
 
         # Sort by date
-        sorted_filings = sorted(
-            filings,
-            key=lambda f: f.get("filing_date", "")
-        )
+        sorted_filings = sorted(filings, key=lambda f: f.get("filing_date", ""))
 
         # Use sliding window to find clusters
         best_cluster = None
@@ -485,9 +453,9 @@ class InsiderActivityService:
 
             # Find all filings in window
             window_filings = [
-                f for f in sorted_filings
-                if f.get("filing_date") and
-                start_date_str <= f.get("filing_date") <= str(end_date)
+                f
+                for f in sorted_filings
+                if f.get("filing_date") and start_date_str <= f.get("filing_date") <= str(end_date)
             ]
 
             # Get unique insiders in window
@@ -496,14 +464,14 @@ class InsiderActivityService:
             if len(insiders) >= self.CLUSTER_MIN_INSIDERS:
                 total_value = sum(abs(f.get("total_value", 0)) for f in window_filings)
 
-                if len(insiders) > best_count or (len(insiders) == best_count and total_value > (best_cluster.total_value if best_cluster else 0)):
+                if len(insiders) > best_count or (
+                    len(insiders) == best_count and total_value > (best_cluster.total_value if best_cluster else 0)
+                ):
                     best_count = len(insiders)
 
                     # Find actual end date
                     actual_end = max(
-                        date.fromisoformat(f.get("filing_date"))
-                        for f in window_filings
-                        if f.get("filing_date")
+                        date.fromisoformat(f.get("filing_date")) for f in window_filings if f.get("filing_date")
                     )
 
                     best_cluster = ClusterActivity(
@@ -520,11 +488,7 @@ class InsiderActivityService:
 
         return best_cluster
 
-    async def get_key_insider_summary(
-        self,
-        symbol: str,
-        days: int = 180
-    ) -> Dict[str, Any]:
+    async def get_key_insider_summary(self, symbol: str, days: int = 180) -> Dict[str, Any]:
         """Get summary of key insider (C-suite, directors) activity.
 
         Args:
@@ -538,12 +502,7 @@ class InsiderActivityService:
             dao = self._get_dao()
 
             loop = asyncio.get_event_loop()
-            transactions = await loop.run_in_executor(
-                None,
-                dao.get_key_insider_transactions,
-                symbol,
-                days
-            )
+            transactions = await loop.run_in_executor(None, dao.get_key_insider_transactions, symbol, days)
 
             if not transactions:
                 return {
@@ -574,11 +533,7 @@ class InsiderActivityService:
             total_net = sum(i["net_value"] for i in insider_activity.values())
 
             # Sort by absolute net value
-            sorted_insiders = sorted(
-                insider_activity.values(),
-                key=lambda x: abs(x["net_value"]),
-                reverse=True
-            )
+            sorted_insiders = sorted(insider_activity.values(), key=lambda x: abs(x["net_value"]), reverse=True)
 
             return {
                 "symbol": symbol,

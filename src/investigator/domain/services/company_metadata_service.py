@@ -17,7 +17,6 @@ from typing import Dict, Optional, Tuple
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -79,7 +78,14 @@ class CompanyMetadataService:
         from investigator.config import get_config
 
         config = get_config()
-        stock_db_url = f"postgresql://stockuser:${STOCK_DB_PASSWORD}@" f"{config.database.host}:{config.database.port}/stock"
+        stock_password = os.environ.get("STOCK_DB_PASSWORD")
+        stock_host = os.environ.get("STOCK_DB_HOST", config.database.host)
+        if not stock_password:
+            raise EnvironmentError(
+                "STOCK_DB_PASSWORD environment variable not set. "
+                "Please set it or source your ~/.investigator/env file."
+            )
+        stock_db_url = f"postgresql://stockuser:{stock_password}@{stock_host}:{config.database.port}/stock"
         engine = create_engine(stock_db_url, pool_pre_ping=True)
         logger.info("Created default database engine for stock database")
         return engine

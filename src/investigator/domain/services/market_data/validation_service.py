@@ -63,16 +63,25 @@ class DataValidationService:
 
     def __init__(
         self,
-        sec_db_url: str = "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database",
-        stock_db_url: str = "postgresql://stockuser:${STOCK_DB_PASSWORD}@${STOCK_DB_HOST}:5432/stock",
+        sec_db_url: str = None,
+        stock_db_url: str = None,
     ):
         """
         Initialize DataValidationService with database connections.
 
         Args:
-            sec_db_url: Connection string for SEC database
-            stock_db_url: Connection string for stock database
+            sec_db_url: Connection string for SEC database.
+                       If None, builds from environment variables.
+            stock_db_url: Connection string for stock database.
+                         If None, builds from environment variables.
         """
+        from investigator.domain.services.market_data import get_sec_db_url, get_stock_db_url
+
+        if sec_db_url is None:
+            sec_db_url = get_sec_db_url()
+        if stock_db_url is None:
+            stock_db_url = get_stock_db_url()
+
         self.sec_engine = create_engine(
             sec_db_url,
             pool_size=5,

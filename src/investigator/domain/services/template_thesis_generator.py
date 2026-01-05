@@ -20,16 +20,17 @@ Design Principles (SOLID):
 - Dependency Inversion: Depends on abstractions, not concretions
 """
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 class InvestmentStance(Enum):
     """Investment stance derived from analysis."""
+
     STRONG_BUY = "strong_buy"
     BUY = "buy"
     HOLD = "hold"
@@ -39,6 +40,7 @@ class InvestmentStance(Enum):
 
 class TimeHorizon(Enum):
     """Investment time horizon."""
+
     SHORT_TERM = "6-12 months"
     MEDIUM_TERM = "1-3 years"
     LONG_TERM = "3-5 years"
@@ -47,13 +49,14 @@ class TimeHorizon(Enum):
 @dataclass
 class ThesisContext:
     """Context for thesis generation."""
+
     symbol: str
     company_name: str
     sector: str
     industry: Optional[str]
     overall_score: float  # 0-100
-    confidence: float     # 0-100
-    upside: float         # Decimal (0.15 = 15%)
+    confidence: float  # 0-100
+    upside: float  # Decimal (0.15 = 15%)
     current_price: float
     fair_value: float
     # From key insights
@@ -75,6 +78,7 @@ class ThesisContext:
 @dataclass
 class InvestmentThesis:
     """Complete investment thesis output."""
+
     core_investment_narrative: str
     key_value_drivers: List[str]
     competitive_advantages: List[str]
@@ -100,14 +104,14 @@ class InvestmentThesis:
 
 class NarrativeGenerator(Protocol):
     """Protocol for generating narrative sections."""
-    def generate(self, context: ThesisContext) -> str:
-        ...
+
+    def generate(self, context: ThesisContext) -> str: ...
 
 
 class ListGenerator(Protocol):
     """Protocol for generating list sections."""
-    def generate(self, context: ThesisContext) -> List[str]:
-        ...
+
+    def generate(self, context: ThesisContext) -> List[str]: ...
 
 
 # ============================================================================
@@ -236,31 +240,31 @@ class ValueDriversGenerator:
             "Innovation pipeline and R&D productivity",
             "Recurring revenue and subscription growth",
             "Market share expansion in core segments",
-            "Cloud/digital transformation tailwinds"
+            "Cloud/digital transformation tailwinds",
         ],
         "Healthcare": [
             "Drug pipeline and FDA approval potential",
             "Demographic tailwinds from aging population",
             "Healthcare spending growth",
-            "Pricing power in specialty therapeutics"
+            "Pricing power in specialty therapeutics",
         ],
         "Financials": [
             "Net interest margin expansion",
             "Credit quality and loan growth",
             "Fee income diversification",
-            "Capital return programs"
+            "Capital return programs",
         ],
         "Consumer": [
             "Brand strength and pricing power",
             "Market share gains",
             "Geographic expansion",
-            "E-commerce growth"
+            "E-commerce growth",
         ],
         "Industrials": [
             "Order backlog and book-to-bill ratio",
             "Margin expansion through operational efficiency",
             "Infrastructure spending tailwinds",
-            "Aftermarket services growth"
+            "Aftermarket services growth",
         ],
     }
 
@@ -268,7 +272,7 @@ class ValueDriversGenerator:
         "Revenue growth sustainability",
         "Margin expansion opportunity",
         "Competitive positioning",
-        "Capital allocation efficiency"
+        "Capital allocation efficiency",
     ]
 
     def generate(self, context: ThesisContext) -> List[str]:
@@ -277,17 +281,11 @@ class ValueDriversGenerator:
 
         # Add metrics-based drivers
         if context.revenue_growth and context.revenue_growth > 0.10:
-            drivers.append(
-                f"Strong revenue growth of {context.revenue_growth:.0%} demonstrates market share gains"
-            )
+            drivers.append(f"Strong revenue growth of {context.revenue_growth:.0%} demonstrates market share gains")
         if context.profit_margin and context.profit_margin > 0.15:
-            drivers.append(
-                f"Above-average profit margins of {context.profit_margin:.0%} support valuation premium"
-            )
+            drivers.append(f"Above-average profit margins of {context.profit_margin:.0%} support valuation premium")
         if context.dividend_yield and context.dividend_yield > 0.02:
-            drivers.append(
-                f"Dividend yield of {context.dividend_yield:.1%} provides income component"
-            )
+            drivers.append(f"Dividend yield of {context.dividend_yield:.1%} provides income component")
 
         # Add sector-specific drivers
         sector_specific = self.SECTOR_DRIVERS.get(context.sector, self.DEFAULT_DRIVERS)
@@ -360,31 +358,31 @@ class GrowthCatalystsGenerator:
             "AI and machine learning integration driving new revenue streams",
             "Cloud adoption acceleration across enterprise customers",
             "Geographic expansion into emerging markets",
-            "Strategic acquisitions to expand product portfolio"
+            "Strategic acquisitions to expand product portfolio",
         ],
         "Healthcare": [
             "Pipeline developments and regulatory approvals",
             "Medicare/Medicaid policy changes benefiting segment",
             "Biosimilar opportunities in key therapeutic areas",
-            "Value-based care transition driving utilization"
+            "Value-based care transition driving utilization",
         ],
         "Financials": [
             "Interest rate environment supporting net interest income",
             "Credit normalization improving loss provisions",
             "Wealth management AUM growth",
-            "Digital banking adoption reducing cost-to-income"
+            "Digital banking adoption reducing cost-to-income",
         ],
         "Consumer": [
             "Product innovation driving market share gains",
             "International expansion into underpenetrated markets",
             "E-commerce channel optimization",
-            "Premiumization strategy supporting margins"
+            "Premiumization strategy supporting margins",
         ],
         "Industrials": [
             "Infrastructure spending legislation benefits",
             "Reshoring and supply chain localization trends",
             "Electrification and decarbonization investments",
-            "Aftermarket services expansion"
+            "Aftermarket services expansion",
         ],
     }
 
@@ -392,7 +390,7 @@ class GrowthCatalystsGenerator:
         "Market share expansion opportunities",
         "Operational efficiency improvements",
         "Strategic capital deployment",
-        "Industry consolidation potential"
+        "Industry consolidation potential",
     ]
 
     def generate(self, context: ThesisContext) -> List[str]:
@@ -401,9 +399,7 @@ class GrowthCatalystsGenerator:
 
         # Add revenue-growth specific catalyst if applicable
         if context.revenue_growth and context.revenue_growth > 0.15:
-            catalysts = [
-                f"Momentum in core business with {context.revenue_growth:.0%} revenue growth"
-            ] + catalysts
+            catalysts = [f"Momentum in core business with {context.revenue_growth:.0%} revenue growth"] + catalysts
 
         return catalysts[:4]
 
@@ -416,31 +412,31 @@ class BearCaseGenerator:
             "Increased competition from well-funded rivals",
             "Technology obsolescence or disruption risk",
             "Customer concentration in key accounts",
-            "Regulatory scrutiny and antitrust concerns"
+            "Regulatory scrutiny and antitrust concerns",
         ],
         "Healthcare": [
             "Drug pricing pressure from policy changes",
             "Clinical trial failures or delays",
             "Patent cliff exposure",
-            "Reimbursement rate reductions"
+            "Reimbursement rate reductions",
         ],
         "Financials": [
             "Credit cycle deterioration increasing losses",
             "Interest rate volatility compressing margins",
             "Regulatory capital requirements tightening",
-            "Fintech disruption in core businesses"
+            "Fintech disruption in core businesses",
         ],
         "Consumer": [
             "Consumer spending weakness in downturn",
             "Private label and discount competition",
             "Supply chain cost inflation",
-            "Changing consumer preferences"
+            "Changing consumer preferences",
         ],
         "Industrials": [
             "Economic cycle sensitivity",
             "Raw material cost inflation",
             "Labor availability and cost pressures",
-            "Project execution and backlog risks"
+            "Project execution and backlog risks",
         ],
     }
 
@@ -448,7 +444,7 @@ class BearCaseGenerator:
         "Macroeconomic uncertainty affecting demand",
         "Competitive pressure on margins",
         "Execution risk in growth initiatives",
-        "Valuation premium at risk if growth disappoints"
+        "Valuation premium at risk if growth disappoints",
     ]
 
     def generate(self, context: ThesisContext) -> List[str]:
@@ -469,9 +465,7 @@ class BearCaseGenerator:
 
         # Add valuation risk if overvalued
         if context.upside < 0:
-            risks.append(
-                f"Valuation risk with {abs(context.upside):.0%} implied downside to fair value"
-            )
+            risks.append(f"Valuation risk with {abs(context.upside):.0%} implied downside to fair value")
 
         return risks[:4]
 
@@ -484,31 +478,31 @@ class KeyMetricsGenerator:
             "Revenue growth and ARR/MRR trends",
             "Operating margin and R&D efficiency",
             "Customer acquisition cost and LTV",
-            "Net revenue retention rate"
+            "Net revenue retention rate",
         ],
         "Healthcare": [
             "Revenue growth by therapeutic area",
             "Gross margin and SG&A efficiency",
             "Pipeline milestones and approval dates",
-            "Payer mix and reimbursement trends"
+            "Payer mix and reimbursement trends",
         ],
         "Financials": [
             "Net interest margin and spread trends",
             "Credit quality metrics (NPL, NCO, provisions)",
             "Efficiency ratio and operating leverage",
-            "Capital ratios and return on equity"
+            "Capital ratios and return on equity",
         ],
         "Consumer": [
             "Same-store sales and comparable growth",
             "Gross margin and promotional intensity",
             "Inventory turns and working capital",
-            "Customer acquisition and retention"
+            "Customer acquisition and retention",
         ],
         "Industrials": [
             "Order book and book-to-bill ratio",
             "Operating margin and productivity",
             "Free cash flow conversion",
-            "Backlog duration and quality"
+            "Backlog duration and quality",
         ],
     }
 
@@ -516,7 +510,7 @@ class KeyMetricsGenerator:
         "Revenue growth trajectory",
         "Operating margin trends",
         "Free cash flow generation",
-        "Return on invested capital"
+        "Return on invested capital",
     ]
 
     def generate(self, context: ThesisContext) -> List[str]:
@@ -547,34 +541,26 @@ class InvalidationTriggersGenerator:
         # Revenue growth trigger
         if context.revenue_growth:
             min_growth = max(0, context.revenue_growth - 0.10)
-            triggers.append(
-                f"Revenue growth decelerates below {min_growth:.0%} for two consecutive quarters"
-            )
+            triggers.append(f"Revenue growth decelerates below {min_growth:.0%} for two consecutive quarters")
         else:
             triggers.append("Revenue growth turns negative for two consecutive quarters")
 
         # Margin trigger
         if context.profit_margin:
             margin_floor = context.profit_margin * 0.7
-            triggers.append(
-                f"Operating margin contracts below {margin_floor:.0%} (30% compression from current)"
-            )
+            triggers.append(f"Operating margin contracts below {margin_floor:.0%} (30% compression from current)")
         else:
             triggers.append("Operating margin declines materially from current levels")
 
         # Leverage trigger
         if context.debt_to_equity:
             leverage_ceiling = context.debt_to_equity * 1.5
-            triggers.append(
-                f"Debt-to-equity ratio exceeds {leverage_ceiling:.1f}x (50% increase from current)"
-            )
+            triggers.append(f"Debt-to-equity ratio exceeds {leverage_ceiling:.1f}x (50% increase from current)")
         else:
             triggers.append("Significant deterioration in balance sheet leverage")
 
         # Fair value trigger
-        triggers.append(
-            f"Stock price exceeds fair value estimate of ${context.fair_value:.2f} by more than 20%"
-        )
+        triggers.append(f"Stock price exceeds fair value estimate of ${context.fair_value:.2f} by more than 20%")
 
         return triggers[:4]
 
@@ -673,7 +659,7 @@ class TemplateBasedThesisGenerator:
         key_insights: Dict[str, Any],
         composite_scores: Dict[str, Any],
         fundamental_analysis: Optional[Dict[str, Any]] = None,
-        company_profile: Optional[Dict[str, Any]] = None
+        company_profile: Optional[Dict[str, Any]] = None,
     ) -> InvestmentThesis:
         """
         Factory method to create thesis from existing synthesis data.
@@ -743,8 +729,16 @@ class TemplateBasedThesisGenerator:
             dividend_yield=dividend_yield,
             pe_ratio=pe_ratio,
             debt_to_equity=debt_to_equity,
-            data_quality_score=fundamental_analysis.get("data_quality", {}).get("data_quality_score", 50) if fundamental_analysis else 50,
-            model_agreement=fundamental_analysis.get("multi_model_summary", {}).get("model_agreement_score", 0.5) if fundamental_analysis else 0.5,
+            data_quality_score=(
+                fundamental_analysis.get("data_quality", {}).get("data_quality_score", 50)
+                if fundamental_analysis
+                else 50
+            ),
+            model_agreement=(
+                fundamental_analysis.get("multi_model_summary", {}).get("model_agreement_score", 0.5)
+                if fundamental_analysis
+                else 0.5
+            ),
         )
 
         # Generate thesis
@@ -762,7 +756,7 @@ def generate_investment_thesis(
     key_insights: Dict[str, Any],
     composite_scores: Dict[str, Any],
     fundamental_analysis: Optional[Dict[str, Any]] = None,
-    company_profile: Optional[Dict[str, Any]] = None
+    company_profile: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Drop-in replacement for LLM-based investment thesis generation.
@@ -786,7 +780,7 @@ def generate_investment_thesis(
         key_insights=key_insights,
         composite_scores=composite_scores,
         fundamental_analysis=fundamental_analysis,
-        company_profile=company_profile
+        company_profile=company_profile,
     )
     return thesis.to_dict()
 

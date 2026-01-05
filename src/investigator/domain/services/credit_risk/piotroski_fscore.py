@@ -62,9 +62,10 @@ logger = logging.getLogger(__name__)
 
 class FinancialStrength(Enum):
     """Piotroski F-Score financial strength classification."""
-    STRONG = "strong"       # 8-9 points
-    MODERATE = "moderate"   # 5-7 points
-    WEAK = "weak"           # 0-4 points
+
+    STRONG = "strong"  # 8-9 points
+    MODERATE = "moderate"  # 5-7 points
+    WEAK = "weak"  # 0-4 points
 
 
 @dataclass
@@ -78,6 +79,7 @@ class PiotroskiFScoreResult(CreditScoreResult):
         efficiency_score: Points from operating efficiency criteria (0-2)
         criteria_details: Individual criterion pass/fail details
     """
+
     strength: Optional[FinancialStrength] = None
     profitability_score: int = 0
     leverage_score: int = 0
@@ -88,18 +90,20 @@ class PiotroskiFScoreResult(CreditScoreResult):
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary."""
         result = super().to_dict()
-        result.update({
-            "strength": self.strength.value if self.strength else None,
-            "profitability_score": self.profitability_score,
-            "leverage_score": self.leverage_score,
-            "efficiency_score": self.efficiency_score,
-            "criteria_details": self.criteria_details,
-            "criteria_breakdown": {
-                "profitability": f"{self.profitability_score}/4",
-                "leverage_liquidity": f"{self.leverage_score}/3",
-                "operating_efficiency": f"{self.efficiency_score}/2",
-            },
-        })
+        result.update(
+            {
+                "strength": self.strength.value if self.strength else None,
+                "profitability_score": self.profitability_score,
+                "leverage_score": self.leverage_score,
+                "efficiency_score": self.efficiency_score,
+                "criteria_details": self.criteria_details,
+                "criteria_breakdown": {
+                    "profitability": f"{self.profitability_score}/4",
+                    "leverage_liquidity": f"{self.leverage_score}/3",
+                    "operating_efficiency": f"{self.efficiency_score}/2",
+                },
+            }
+        )
         return result
 
 
@@ -113,15 +117,14 @@ class PiotroskiFScoreCalculator:
     """
 
     # Score thresholds
-    STRONG_THRESHOLD = 8    # >= 8 is strong
-    WEAK_THRESHOLD = 5      # < 5 is weak
+    STRONG_THRESHOLD = 8  # >= 8 is strong
+    WEAK_THRESHOLD = 5  # < 5 is weak
 
     def __init__(self):
         """Initialize the F-Score calculator."""
         self._name = "Piotroski F-Score Calculator"
         self._description = (
-            "Financial strength assessment using 9 binary criteria. "
-            "8-9 = Strong, 5-7 = Moderate, 0-4 = Weak."
+            "Financial strength assessment using 9 binary criteria. " "8-9 = Strong, 5-7 = Moderate, 0-4 = Weak."
         )
 
     @property
@@ -239,9 +242,7 @@ class PiotroskiFScoreCalculator:
             result.strength = self._classify_strength(total_score)
 
             # Set interpretation
-            result.interpretation = self._get_interpretation(
-                result.strength, total_score, criteria
-            )
+            result.interpretation = self._get_interpretation(result.strength, total_score, criteria)
 
             logger.info(
                 f"{data.symbol}: Piotroski F-Score = {total_score}/9 "
@@ -255,9 +256,7 @@ class PiotroskiFScoreCalculator:
 
         return result
 
-    def _calculate_profitability(
-        self, data: FinancialData
-    ) -> tuple[int, Dict[str, bool], Dict[str, Any]]:
+    def _calculate_profitability(self, data: FinancialData) -> tuple[int, Dict[str, bool], Dict[str, Any]]:
         """Calculate profitability criteria (4 points).
 
         1. Positive ROA (net income > 0)
@@ -312,9 +311,7 @@ class PiotroskiFScoreCalculator:
 
         return score, criteria, components
 
-    def _calculate_leverage(
-        self, data: FinancialData
-    ) -> tuple[int, Dict[str, bool], Dict[str, Any]]:
+    def _calculate_leverage(self, data: FinancialData) -> tuple[int, Dict[str, bool], Dict[str, Any]]:
         """Calculate leverage and liquidity criteria (3 points).
 
         5. Leverage decreasing (LTD/Assets lower)
@@ -352,10 +349,7 @@ class PiotroskiFScoreCalculator:
                 if data.prior_period:
                     if data.prior_period.current_assets is not None and data.prior_period.current_liabilities:
                         if data.prior_period.current_liabilities > 0:
-                            prior_ratio = (
-                                data.prior_period.current_assets /
-                                data.prior_period.current_liabilities
-                            )
+                            prior_ratio = data.prior_period.current_assets / data.prior_period.current_liabilities
                             components["prior_current_ratio"] = prior_ratio
                             current_ratio_improving = current_ratio > prior_ratio
                             components["current_ratio_change"] = current_ratio - prior_ratio
@@ -370,18 +364,14 @@ class PiotroskiFScoreCalculator:
                 no_dilution = data.shares_outstanding <= data.prior_period.shares_outstanding
                 components["current_shares"] = data.shares_outstanding
                 components["prior_shares"] = data.prior_period.shares_outstanding
-                components["share_change"] = (
-                    data.shares_outstanding - data.prior_period.shares_outstanding
-                )
+                components["share_change"] = data.shares_outstanding - data.prior_period.shares_outstanding
                 if no_dilution:
                     score += 1
         criteria["F7_no_dilution"] = no_dilution
 
         return score, criteria, components
 
-    def _calculate_efficiency(
-        self, data: FinancialData
-    ) -> tuple[int, Dict[str, bool], Dict[str, Any]]:
+    def _calculate_efficiency(self, data: FinancialData) -> tuple[int, Dict[str, bool], Dict[str, Any]]:
         """Calculate operating efficiency criteria (2 points).
 
         8. Gross margin improving
@@ -436,12 +426,7 @@ class PiotroskiFScoreCalculator:
         else:
             return FinancialStrength.MODERATE
 
-    def _get_interpretation(
-        self,
-        strength: FinancialStrength,
-        score: int,
-        criteria: Dict[str, bool]
-    ) -> str:
+    def _get_interpretation(self, strength: FinancialStrength, score: int, criteria: Dict[str, bool]) -> str:
         """Generate human-readable interpretation."""
         passed = sum(1 for v in criteria.values() if v)
         failed = len(criteria) - passed

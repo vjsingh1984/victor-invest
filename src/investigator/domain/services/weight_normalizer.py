@@ -11,7 +11,6 @@ Date: 2025-11-07
 import logging
 from typing import Dict, List
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -40,11 +39,7 @@ class WeightNormalizer:
 
         self.increment = rounding_increment
 
-    def normalize(
-        self,
-        weights: Dict[str, float],
-        model_order: List[str] = None
-    ) -> Dict[str, float]:
+    def normalize(self, weights: Dict[str, float], model_order: List[str] = None) -> Dict[str, float]:
         """
         Normalize weights to sum to 100% and round to increment.
 
@@ -95,8 +90,7 @@ class WeightNormalizer:
                 # If adjustment makes largest weight negative, redistribute
                 if new_value < 0:
                     logger.warning(
-                        f"Adjustment would make {max_model} negative ({new_value}%), "
-                        f"redistributing difference"
+                        f"Adjustment would make {max_model} negative ({new_value}%), " f"redistributing difference"
                     )
                     # Reset and try equal distribution
                     num_models = len(rounded)
@@ -119,18 +113,12 @@ class WeightNormalizer:
         # Final validation
         final_sum = sum(final.values())
         if abs(final_sum - 100) > 0.01:  # Allow tiny floating point errors
-            logger.warning(
-                f"Final weights sum to {final_sum}% (not exactly 100%), "
-                f"this may cause issues"
-            )
+            logger.warning(f"Final weights sum to {final_sum}% (not exactly 100%), " f"this may cause issues")
 
         return final
 
     def normalize_with_fallback(
-        self,
-        weights: Dict[str, float],
-        fallback_weights: Dict[str, float],
-        model_order: List[str] = None
+        self, weights: Dict[str, float], fallback_weights: Dict[str, float], model_order: List[str] = None
     ) -> Dict[str, float]:
         """
         Normalize weights with fallback to default weights if all zeros.
@@ -157,10 +145,7 @@ class WeightNormalizer:
                 raise
 
     def apply_confidence_weighting(
-        self,
-        base_weights: Dict[str, float],
-        confidences: Dict[str, float],
-        model_order: List[str] = None
+        self, base_weights: Dict[str, float], confidences: Dict[str, float], model_order: List[str] = None
     ) -> Dict[str, float]:
         """
         Adjust weights based on model confidence scores.
@@ -230,7 +215,8 @@ class WeightNormalizer:
         if not non_zero:
             return "No weights"
 
-        parts = [f"{model.upper()}={weight:.0f}%" for model, weight in sorted(
-            non_zero.items(), key=lambda x: x[1], reverse=True
-        )]
+        parts = [
+            f"{model.upper()}={weight:.0f}%"
+            for model, weight in sorted(non_zero.items(), key=lambda x: x[1], reverse=True)
+        ]
         return ", ".join(parts)

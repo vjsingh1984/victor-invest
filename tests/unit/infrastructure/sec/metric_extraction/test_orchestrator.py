@@ -7,27 +7,28 @@ Note: conftest.py handles mocking of parent package imports to avoid circular
 import issues during test collection.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-# Import the modules directly (conftest.py handles parent package mocking)
-from investigator.infrastructure.sec.metric_extraction.result import (
-    ExtractionResult,
-    ExtractionConfidence,
-    MatchMethod,
-)
-from investigator.infrastructure.sec.metric_extraction.strategies import (
-    ByPeriodEndMatcher,
-    ByDateRangeMatcher,
-    ByFrameFieldMatcher,
-    ByAdshFyFpMatcher,
-    ByAdshOnlyMatcher,
-    MatchContext,
-)
+import pytest
+
 from investigator.infrastructure.sec.metric_extraction.orchestrator import (
     MetricExtractionOrchestrator,
 )
 
+# Import the modules directly (conftest.py handles parent package mocking)
+from investigator.infrastructure.sec.metric_extraction.result import (
+    ExtractionConfidence,
+    ExtractionResult,
+    MatchMethod,
+)
+from investigator.infrastructure.sec.metric_extraction.strategies import (
+    ByAdshFyFpMatcher,
+    ByAdshOnlyMatcher,
+    ByDateRangeMatcher,
+    ByFrameFieldMatcher,
+    ByPeriodEndMatcher,
+    MatchContext,
+)
 
 # Mock us-gaap data structure simulating SEC CompanyFacts
 MOCK_US_GAAP = {
@@ -475,10 +476,7 @@ class TestDerivedValueCalculation:
             "capital_expenditures": 3_000_000_000,
         }
 
-        result = orchestrator._evaluate_formula(
-            "operating_cash_flow - capital_expenditures",
-            components
-        )
+        result = orchestrator._evaluate_formula("operating_cash_flow - capital_expenditures", components)
 
         assert result == 5_000_000_000
 
@@ -492,9 +490,6 @@ class TestDerivedValueCalculation:
         components = {"x": 1}
 
         # Formula with unsafe characters
-        result = orchestrator._evaluate_formula(
-            "import os; x",
-            components
-        )
+        result = orchestrator._evaluate_formula("import os; x", components)
 
         assert result is None

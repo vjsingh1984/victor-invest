@@ -18,8 +18,8 @@ from investigator.domain.services.valuation.models.base import (
     ModelNotApplicable,
     ValuationModelResult,
 )
-from investigator.domain.services.valuation.models.company_profile import CompanyProfile, DataQualityFlag
 from investigator.domain.services.valuation.models.common import baseline_multiple_context, clamp
+from investigator.domain.services.valuation.models.company_profile import CompanyProfile, DataQualityFlag
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ class PEMultipleModel(BaseValuationModel):
 
     def _determine_target_pe(self) -> Optional[float]:
         # Get symbol for logging (defined once at the beginning)
-        symbol = self.company_profile.symbol if hasattr(self.company_profile, 'symbol') else 'UNKNOWN'
+        symbol = self.company_profile.symbol if hasattr(self.company_profile, "symbol") else "UNKNOWN"
 
         candidates = []
         sources = []
@@ -187,36 +187,32 @@ class PEMultipleModel(BaseValuationModel):
                 logger.debug("config.yaml not found, skipping P/E fallback")
                 return None
 
-            with open(config_path, 'r') as f:
+            with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
 
-            pe_config = config.get('pe_multiples', {})
+            pe_config = config.get("pe_multiples", {})
             if not pe_config:
                 logger.debug("No pe_multiples section in config.yaml")
                 return None
 
             # Priority 1: Industry override
-            if hasattr(self.company_profile, 'industry') and self.company_profile.industry:
-                industry_overrides = pe_config.get('industry_overrides', {})
+            if hasattr(self.company_profile, "industry") and self.company_profile.industry:
+                industry_overrides = pe_config.get("industry_overrides", {})
                 if self.company_profile.industry in industry_overrides:
                     pe_value = float(industry_overrides[self.company_profile.industry])
-                    logger.debug(
-                        f"P/E fallback: industry={self.company_profile.industry}, pe={pe_value}"
-                    )
+                    logger.debug(f"P/E fallback: industry={self.company_profile.industry}, pe={pe_value}")
                     return pe_value
 
             # Priority 2: Sector default
-            if hasattr(self.company_profile, 'sector') and self.company_profile.sector:
-                sector_defaults = pe_config.get('sector_defaults', {})
+            if hasattr(self.company_profile, "sector") and self.company_profile.sector:
+                sector_defaults = pe_config.get("sector_defaults", {})
                 if self.company_profile.sector in sector_defaults:
                     pe_value = float(sector_defaults[self.company_profile.sector])
-                    logger.debug(
-                        f"P/E fallback: sector={self.company_profile.sector}, pe={pe_value}"
-                    )
+                    logger.debug(f"P/E fallback: sector={self.company_profile.sector}, pe={pe_value}")
                     return pe_value
 
             # Priority 3: Global default
-            default_pe = pe_config.get('default')
+            default_pe = pe_config.get("default")
             if default_pe:
                 logger.debug(f"P/E fallback: using global default={default_pe}")
                 return float(default_pe)

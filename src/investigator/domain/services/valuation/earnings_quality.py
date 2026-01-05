@@ -19,22 +19,24 @@ Date: 2025-12-30
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class EarningsQualityTier(Enum):
     """Earnings quality classification."""
-    HIGH = "high"           # Clean earnings, minimal adjustments needed
-    MODERATE = "moderate"   # Some non-recurring items, minor adjustments
-    LOW = "low"             # Significant non-recurring items
+
+    HIGH = "high"  # Clean earnings, minimal adjustments needed
+    MODERATE = "moderate"  # Some non-recurring items, minor adjustments
+    LOW = "low"  # Significant non-recurring items
     UNRELIABLE = "unreliable"  # Earnings too distorted for P/E valuation
 
 
 @dataclass
 class NonRecurringItem:
     """Represents a detected non-recurring item."""
+
     name: str
     amount: float
     as_pct_of_net_income: float
@@ -46,6 +48,7 @@ class NonRecurringItem:
 @dataclass
 class EarningsQualityResult:
     """Result from earnings quality assessment."""
+
     quality_tier: EarningsQualityTier
     reported_net_income: float
     adjusted_net_income: float
@@ -106,9 +109,9 @@ NON_RECURRING_XBRL_TAGS = {
 
 # Thresholds for materiality
 MATERIALITY_THRESHOLDS = {
-    "significant": 0.10,    # >10% of net income
-    "material": 0.05,       # >5% of net income
-    "minor": 0.02,          # >2% of net income
+    "significant": 0.10,  # >10% of net income
+    "material": 0.05,  # >5% of net income
+    "minor": 0.02,  # >2% of net income
 }
 
 
@@ -148,18 +151,19 @@ def extract_non_recurring_items(
                             impact = "negative" if amount > 0 else "positive"
                             adjustment = amount  # Add back charges
 
-                        items.append(NonRecurringItem(
-                            name=category.replace("_", " ").title(),
-                            amount=amount,
-                            as_pct_of_net_income=pct_of_ni,
-                            impact=impact,
-                            adjustment_recommended=adjustment,
-                            source=tag,
-                        ))
+                        items.append(
+                            NonRecurringItem(
+                                name=category.replace("_", " ").title(),
+                                amount=amount,
+                                as_pct_of_net_income=pct_of_ni,
+                                impact=impact,
+                                adjustment_recommended=adjustment,
+                                source=tag,
+                            )
+                        )
 
                         logger.info(
-                            f"Detected non-recurring: {category} = ${amount/1e6:.1f}M "
-                            f"({pct_of_ni:.1%} of NI)"
+                            f"Detected non-recurring: {category} = ${amount/1e6:.1f}M " f"({pct_of_ni:.1%} of NI)"
                         )
 
     return items
@@ -264,7 +268,9 @@ def detect_revenue_quality(
         explanation = "Good: Receivables growth <= revenue growth"
     elif receivables_growth <= revenue_growth + 0.10:
         score = 0.8
-        explanation = f"Acceptable: Receivables growing slightly faster ({receivables_growth:.1%} vs {revenue_growth:.1%})"
+        explanation = (
+            f"Acceptable: Receivables growing slightly faster ({receivables_growth:.1%} vs {revenue_growth:.1%})"
+        )
     elif receivables_growth <= revenue_growth + 0.25:
         score = 0.6
         explanation = f"Caution: Receivables growing faster ({receivables_growth:.1%} vs {revenue_growth:.1%})"
@@ -323,8 +329,7 @@ def assess_earnings_quality(
             total_adjustment += item.adjustment_recommended
             if item.as_pct_of_net_income >= MATERIALITY_THRESHOLDS["significant"]:
                 warnings.append(
-                    f"Significant {item.name}: ${item.amount/1e6:.1f}M "
-                    f"({item.as_pct_of_net_income:.1%} of NI)"
+                    f"Significant {item.name}: ${item.amount/1e6:.1f}M " f"({item.as_pct_of_net_income:.1%} of NI)"
                 )
 
     # Calculate adjusted net income
@@ -333,9 +338,7 @@ def assess_earnings_quality(
     # 2. Accrual quality
     accrual_score = 0.7
     if net_income > 0 and operating_cf != 0:
-        accrual_score, accrual_explanation = detect_accrual_quality(
-            net_income, operating_cf, revenue
-        )
+        accrual_score, accrual_explanation = detect_accrual_quality(net_income, operating_cf, revenue)
         quality_components.append(("accrual", accrual_score, accrual_explanation))
         if accrual_score < 0.6:
             warnings.append(f"Accrual quality: {accrual_explanation}")
@@ -355,15 +358,13 @@ def assess_earnings_quality(
 
     # Non-recurring penalty
     non_recurring_score = max(0, 1 - adjustment_pct)
-    quality_components.append(("non_recurring", non_recurring_score,
-                               f"Non-recurring items: {adjustment_pct:.1%} of NI"))
+    quality_components.append(
+        ("non_recurring", non_recurring_score, f"Non-recurring items: {adjustment_pct:.1%} of NI")
+    )
 
     # Weighted quality score
     weights = {"accrual": 0.40, "revenue": 0.25, "non_recurring": 0.35}
-    quality_score = sum(
-        score * weights.get(name, 0.33)
-        for name, score, _ in quality_components
-    )
+    quality_score = sum(score * weights.get(name, 0.33) for name, score, _ in quality_components)
     quality_score = min(100, max(0, quality_score * 100))
 
     # Determine quality tier

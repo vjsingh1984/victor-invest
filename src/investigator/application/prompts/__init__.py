@@ -9,8 +9,8 @@ Prompt management for LLM interactions
 
 from .prompt_manager import (
     PromptManager,
-    get_prompt_manager,
     get_enhanced_prompt_manager,
+    get_prompt_manager,
 )
 
 __all__ = [

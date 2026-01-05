@@ -133,12 +133,23 @@ def summary(ctx, json_output):
 
 @macro.command("fed")
 @click.option(
-    "--district", "-d",
-    type=click.Choice([
-        "atlanta", "chicago", "cleveland", "dallas", "kansas_city",
-        "new_york", "philadelphia", "richmond", "san_francisco", "st_louis"
-    ]),
-    help="Filter by Federal Reserve district"
+    "--district",
+    "-d",
+    type=click.Choice(
+        [
+            "atlanta",
+            "chicago",
+            "cleveland",
+            "dallas",
+            "kansas_city",
+            "new_york",
+            "philadelphia",
+            "richmond",
+            "san_francisco",
+            "st_louis",
+        ]
+    ),
+    help="Filter by Federal Reserve district",
 )
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @click.pass_context
@@ -199,9 +210,10 @@ def fed_data(ctx, district, json_output):
 
 @macro.command("indicators")
 @click.option(
-    "--category", "-c",
+    "--category",
+    "-c",
     type=click.Choice(["gdp", "inflation", "employment", "financial", "manufacturing"]),
-    help="Filter by category"
+    help="Filter by category",
 )
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @click.pass_context
@@ -263,12 +275,7 @@ def indicators(ctx, category, json_output):
 
 
 @macro.command("treasury")
-@click.option(
-    "--view",
-    type=click.Choice(["curve", "spread", "history"]),
-    default="curve",
-    help="View type"
-)
+@click.option("--view", type=click.Choice(["curve", "spread", "history"]), default="curve", help="View type")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @click.pass_context
 def treasury(ctx, view, json_output):
@@ -280,14 +287,17 @@ def treasury(ctx, view, json_output):
         investigator macro treasury
         investigator macro treasury --view spread
     """
-    from investigator.infrastructure.database.db import get_engine
     from sqlalchemy import text
+
+    from investigator.infrastructure.database.db import get_engine
 
     engine = get_engine()
 
     with engine.connect() as conn:
         # Get latest Treasury yields
-        result = conn.execute(text("""
+        result = conn.execute(
+            text(
+                """
             SELECT series_id, value, observation_date
             FROM fred_economic_data
             WHERE series_id IN ('DGS1MO', 'DGS3MO', 'DGS6MO', 'DGS1', 'DGS2', 'DGS5', 'DGS10', 'DGS30')
@@ -306,7 +316,9 @@ def treasury(ctx, view, json_output):
                     WHEN 'DGS10' THEN 7
                     WHEN 'DGS30' THEN 8
                 END
-        """))
+        """
+            )
+        )
         yields = {row[0]: {"value": float(row[1]), "date": row[2]} for row in result}
 
     if not yields:

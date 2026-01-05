@@ -10,9 +10,9 @@ This ensures consistent handling of both cached and direct LLM responses.
 """
 
 import json
-import re
 import logging
-from typing import Dict, Any, Tuple, Optional, Union
+import re
+from typing import Any, Dict, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 

@@ -44,8 +44,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import create_engine, text
 
-# Victor-Invest imports
-from victor_invest.workflows import AnalysisMode, run_analysis
+# Victor-Invest imports - uses BaseYAMLWorkflowProvider pattern
+from victor_invest.workflows import (
+    AnalysisMode,
+    InvestmentWorkflowProvider,
+    run_analysis,  # Fallback for backwards compatibility
+)
 
 # RL Infrastructure imports for tracking predictions
 try:
@@ -236,6 +240,11 @@ class BatchAnalysisRunner:
         # Initialize data source facade for economic indicators
         self.data_source_facade = get_data_source_facade()
         logger.info("DataSourceFacade initialized for economic indicators")
+
+        # Initialize InvestmentWorkflowProvider (BaseYAMLWorkflowProvider pattern)
+        # This loads YAML workflows and registers handlers for compute nodes
+        self.workflow_provider = InvestmentWorkflowProvider()
+        logger.info(f"InvestmentWorkflowProvider initialized with workflows: {self.workflow_provider.get_workflow_names()}")
 
     def get_symbol_metadata(self, symbol: str) -> Dict[str, Any]:
         """
@@ -466,6 +475,60 @@ class BatchAnalysisRunner:
             logger.debug(f"Failed to fetch economic indicators: {e}")
             return {}
 
+    def _convert_workflow_result(self, symbol: str, workflow_result: Any) -> Any:
+        """Convert YAML workflow result to AnalysisWorkflowState format.
+
+        Bridges the gap between YAML workflow execution output and the
+        expected AnalysisWorkflowState for RL tracking and result processing.
+        """
+        from victor_invest.workflows import AnalysisWorkflowState
+
+        # Extract outputs from workflow context
+        context_data = {}
+        if hasattr(workflow_result, 'context'):
+            ctx = workflow_result.context
+            # Get outputs from context - either dict or WorkflowContext
+            if hasattr(ctx, 'get'):
+                context_data = {
+                    "symbol": ctx.get("symbol", symbol),
+                    "mode": ctx.get("mode", self.mode.value),
+                    "sec_data": ctx.get("sec_data"),
+                    "market_data": ctx.get("market_data"),
+                    "fundamental_analysis": ctx.get("fundamental_analysis"),
+                    "technical_analysis": ctx.get("technical_analysis"),
+                    "market_context": ctx.get("market_context"),
+                    "synthesis": ctx.get("synthesis"),
+                    "recommendation": ctx.get("recommendation") or ctx.get("synthesis", {}).get("recommendation"),
+                }
+            elif isinstance(ctx, dict):
+                context_data = ctx
+        elif isinstance(workflow_result, dict):
+            context_data = workflow_result
+
+        # Create AnalysisWorkflowState from context data
+        state = AnalysisWorkflowState(
+            symbol=symbol.upper(),
+            mode=self.mode,
+        )
+
+        # Populate state fields
+        if context_data.get("sec_data"):
+            state.sec_data = context_data["sec_data"]
+        if context_data.get("market_data"):
+            state.market_data = context_data["market_data"]
+        if context_data.get("fundamental_analysis"):
+            state.fundamental_analysis = context_data["fundamental_analysis"]
+        if context_data.get("technical_analysis"):
+            state.technical_analysis = context_data["technical_analysis"]
+        if context_data.get("market_context"):
+            state.market_context = context_data["market_context"]
+        if context_data.get("synthesis"):
+            state.synthesis = context_data["synthesis"]
+        if context_data.get("recommendation"):
+            state.recommendation = context_data["recommendation"]
+
+        return state
+
     def _build_valuation_context(
         self, symbol: str, result: Any, current_price: Optional[float] = None, fair_value: Optional[float] = None
     ) -> Any:
@@ -575,7 +638,12 @@ class BatchAnalysisRunner:
         )
 
     async def analyze_symbol(self, symbol: str) -> SymbolResult:
-        """Run analysis for a single symbol using victor-invest workflow."""
+        """Run analysis for a single symbol using InvestmentWorkflowProvider.
+
+        Uses BaseYAMLWorkflowProvider pattern with YAML-defined workflows and
+        shared handlers for compute nodes. This ensures consistent execution
+        across CLI, batch runner, and RL backtest.
+        """
         start_time = time.time()
 
         try:
@@ -586,8 +654,32 @@ class BatchAnalysisRunner:
 
             logger.info(f"  Starting: {symbol} ({sector})")
 
-            # Run the analysis workflow
-            result = await run_analysis(symbol.upper(), self.mode)
+            # Map mode to workflow name
+            workflow_name = self.workflow_provider.get_workflow_for_task_type(self.mode.value) or self.mode.value
+
+            # Get the workflow definition
+            workflow = self.workflow_provider.get_workflow(workflow_name)
+
+            if workflow:
+                # Execute via YAML workflow with shared handlers
+                from victor.workflows.executor import WorkflowExecutor, WorkflowContext
+
+                # Create execution context with symbol
+                context = WorkflowContext({"symbol": symbol.upper(), "mode": self.mode.value})
+
+                # Create executor (no orchestrator needed for pure compute workflows)
+                # All our handlers have llm_allowed: false
+                executor = WorkflowExecutor(orchestrator=None)
+
+                # Execute the workflow
+                workflow_result = await executor.execute(workflow, context)
+
+                # Convert workflow result to expected format
+                result = self._convert_workflow_result(symbol, workflow_result)
+            else:
+                # Fallback to Python-based execution if workflow not found
+                logger.debug(f"  Workflow '{workflow_name}' not found, using Python fallback")
+                result = await run_analysis(symbol.upper(), self.mode)
 
             duration = time.time() - start_time
 
@@ -605,11 +697,24 @@ class BatchAnalysisRunner:
             if result.synthesis:
                 fair_value = result.synthesis.get("fair_value")
                 current_price = result.synthesis.get("current_price")
-                if fair_value and current_price and current_price > 0:
-                    upside_pct = ((fair_value / current_price) - 1) * 100
                 tier = result.synthesis.get("tier")
                 model_fair_values = result.synthesis.get("model_fair_values", {})
                 model_weights = result.synthesis.get("model_weights", {})
+
+                # Calculate fair_value from model weights if not directly provided
+                if fair_value is None and model_fair_values and model_weights:
+                    total_weight = sum(model_weights.values())
+                    if total_weight > 0:
+                        weighted_sum = sum(
+                            fv * model_weights.get(model, 0)
+                            for model, fv in model_fair_values.items()
+                            if fv is not None
+                        )
+                        fair_value = weighted_sum / total_weight
+                        logger.debug(f"  Calculated fair_value from model weights: ${fair_value:.2f}")
+
+                if fair_value and current_price and current_price > 0:
+                    upside_pct = ((fair_value / current_price) - 1) * 100
 
                 # Update market cap from current price if available
                 if current_price and shares_outstanding:
@@ -648,13 +753,14 @@ class BatchAnalysisRunner:
 
             # Enhanced logging with shares and market cap
             fv_str = f"${fair_value:.2f}" if fair_value else "N/A"
+            price_str = f"${current_price:.2f}" if current_price else "N/A"
             upside_str = f"{upside_pct:.1f}%" if upside_pct is not None else "N/A"
             shares_str = f"{shares_outstanding/1e9:.2f}B" if shares_outstanding else "N/A"
             mktcap_str = f"${market_cap/1e9:.0f}B" if market_cap else "N/A"
 
             logger.info(
                 f"  Done: {symbol} [{tier or 'unknown'}] in {duration:.1f}s | "
-                f"FV={fv_str}, Price=${current_price:.2f if current_price else 0:.2f}, "
+                f"FV={fv_str}, Price={price_str}, "
                 f"Upside={upside_str}, Shares={shares_str}, MktCap={mktcap_str}"
             )
 

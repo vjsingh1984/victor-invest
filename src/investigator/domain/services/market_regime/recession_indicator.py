@@ -49,21 +49,23 @@ logger = logging.getLogger(__name__)
 
 class EconomicPhase(Enum):
     """Economic cycle phase classification."""
-    EXPANSION = "expansion"           # Strong growth, low recession risk
-    LATE_CYCLE = "late_cycle"         # Maturing expansion, rising risks
-    PRE_RECESSION = "pre_recession"   # High recession probability
-    RECESSION = "recession"           # Economic contraction
-    RECOVERY = "recovery"             # Early expansion from trough
+
+    EXPANSION = "expansion"  # Strong growth, low recession risk
+    LATE_CYCLE = "late_cycle"  # Maturing expansion, rising risks
+    PRE_RECESSION = "pre_recession"  # High recession probability
+    RECESSION = "recession"  # Economic contraction
+    RECOVERY = "recovery"  # Early expansion from trough
     UNKNOWN = "unknown"
 
 
 class InvestmentPosture(Enum):
     """Recommended investment posture."""
-    AGGRESSIVE = "aggressive"         # Max equity, growth/cyclicals
-    GROWTH = "growth"                 # Above-avg equity, balanced sectors
-    BALANCED = "balanced"             # Neutral positioning
-    CAUTIOUS = "cautious"             # Below-avg equity, quality focus
-    DEFENSIVE = "defensive"           # Low equity, defensives/bonds
+
+    AGGRESSIVE = "aggressive"  # Max equity, growth/cyclicals
+    GROWTH = "growth"  # Above-avg equity, balanced sectors
+    BALANCED = "balanced"  # Neutral positioning
+    CAUTIOUS = "cautious"  # Below-avg equity, quality focus
+    DEFENSIVE = "defensive"  # Low equity, defensives/bonds
     STRONGLY_DEFENSIVE = "strongly_defensive"  # Min equity, max safety
 
 
@@ -83,6 +85,7 @@ class RecessionAssessment:
         confidence: Confidence in the assessment (0-1)
         warnings: Any data quality warnings
     """
+
     date: date
     probability: float = 0.0
     phase: EconomicPhase = EconomicPhase.UNKNOWN
@@ -213,10 +216,7 @@ class RecessionAssessment:
                 "Consider increasing equity, favor cyclicals."
             ),
         }
-        return interpretations.get(
-            self.phase,
-            "Economic conditions uncertain. Maintain balanced positioning."
-        )
+        return interpretations.get(self.phase, "Economic conditions uncertain. Maintain balanced positioning.")
 
     @property
     def equity_allocation_range(self) -> tuple:
@@ -283,15 +283,15 @@ class RecessionIndicator:
         """Lazy-load NY Fed client."""
         if self._nyfed_client is None:
             from investigator.infrastructure.external.nyfed import get_nyfed_client
+
             self._nyfed_client = get_nyfed_client()
         return self._nyfed_client
 
     def _get_yield_analyzer(self):
         """Lazy-load yield curve analyzer."""
         if self._yield_analyzer is None:
-            from investigator.domain.services.market_regime.yield_curve_analyzer import (
-                get_yield_curve_analyzer
-            )
+            from investigator.domain.services.market_regime.yield_curve_analyzer import get_yield_curve_analyzer
+
             self._yield_analyzer = get_yield_curve_analyzer()
         return self._yield_analyzer
 
@@ -324,15 +324,11 @@ class RecessionIndicator:
             curve_analysis = await yield_analyzer.analyze()
 
             if curve_analysis:
-                assessment.yield_curve_inverted = curve_analysis.shape.value in ('inverted', 'deeply_inverted')
+                assessment.yield_curve_inverted = curve_analysis.shape.value in ("inverted", "deeply_inverted")
                 assessment.inversion_days = curve_analysis.days_inverted
 
             # Build leading indicators summary
-            assessment.leading_indicators = self._build_leading_indicators(
-                recession_prob,
-                gscpi,
-                curve_analysis
-            )
+            assessment.leading_indicators = self._build_leading_indicators(recession_prob, gscpi, curve_analysis)
 
             # Recalculate derived values after setting all inputs
             assessment._classify_phase()
@@ -346,12 +342,7 @@ class RecessionIndicator:
             assessment.warnings.append(f"Assessment error: {str(e)}")
             return assessment
 
-    def _build_leading_indicators(
-        self,
-        recession_prob,
-        gscpi,
-        curve_analysis
-    ) -> Dict[str, str]:
+    def _build_leading_indicators(self, recession_prob, gscpi, curve_analysis) -> Dict[str, str]:
         """Build leading indicators summary."""
         indicators = {}
 

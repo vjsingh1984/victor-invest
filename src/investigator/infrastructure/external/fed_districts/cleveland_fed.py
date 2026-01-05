@@ -48,13 +48,14 @@ MEDIAN_CPI_URL = "https://www.clevelandfed.org/-/media/files/charts/median-cpi/m
 
 class InflationOutlook(Enum):
     """Classification of inflation expectations."""
-    DEFLATION_RISK = "deflation_risk"      # < 1%
-    VERY_LOW = "very_low"                  # 1-1.5%
-    LOW = "low"                            # 1.5-2%
-    TARGET = "target"                      # 2-2.5%
-    ELEVATED = "elevated"                  # 2.5-3%
-    HIGH = "high"                          # 3-4%
-    VERY_HIGH = "very_high"                # > 4%
+
+    DEFLATION_RISK = "deflation_risk"  # < 1%
+    VERY_LOW = "very_low"  # 1-1.5%
+    LOW = "low"  # 1.5-2%
+    TARGET = "target"  # 2-2.5%
+    ELEVATED = "elevated"  # 2.5-3%
+    HIGH = "high"  # 3-4%
+    VERY_HIGH = "very_high"  # > 4%
 
 
 @dataclass
@@ -74,6 +75,7 @@ class InflationExpectations:
         inflation_risk_premium: Compensation for inflation uncertainty
         outlook: Classified inflation outlook
     """
+
     date: date
     one_year: float
     two_year: Optional[float] = None
@@ -136,6 +138,7 @@ class YieldCurveModel:
         term_spread_10y_3m: 10Y-3M spread used
         term_spread_10y_2y: 10Y-2Y spread
     """
+
     date: date
     recession_prob_12m: float
     recession_prob_24m: Optional[float] = None
@@ -168,6 +171,7 @@ class MedianCPI:
         trimmed_mean_16: 16% trimmed-mean CPI
         trimmed_mean_16_yoy: 16% trimmed-mean year-over-year
     """
+
     date: date
     median_cpi: float
     median_cpi_yoy: Optional[float] = None
@@ -198,6 +202,7 @@ class ClevelandFedClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()
@@ -231,6 +236,7 @@ class ClevelandFedClient:
         """Parse inflation expectations from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -250,11 +256,11 @@ class ClevelandFedClient:
                         return col
                 return None
 
-            one_yr = find_col('1-year') or find_col('1 year') or find_col('1yr')
-            two_yr = find_col('2-year') or find_col('2 year') or find_col('2yr')
-            five_yr = find_col('5-year') or find_col('5 year') or find_col('5yr')
-            ten_yr = find_col('10-year') or find_col('10 year') or find_col('10yr')
-            five_five = find_col('5y5y') or find_col('5-year, 5-year')
+            one_yr = find_col("1-year") or find_col("1 year") or find_col("1yr")
+            two_yr = find_col("2-year") or find_col("2 year") or find_col("2yr")
+            five_yr = find_col("5-year") or find_col("5 year") or find_col("5yr")
+            ten_yr = find_col("10-year") or find_col("10 year") or find_col("10yr")
+            five_five = find_col("5y5y") or find_col("5-year, 5-year")
 
             # Use first numeric column as fallback
             one_year_val = float(latest[one_yr]) if one_yr else float(latest[df.columns[1]])
@@ -294,6 +300,7 @@ class ClevelandFedClient:
         """Parse yield curve model from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -313,10 +320,10 @@ class ClevelandFedClient:
                         return col
                 return None
 
-            prob_col = find_col('recession') or find_col('probability') or df.columns[1]
-            gdp_col = find_col('gdp')
-            spread_10_3 = find_col('10y-3m') or find_col('10-3')
-            spread_10_2 = find_col('10y-2y') or find_col('10-2')
+            prob_col = find_col("recession") or find_col("probability") or df.columns[1]
+            gdp_col = find_col("gdp")
+            spread_10_3 = find_col("10y-3m") or find_col("10-3")
+            spread_10_2 = find_col("10y-2y") or find_col("10-2")
 
             return YieldCurveModel(
                 date=obs_date,
@@ -352,6 +359,7 @@ class ClevelandFedClient:
         """Parse median CPI from Excel file."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -371,8 +379,8 @@ class ClevelandFedClient:
                         return col
                 return None
 
-            median_col = find_col('median') or df.columns[1]
-            trimmed_col = find_col('trimmed') or find_col('16%')
+            median_col = find_col("median") or df.columns[1]
+            trimmed_col = find_col("trimmed") or find_col("16%")
 
             return MedianCPI(
                 date=obs_date,

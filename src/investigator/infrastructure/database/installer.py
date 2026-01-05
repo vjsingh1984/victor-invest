@@ -50,9 +50,7 @@ def get_schema_dir() -> Path:
     if cwd_path.exists():
         return cwd_path
 
-    raise FileNotFoundError(
-        f"Schema directory not found. Tried: {SCHEMA_DIR}, {cwd_path}"
-    )
+    raise FileNotFoundError(f"Schema directory not found. Tried: {SCHEMA_DIR}, {cwd_path}")
 
 
 def load_schema_sql(schema_dir: Path) -> str:
@@ -125,14 +123,10 @@ def install_postgres(db_url: str, schema_sql: str) -> Tuple[bool, str]:
 
         # Verify
         with engine.connect() as conn:
-            result = conn.execute(text(
-                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"
-            ))
+            result = conn.execute(text("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"))
             table_count = result.scalar()
 
-            result = conn.execute(text(
-                "SELECT version, description FROM schema_version ORDER BY version DESC LIMIT 1"
-            ))
+            result = conn.execute(text("SELECT version, description FROM schema_version ORDER BY version DESC LIMIT 1"))
             version_row = result.fetchone()
             version = version_row[0] if version_row else "unknown"
 
@@ -152,35 +146,16 @@ def convert_sqlite_to_postgres(sql: str) -> str:
 
     # AUTOINCREMENT -> SERIAL (handled differently)
     # In PostgreSQL, we use SERIAL which auto-creates sequence
-    pg_sql = re.sub(
-        r"INTEGER PRIMARY KEY AUTOINCREMENT",
-        "SERIAL PRIMARY KEY",
-        pg_sql,
-        flags=re.IGNORECASE
-    )
+    pg_sql = re.sub(r"INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY", pg_sql, flags=re.IGNORECASE)
 
     # datetime('now') -> NOW()
-    pg_sql = re.sub(
-        r"datetime\('now'\)",
-        "NOW()",
-        pg_sql,
-        flags=re.IGNORECASE
-    )
+    pg_sql = re.sub(r"datetime\('now'\)", "NOW()", pg_sql, flags=re.IGNORECASE)
 
     # INSERT OR IGNORE -> INSERT ... ON CONFLICT DO NOTHING
-    pg_sql = re.sub(
-        r"INSERT OR IGNORE INTO",
-        "INSERT INTO",
-        pg_sql,
-        flags=re.IGNORECASE
-    )
+    pg_sql = re.sub(r"INSERT OR IGNORE INTO", "INSERT INTO", pg_sql, flags=re.IGNORECASE)
 
     # Add ON CONFLICT DO NOTHING where appropriate
-    pg_sql = re.sub(
-        r"(VALUES \([^)]+\))(\s*;)",
-        r"\1 ON CONFLICT DO NOTHING\2",
-        pg_sql
-    )
+    pg_sql = re.sub(r"(VALUES \([^)]+\))(\s*;)", r"\1 ON CONFLICT DO NOTHING\2", pg_sql)
 
     return pg_sql
 
@@ -201,7 +176,7 @@ def split_sql_statements(sql: str) -> list:
 
         # Track string state
         for i, char in enumerate(line):
-            if char in ("'", '"') and (i == 0 or line[i-1] != "\\"):
+            if char in ("'", '"') and (i == 0 or line[i - 1] != "\\"):
                 if not in_string:
                     in_string = True
                     string_char = char
@@ -247,11 +222,12 @@ def check_schema_version(db_url: str, is_sqlite: bool = False) -> Tuple[bool, st
                 conn.close()
         else:
             from sqlalchemy import create_engine, text
+
             engine = create_engine(db_url)
             with engine.connect() as conn:
-                result = conn.execute(text(
-                    "SELECT version, description, applied_at FROM schema_version ORDER BY version DESC"
-                ))
+                result = conn.execute(
+                    text("SELECT version, description, applied_at FROM schema_version ORDER BY version DESC")
+                )
                 rows = result.fetchall()
                 if rows:
                     result_str = "\n".join([f"  {r[0]}: {r[1]} ({r[2]})" for r in rows])
@@ -278,37 +254,18 @@ Examples:
 
   # Check current version
   python -m investigator.infrastructure.database.installer --check --sqlite investigator.db
-        """
+        """,
     )
 
-    parser.add_argument(
-        "--sqlite",
-        metavar="PATH",
-        help="SQLite database path"
-    )
-    parser.add_argument(
-        "--postgres",
-        metavar="URL",
-        help="PostgreSQL connection URL"
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Check schema version instead of installing"
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Verbose output"
-    )
+    parser.add_argument("--sqlite", metavar="PATH", help="SQLite database path")
+    parser.add_argument("--postgres", metavar="URL", help="PostgreSQL connection URL")
+    parser.add_argument("--check", action="store_true", help="Check schema version instead of installing")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
 
     args = parser.parse_args()
 
     # Setup logging
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(levelname)s: %(message)s"
-    )
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s: %(message)s")
 
     if not args.sqlite and not args.postgres:
         parser.error("Either --sqlite or --postgres is required")

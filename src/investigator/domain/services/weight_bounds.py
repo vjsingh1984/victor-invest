@@ -30,14 +30,15 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class BoundAction(Enum):
     """Action taken when a bound is applied."""
+
     NONE = "none"
     FLOOR_APPLIED = "floor_applied"
     CEILING_APPLIED = "ceiling_applied"
@@ -47,6 +48,7 @@ class BoundAction(Enum):
 @dataclass
 class MultiplierAuditEntry:
     """Audit entry for a single multiplier application."""
+
     model: str
     group: str
     original_multiplier: float
@@ -58,6 +60,7 @@ class MultiplierAuditEntry:
 @dataclass
 class BoundedMultiplierResult:
     """Result of bounded multiplier application."""
+
     adjusted_weights: Dict[str, float]
     cumulative_multipliers: Dict[str, float]
     audit_entries: List[MultiplierAuditEntry]
@@ -77,11 +80,12 @@ class BoundedMultiplierResult:
 @dataclass
 class BoundConfig:
     """Configuration for weight bounds."""
-    cumulative_floor: float = 0.50      # Never below 50% of base
-    cumulative_ceiling: float = 1.50    # Never above 150% of base
-    per_model_minimum: float = 5.0      # Minimum 5% weight per model
-    warning_threshold: float = 0.70     # Warn if approaching bounds
-    normalization_target: float = 100.0 # Target sum for normalized weights
+
+    cumulative_floor: float = 0.50  # Never below 50% of base
+    cumulative_ceiling: float = 1.50  # Never above 150% of base
+    per_model_minimum: float = 5.0  # Minimum 5% weight per model
+    warning_threshold: float = 0.70  # Warn if approaching bounds
+    normalization_target: float = 100.0  # Target sum for normalized weights
 
 
 class BoundedMultiplierApplicator:
@@ -116,10 +120,7 @@ class BoundedMultiplierApplicator:
         self.config = config or BoundConfig()
 
     def apply_multipliers(
-        self,
-        base_weights: Dict[str, float],
-        multiplier_groups: Dict[str, Dict[str, float]],
-        symbol: str
+        self, base_weights: Dict[str, float], multiplier_groups: Dict[str, Dict[str, float]], symbol: str
     ) -> BoundedMultiplierResult:
         """
         Apply multipliers with bounded cumulative effects.
@@ -153,13 +154,15 @@ class BoundedMultiplierApplicator:
                     cumulative *= multiplier
 
                     # Track each step
-                    audit_entries.append(MultiplierAuditEntry(
-                        model=model,
-                        group=group_name,
-                        original_multiplier=multiplier,
-                        applied_multiplier=multiplier,
-                        action=BoundAction.NONE
-                    ))
+                    audit_entries.append(
+                        MultiplierAuditEntry(
+                            model=model,
+                            group=group_name,
+                            original_multiplier=multiplier,
+                            applied_multiplier=multiplier,
+                            action=BoundAction.NONE,
+                        )
+                    )
 
             cumulative_multipliers[model] = cumulative
 
@@ -175,46 +178,38 @@ class BoundedMultiplierApplicator:
             if cumulative < self.config.cumulative_floor:
                 bounded = self.config.cumulative_floor
                 action = BoundAction.FLOOR_APPLIED
-                reason = (
-                    f"Cumulative multiplier {cumulative:.3f} below floor {self.config.cumulative_floor}"
-                )
+                reason = f"Cumulative multiplier {cumulative:.3f} below floor {self.config.cumulative_floor}"
                 bounds_applied = True
-                warnings.append(
-                    f"[{symbol}] {model}: {reason}"
-                )
+                warnings.append(f"[{symbol}] {model}: {reason}")
                 logger.warning(f"[{symbol}] {model}: {reason}")
 
             # Check ceiling
             elif cumulative > self.config.cumulative_ceiling:
                 bounded = self.config.cumulative_ceiling
                 action = BoundAction.CEILING_APPLIED
-                reason = (
-                    f"Cumulative multiplier {cumulative:.3f} above ceiling {self.config.cumulative_ceiling}"
-                )
+                reason = f"Cumulative multiplier {cumulative:.3f} above ceiling {self.config.cumulative_ceiling}"
                 bounds_applied = True
-                warnings.append(
-                    f"[{symbol}] {model}: {reason}"
-                )
+                warnings.append(f"[{symbol}] {model}: {reason}")
                 logger.warning(f"[{symbol}] {model}: {reason}")
 
             # Check warning threshold (approaching bounds)
             elif cumulative < self.config.warning_threshold:
-                warnings.append(
-                    f"[{symbol}] {model}: Approaching floor (multiplier: {cumulative:.3f})"
-                )
+                warnings.append(f"[{symbol}] {model}: Approaching floor (multiplier: {cumulative:.3f})")
                 logger.debug(f"[{symbol}] {model}: Approaching floor (multiplier: {cumulative:.3f})")
 
             bounded_multipliers[model] = bounded
 
             if action != BoundAction.NONE:
-                audit_entries.append(MultiplierAuditEntry(
-                    model=model,
-                    group="cumulative_bound",
-                    original_multiplier=cumulative,
-                    applied_multiplier=bounded,
-                    action=action,
-                    reason=reason
-                ))
+                audit_entries.append(
+                    MultiplierAuditEntry(
+                        model=model,
+                        group="cumulative_bound",
+                        original_multiplier=cumulative,
+                        applied_multiplier=bounded,
+                        action=action,
+                        reason=reason,
+                    )
+                )
 
         # Apply bounded multipliers to base weights
         adjusted_weights: Dict[str, float] = {}
@@ -227,45 +222,41 @@ class BoundedMultiplierApplicator:
         # Enforce per-model minimum
         for model, weight in adjusted_weights.items():
             if weight < self.config.per_model_minimum:
-                reason = (
-                    f"Weight {weight:.2f}% below minimum {self.config.per_model_minimum}%"
-                )
+                reason = f"Weight {weight:.2f}% below minimum {self.config.per_model_minimum}%"
                 warnings.append(f"[{symbol}] {model}: {reason}")
                 logger.warning(f"[{symbol}] {model}: {reason}")
 
                 adjusted_weights[model] = self.config.per_model_minimum
                 bounds_applied = True
 
-                audit_entries.append(MultiplierAuditEntry(
-                    model=model,
-                    group="minimum_weight",
-                    original_multiplier=weight / base_weights[model] if base_weights[model] > 0 else 0,
-                    applied_multiplier=self.config.per_model_minimum / base_weights[model] if base_weights[model] > 0 else 0,
-                    action=BoundAction.MINIMUM_APPLIED,
-                    reason=reason
-                ))
+                audit_entries.append(
+                    MultiplierAuditEntry(
+                        model=model,
+                        group="minimum_weight",
+                        original_multiplier=weight / base_weights[model] if base_weights[model] > 0 else 0,
+                        applied_multiplier=(
+                            self.config.per_model_minimum / base_weights[model] if base_weights[model] > 0 else 0
+                        ),
+                        action=BoundAction.MINIMUM_APPLIED,
+                        reason=reason,
+                    )
+                )
 
         # Normalize to target (default 100%)
         total = sum(adjusted_weights.values())
         if total > 0 and abs(total - self.config.normalization_target) > 0.1:
             scale = self.config.normalization_target / total
-            adjusted_weights = {
-                model: weight * scale
-                for model, weight in adjusted_weights.items()
-            }
+            adjusted_weights = {model: weight * scale for model, weight in adjusted_weights.items()}
 
         return BoundedMultiplierResult(
             adjusted_weights=adjusted_weights,
             cumulative_multipliers=cumulative_multipliers,
             audit_entries=audit_entries,
             warnings=warnings,
-            bounds_applied=bounds_applied
+            bounds_applied=bounds_applied,
         )
 
-    def validate_weights(
-        self,
-        weights: Dict[str, float]
-    ) -> Tuple[bool, List[str]]:
+    def validate_weights(self, weights: Dict[str, float]) -> Tuple[bool, List[str]]:
         """
         Validate that weights meet all bounds constraints.
 
@@ -280,16 +271,12 @@ class BoundedMultiplierApplicator:
         # Check per-model minimum
         for model, weight in weights.items():
             if weight < self.config.per_model_minimum:
-                issues.append(
-                    f"{model}: Weight {weight:.2f}% below minimum {self.config.per_model_minimum}%"
-                )
+                issues.append(f"{model}: Weight {weight:.2f}% below minimum {self.config.per_model_minimum}%")
 
         # Check sum is approximately 100%
         total = sum(weights.values())
         if abs(total - self.config.normalization_target) > 1.0:
-            issues.append(
-                f"Total weight {total:.2f}% deviates from target {self.config.normalization_target}%"
-            )
+            issues.append(f"Total weight {total:.2f}% deviates from target {self.config.normalization_target}%")
 
         return (len(issues) == 0, issues)
 

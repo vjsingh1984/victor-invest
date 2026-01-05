@@ -356,12 +356,16 @@ class FileCacheStorageHandler(CacheStorageHandler):
                 else:
                     # Add metadata for audit (standard wrapping for other cache types)
                     # Check if value is a dataclass or object with to_dict() method
-                    if hasattr(value, 'to_dict') and callable(getattr(value, 'to_dict')):
+                    if hasattr(value, "to_dict") and callable(getattr(value, "to_dict")):
                         data_to_cache = value.to_dict()
-                    elif hasattr(value, '__dict__') and not isinstance(value, (dict, list, str, int, float, bool, type(None))):
+                    elif hasattr(value, "__dict__") and not isinstance(
+                        value, (dict, list, str, int, float, bool, type(None))
+                    ):
                         # Dataclass or custom object - try to serialize it
                         data_to_cache = str(value)  # Fallback to string representation
-                        logger.warning(f"Caching object without to_dict() method: {type(value)}. Using string representation.")
+                        logger.warning(
+                            f"Caching object without to_dict() method: {type(value)}. Using string representation."
+                        )
                     else:
                         data_to_cache = value
 

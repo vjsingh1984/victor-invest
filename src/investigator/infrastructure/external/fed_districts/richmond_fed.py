@@ -66,6 +66,7 @@ class FifthDistrictSurvey:
         future_employment: 6-month employment expectations
         survey_type: 'manufacturing' or 'services'
     """
+
     date: date
     composite_index: float
     shipments: Optional[float] = None
@@ -105,6 +106,7 @@ class RichmondFedClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()
@@ -144,7 +146,9 @@ class RichmondFedClient:
     def _parse_survey_excel(self, content: bytes, survey_type: str) -> Optional[FifthDistrictSurvey]:
         try:
             import io
+
             import pandas as pd
+
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
             if df.empty:
                 return None
@@ -159,13 +163,13 @@ class RichmondFedClient:
                         return col
                 return None
 
-            comp_col = find_col('composite') or find_col('index') or df.columns[1]
-            ship_col = find_col('shipment')
-            orders_col = find_col('new order')
-            emp_col = find_col('employment')
-            wages_col = find_col('wage')
-            pp_col = find_col('prices paid')
-            pr_col = find_col('prices received')
+            comp_col = find_col("composite") or find_col("index") or df.columns[1]
+            ship_col = find_col("shipment")
+            orders_col = find_col("new order")
+            emp_col = find_col("employment")
+            wages_col = find_col("wage")
+            pp_col = find_col("prices paid")
+            pr_col = find_col("prices received")
 
             return FifthDistrictSurvey(
                 date=obs_date,
@@ -184,6 +188,7 @@ class RichmondFedClient:
 
     async def get_all_indicators(self) -> Dict[str, Any]:
         import asyncio
+
         mfg, svc = await asyncio.gather(
             self.get_manufacturing_survey(),
             self.get_services_survey(),

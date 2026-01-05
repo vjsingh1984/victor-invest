@@ -5,14 +5,15 @@ Tests 3-stage DCF with Damodaran methodology.
 """
 
 import pytest
+
 from investigator.domain.services.valuation.damodaran_dcf import (
     DamodaranDCFModel,
     DCFProjection,
     MonteCarloResult,
 )
 from investigator.domain.services.valuation.models.base import (
-    ValuationModelResult,
     ModelNotApplicable,
+    ValuationModelResult,
 )
 from investigator.domain.services.valuation.models.company_profile import CompanyProfile
 
@@ -24,9 +25,9 @@ class TestDamodaranDCFModel:
     def company_profile(self):
         """Create test company profile."""
         return CompanyProfile(
-            symbol='AAPL',
-            sector='Technology',
-            industry='Consumer Electronics',
+            symbol="AAPL",
+            sector="Technology",
+            industry="Consumer Electronics",
         )
 
     @pytest.fixture
@@ -48,8 +49,8 @@ class TestDamodaranDCFModel:
 
         assert isinstance(result, ValuationModelResult)
         assert result.fair_value > 0
-        assert result.methodology == '3-Stage DCF (Damodaran)'
-        assert 'high_growth_years' in result.assumptions
+        assert result.methodology == "3-Stage DCF (Damodaran)"
+        assert "high_growth_years" in result.assumptions
 
     def test_negative_fcf_uses_revenue_bridge(self, model):
         """Test that negative FCF uses revenue bridge method."""
@@ -65,7 +66,7 @@ class TestDamodaranDCFModel:
         )
 
         assert isinstance(result, ValuationModelResult)
-        assert result.assumptions.get('use_revenue_bridge') is True
+        assert result.assumptions.get("use_revenue_bridge") is True
 
     def test_three_stage_structure(self, model):
         """Test that projections include all three stages."""
@@ -80,12 +81,12 @@ class TestDamodaranDCFModel:
         )
 
         # Projection summary is in metadata
-        projection_summary = result.metadata.get('projection_summary', {})
+        projection_summary = result.metadata.get("projection_summary", {})
 
         # Should have high growth and transition years
-        assert projection_summary.get('high_growth_years') == 5
-        assert projection_summary.get('transition_years') == 5
-        assert projection_summary.get('total_years') == 10
+        assert projection_summary.get("high_growth_years") == 5
+        assert projection_summary.get("transition_years") == 5
+        assert projection_summary.get("total_years") == 10
 
     def test_growth_rate_decay(self, model):
         """Test that growth rate decays in transition phase."""
@@ -100,10 +101,10 @@ class TestDamodaranDCFModel:
         )
 
         # High growth rate should be stored in assumptions
-        assert result.assumptions.get('high_growth_rate') == 0.25
+        assert result.assumptions.get("high_growth_rate") == 0.25
 
         # Terminal growth should be lower
-        terminal_growth = result.assumptions.get('terminal_growth')
+        terminal_growth = result.assumptions.get("terminal_growth")
         assert terminal_growth < 0.25
 
     def test_wacc_from_industry(self, model):
@@ -118,9 +119,9 @@ class TestDamodaranDCFModel:
             tax_rate=0.21,
         )
 
-        assert 'wacc' in result.assumptions
-        assert result.assumptions['wacc'] > 0
-        assert result.assumptions['wacc'] < 0.20  # Reasonable range
+        assert "wacc" in result.assumptions
+        assert result.assumptions["wacc"] > 0
+        assert result.assumptions["wacc"] < 0.20  # Reasonable range
 
     def test_custom_high_growth_years(self, model):
         """Test custom high growth period."""
@@ -135,7 +136,7 @@ class TestDamodaranDCFModel:
             high_growth_years=7,  # Custom: 7 years
         )
 
-        assert result.assumptions.get('high_growth_years') == 7
+        assert result.assumptions.get("high_growth_years") == 7
 
     def test_custom_terminal_growth(self, model):
         """Test custom terminal growth rate."""
@@ -150,7 +151,7 @@ class TestDamodaranDCFModel:
             terminal_growth=0.03,  # Custom: 3%
         )
 
-        assert result.assumptions.get('terminal_growth') == 0.03
+        assert result.assumptions.get("terminal_growth") == 0.03
 
     def test_missing_fcf_and_revenue(self, model):
         """Test handling when both FCF and revenue are missing."""
@@ -193,7 +194,7 @@ class TestDamodaranDCFModel:
             current_price=150.0,
         )
 
-        assert 'upside_potential_pct' in result.metadata
+        assert "upside_potential_pct" in result.metadata
 
     def test_monte_carlo_disabled(self, model):
         """Test that Monte Carlo is disabled by default."""
@@ -207,7 +208,7 @@ class TestDamodaranDCFModel:
             tax_rate=0.21,
         )
 
-        assert result.metadata.get('monte_carlo') is None
+        assert result.metadata.get("monte_carlo") is None
 
     def test_monte_carlo_enabled(self, model):
         """Test Monte Carlo simulation when enabled."""
@@ -224,9 +225,9 @@ class TestDamodaranDCFModel:
         )
 
         # Should have Monte Carlo results
-        if 'monte_carlo' in result.metadata:
-            mc = result.metadata['monte_carlo']
-            assert 'range_10_90' in mc or 'mean' in mc
+        if "monte_carlo" in result.metadata:
+            mc = result.metadata["monte_carlo"]
+            assert "range_10_90" in mc or "mean" in mc
 
     def test_default_tax_rate(self, model):
         """Test default tax rate when not provided."""
@@ -240,8 +241,8 @@ class TestDamodaranDCFModel:
         )
 
         # Should use WACC calculated with default tax rate
-        assert result.assumptions.get('wacc') is not None
-        assert result.assumptions.get('wacc') > 0
+        assert result.assumptions.get("wacc") is not None
+        assert result.assumptions.get("wacc") > 0
 
     def test_zero_debt(self, model):
         """Test valuation with zero debt."""
@@ -256,7 +257,7 @@ class TestDamodaranDCFModel:
         )
 
         # WACC should equal cost of equity when no debt
-        wacc = result.assumptions.get('wacc')
+        wacc = result.assumptions.get("wacc")
         assert wacc > 0
 
 
@@ -267,7 +268,7 @@ class TestDCFProjection:
         """Test creating a DCF projection."""
         proj = DCFProjection(
             year=1,
-            phase='high_growth',
+            phase="high_growth",
             revenue=10_000_000_000,
             growth_rate=0.15,
             fcf=1_000_000_000,
@@ -309,9 +310,9 @@ class TestSoftwareCompanyValuation:
     def software_profile(self):
         """Create software company profile."""
         return CompanyProfile(
-            symbol='MSFT',
-            sector='Technology',
-            industry='Software (System & Application)',
+            symbol="MSFT",
+            sector="Technology",
+            industry="Software (System & Application)",
         )
 
     @pytest.fixture
@@ -332,4 +333,4 @@ class TestSoftwareCompanyValuation:
         )
 
         # Software should have specific beta from Damodaran
-        assert 'cost_of_capital' in result.metadata or 'wacc' in result.assumptions
+        assert "cost_of_capital" in result.metadata or "wacc" in result.assumptions

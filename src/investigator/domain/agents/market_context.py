@@ -13,11 +13,11 @@ import pandas as pd
 from sqlalchemy import text
 
 from investigator.domain.agents.base import AgentResult, AgentTask, AnalysisType, InvestmentAgent, TaskStatus
-from investigator.infrastructure.external.fred import (
+from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Uses singleton pattern
+from investigator.infrastructure.external.fred import (  # TODO: Move to infrastructure
     MacroIndicatorsFetcher,
     format_indicator_for_display,
-)  # TODO: Move to infrastructure
-from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Uses singleton pattern
+)
 
 logger = logging.getLogger(__name__)
 
@@ -293,8 +293,38 @@ class ETFMarketContextAgent(InvestmentAgent):
             # Determine sector for the symbol
             sector = self._determine_symbol_sector(symbol, task.context)
 
-            # Get macro indicators first (cached for 24 hours, includes VIXCLS)
-            macro_indicators = self._get_macro_indicators_cached()
+            # Phase 2: Check for pre-fetched consolidated data from DataSourceManager
+            consolidated_data = task.context.get("consolidated_data")
+            macro_indicators = None
+
+            if consolidated_data is not None:
+                try:
+                    # Extract macro data from consolidated data
+                    macro_data = getattr(consolidated_data, "macro", None) or (
+                        consolidated_data.get("macro") if isinstance(consolidated_data, dict) else None
+                    )
+                    fed_data = getattr(consolidated_data, "fed_districts", None) or (
+                        consolidated_data.get("fed_districts") if isinstance(consolidated_data, dict) else None
+                    )
+                    volatility_data = getattr(consolidated_data, "volatility", None) or (
+                        consolidated_data.get("volatility") if isinstance(consolidated_data, dict) else None
+                    )
+
+                    if macro_data or fed_data or volatility_data:
+                        macro_indicators = {
+                            "macro_summary": macro_data,
+                            "fed_districts": fed_data,
+                            "volatility": volatility_data,
+                            "buffett_indicator": None,  # Will be calculated if needed
+                            "fetched_at": datetime.now().isoformat(),
+                        }
+                        logger.debug(f"Using pre-fetched macro data for {symbol} from DataSourceManager")
+                except Exception as e:
+                    logger.debug(f"Could not use consolidated macro data for {symbol}: {e}")
+
+            # Fallback to legacy macro fetch if no pre-fetched data
+            if macro_indicators is None:
+                macro_indicators = self._get_macro_indicators_cached()
 
             # Get market context data (now includes VIX from macro_indicators)
             market_context = await self._analyze_market_context(macro_indicators)
@@ -313,6 +343,9 @@ class ETFMarketContextAgent(InvestmentAgent):
             )
 
             # Compile comprehensive context
+            # Defensive check for macro_indicators
+            if macro_indicators is None:
+                macro_indicators = {}
             context_analysis = {
                 "symbol": symbol,
                 "sector": sector,
@@ -347,8 +380,10 @@ class ETFMarketContextAgent(InvestmentAgent):
             )
 
         except Exception as e:
+            import traceback
+
             processing_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"ETF market context analysis failed for {symbol}: {e}")
+            logger.error(f"ETF market context analysis failed for {symbol}: {e}\n{traceback.format_exc()}")
 
             return AgentResult(
                 task_id=task.task_id,
@@ -593,6 +628,14 @@ class ETFMarketContextAgent(InvestmentAgent):
         macro_indicators: Dict = None,
     ) -> Dict:
         """Generate LLM-powered market sentiment analysis with macro economic context"""
+
+        # Defensive checks for None values
+        if market_context is None:
+            market_context = {}
+        if sector_context is None:
+            sector_context = {}
+        if relative_performance is None:
+            relative_performance = {}
 
         # Prepare data for LLM analysis (including macro economic indicators)
         analysis_data = {
@@ -1061,7 +1104,7 @@ class ETFMarketContextAgent(InvestmentAgent):
                 )
 
             # Extract macro_summary which contains FRED data - apply judicious rounding
-            macro_summary = macro_indicators.get("macro_summary", {})
+            macro_summary = macro_indicators.get("macro_summary") or {}
 
             # GDP per capita (whole numbers sufficient)
             gdp_per_capita = macro_summary.get("GDP_PER_CAPITA")

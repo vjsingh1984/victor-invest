@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class DatabaseType(Enum):
     """Supported database types."""
+
     SQLITE = "sqlite"
     POSTGRES = "postgres"
 
@@ -95,7 +96,7 @@ class SQLiteConnection(DatabaseConnection):
         self.cursor = None
         self._rowcount = 0
 
-    def execute(self, sql: str, params: Optional[List] = None) -> 'SQLiteConnection':
+    def execute(self, sql: str, params: Optional[List] = None) -> "SQLiteConnection":
         """Execute SQL with SQLite parameter style (?)."""
         # Convert PostgreSQL style (:name) to SQLite style (?)
         converted_sql, converted_params = self._convert_params(sql, params)
@@ -111,14 +112,15 @@ class SQLiteConnection(DatabaseConnection):
         if isinstance(params, dict):
             # Convert :name style to ? style
             import re
+
             param_list = []
-            pattern = re.compile(r':(\w+)')
+            pattern = re.compile(r":(\w+)")
 
             def replacer(match):
                 name = match.group(1)
                 if name in params:
                     param_list.append(params[name])
-                    return '?'
+                    return "?"
                 return match.group(0)
 
             converted_sql = pattern.sub(replacer, sql)
@@ -154,13 +156,14 @@ class PostgresConnection(DatabaseConnection):
 
     def __init__(self, engine):
         from sqlalchemy import text
+
         self.engine = engine
         self.conn = engine.connect()
         self.result = None
         self._rowcount = 0
         self._text = text
 
-    def execute(self, sql: str, params: Optional[Union[List, Dict]] = None) -> 'PostgresConnection':
+    def execute(self, sql: str, params: Optional[Union[List, Dict]] = None) -> "PostgresConnection":
         """Execute SQL with PostgreSQL."""
         # Handle both list and dict params
         if isinstance(params, list):
@@ -262,8 +265,7 @@ class SQLiteDatabase(Database):
         conn = self.connect()
         try:
             result = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                [table_name]
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", [table_name]
             ).fetchone()
             return result is not None
         finally:
@@ -274,9 +276,7 @@ class SQLiteDatabase(Database):
             return None
         conn = self.connect()
         try:
-            result = conn.execute(
-                "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
-            ).fetchone()
+            result = conn.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1").fetchone()
             return result[0] if result else None
         finally:
             conn.close()
@@ -291,6 +291,7 @@ class PostgresDatabase(Database):
 
     def __init__(self, url: str):
         from sqlalchemy import create_engine
+
         self.url = url
         self.engine = create_engine(
             url,
@@ -307,6 +308,7 @@ class PostgresDatabase(Database):
     def execute_script(self, sql: str):
         """Execute multi-statement SQL script."""
         from sqlalchemy import text
+
         with self.engine.begin() as conn:
             # Split by semicolon and execute
             for stmt in sql.split(";"):
@@ -326,7 +328,7 @@ class PostgresDatabase(Database):
                 SELECT table_name FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name = :name
                 """,
-                {"name": table_name}
+                {"name": table_name},
             ).fetchone()
             return result is not None
         finally:
@@ -337,9 +339,7 @@ class PostgresDatabase(Database):
             return None
         conn = self.connect()
         try:
-            result = conn.execute(
-                "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
-            ).fetchone()
+            result = conn.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1").fetchone()
             return result[0] if result else None
         finally:
             conn.close()
@@ -385,6 +385,7 @@ def get_database(
             # Get from config
             try:
                 from investigator.config import get_config
+
                 config = get_config()
                 url = config.database.url
                 db_type = DatabaseType.POSTGRES
@@ -399,6 +400,7 @@ def get_database(
     elif db_type == DatabaseType.POSTGRES:
         if not url:
             from investigator.config import get_config
+
             config = get_config()
             url = config.database.url
         db = PostgresDatabase(url)

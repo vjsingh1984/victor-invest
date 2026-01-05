@@ -28,9 +28,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
 from investigator.domain.services.rl.models import ValuationContext
 from investigator.domain.services.rl.policy.base import RLPolicy
-from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -116,14 +116,8 @@ class TechnicalRLPolicy(RLPolicy):
         # mu: mean of weight vector
         # Lambda: precision matrix (inverse covariance)
         self.mu = np.zeros((self.n_actions, self.n_features))
-        self.Lambda = np.array([
-            np.eye(self.n_features) / prior_variance
-            for _ in range(self.n_actions)
-        ])
-        self.Sigma = np.array([
-            np.eye(self.n_features) * prior_variance
-            for _ in range(self.n_actions)
-        ])
+        self.Lambda = np.array([np.eye(self.n_features) / prior_variance for _ in range(self.n_actions)])
+        self.Sigma = np.array([np.eye(self.n_features) * prior_variance for _ in range(self.n_actions)])
 
         # Action statistics
         self.action_counts = np.zeros(self.n_actions)
@@ -137,43 +131,47 @@ class TechnicalRLPolicy(RLPolicy):
     def _extract_features(self, context: ValuationContext) -> np.ndarray:
         """Extract technical features from context."""
         if isinstance(context, dict):
-            features = np.array([
-                context.get("technical_trend", 0.0),
-                context.get("market_sentiment", 0.0),
-                context.get("volatility", 0.5),
-                context.get("rsi_14", 50.0) / 100.0,  # Normalize to 0-1
-                context.get("macd_histogram", 0.0),
-                context.get("obv_trend", 0.0),
-                context.get("adx_14", 25.0) / 100.0,  # Normalize to 0-1
-                context.get("stoch_k", 50.0) / 100.0,  # Normalize to 0-1
-                context.get("mfi_14", 50.0) / 100.0,  # Normalize to 0-1
-                context.get("entry_signal_strength", 0.0),
-                context.get("exit_signal_strength", 0.0),
-                context.get("signal_confluence", 0.0),
-                context.get("days_from_support", 0.5),
-                context.get("risk_reward_ratio", 2.0) / 5.0,  # Normalize
-                context.get("valuation_gap", 0.0),
-                context.get("valuation_confidence", 0.5),
-            ])
+            features = np.array(
+                [
+                    context.get("technical_trend", 0.0),
+                    context.get("market_sentiment", 0.0),
+                    context.get("volatility", 0.5),
+                    context.get("rsi_14", 50.0) / 100.0,  # Normalize to 0-1
+                    context.get("macd_histogram", 0.0),
+                    context.get("obv_trend", 0.0),
+                    context.get("adx_14", 25.0) / 100.0,  # Normalize to 0-1
+                    context.get("stoch_k", 50.0) / 100.0,  # Normalize to 0-1
+                    context.get("mfi_14", 50.0) / 100.0,  # Normalize to 0-1
+                    context.get("entry_signal_strength", 0.0),
+                    context.get("exit_signal_strength", 0.0),
+                    context.get("signal_confluence", 0.0),
+                    context.get("days_from_support", 0.5),
+                    context.get("risk_reward_ratio", 2.0) / 5.0,  # Normalize
+                    context.get("valuation_gap", 0.0),
+                    context.get("valuation_confidence", 0.5),
+                ]
+            )
         else:
-            features = np.array([
-                context.technical_trend,
-                context.market_sentiment,
-                context.volatility,
-                context.rsi_14 / 100.0,
-                context.macd_histogram,
-                context.obv_trend,
-                context.adx_14 / 100.0,
-                context.stoch_k / 100.0,
-                context.mfi_14 / 100.0,
-                context.entry_signal_strength,
-                context.exit_signal_strength,
-                context.signal_confluence,
-                context.days_from_support,
-                context.risk_reward_ratio / 5.0,
-                context.valuation_gap,
-                context.valuation_confidence,
-            ])
+            features = np.array(
+                [
+                    context.technical_trend,
+                    context.market_sentiment,
+                    context.volatility,
+                    context.rsi_14 / 100.0,
+                    context.macd_histogram,
+                    context.obv_trend,
+                    context.adx_14 / 100.0,
+                    context.stoch_k / 100.0,
+                    context.mfi_14 / 100.0,
+                    context.entry_signal_strength,
+                    context.exit_signal_strength,
+                    context.signal_confluence,
+                    context.days_from_support,
+                    context.risk_reward_ratio / 5.0,
+                    context.valuation_gap,
+                    context.valuation_confidence,
+                ]
+            )
 
         return features
 
@@ -237,9 +235,7 @@ class TechnicalRLPolicy(RLPolicy):
 
         # Semiconductor penalty - skip volatile sectors
         is_semiconductor = (
-            "semiconductor" in industry.lower() or
-            "chip" in industry.lower() or
-            sector.lower() == "semiconductors"
+            "semiconductor" in industry.lower() or "chip" in industry.lower() or sector.lower() == "semiconductors"
         )
         if is_semiconductor:
             # Semiconductors have -0.13 avg reward - be very conservative
@@ -311,10 +307,7 @@ class TechnicalRLPolicy(RLPolicy):
 
         # Update mean
         self.Sigma[a] = np.linalg.inv(self.Lambda[a])
-        self.mu[a] = np.dot(
-            self.Sigma[a],
-            np.dot(self.Lambda[a], self.mu[a]) + features * reward / self.noise_variance
-        )
+        self.mu[a] = np.dot(self.Sigma[a], np.dot(self.Lambda[a], self.mu[a]) + features * reward / self.noise_variance)
 
         # Track statistics
         self.action_counts[a] += 1

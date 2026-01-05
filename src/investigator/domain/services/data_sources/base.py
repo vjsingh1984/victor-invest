@@ -9,12 +9,12 @@ This module defines the core abstractions for all data sources following:
 - Dependency Inversion: High-level modules depend on abstractions
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Protocol, TypeVar, Generic
-import logging
+from typing import Any, Dict, Generic, List, Optional, Protocol, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -23,19 +23,22 @@ logger = logging.getLogger(__name__)
 # Data Source Categories
 # =============================================================================
 
+
 class DataCategory(Enum):
     """Categories of data sources for organization and filtering"""
-    MARKET_DATA = auto()      # Prices, volumes, technical indicators
-    FUNDAMENTAL = auto()      # SEC filings, financials, ratios
-    MACRO = auto()            # Economic indicators, Fed data
-    SENTIMENT = auto()        # News, social, insider/institutional
-    VOLATILITY = auto()       # VIX, SKEW, options data
-    FIXED_INCOME = auto()     # Treasury, credit spreads
-    ALTERNATIVE = auto()      # Satellite, web traffic, etc.
+
+    MARKET_DATA = auto()  # Prices, volumes, technical indicators
+    FUNDAMENTAL = auto()  # SEC filings, financials, ratios
+    MACRO = auto()  # Economic indicators, Fed data
+    SENTIMENT = auto()  # News, social, insider/institutional
+    VOLATILITY = auto()  # VIX, SKEW, options data
+    FIXED_INCOME = auto()  # Treasury, credit spreads
+    ALTERNATIVE = auto()  # Satellite, web traffic, etc.
 
 
 class DataFrequency(Enum):
     """Data update frequency"""
+
     REAL_TIME = auto()
     INTRADAY = auto()
     DAILY = auto()
@@ -48,19 +51,22 @@ class DataFrequency(Enum):
 
 class DataQuality(Enum):
     """Data quality levels"""
-    HIGH = auto()      # Primary source, validated
-    MEDIUM = auto()    # Secondary source or computed
-    LOW = auto()       # Fallback or estimated
-    STALE = auto()     # Data is outdated
+
+    HIGH = auto()  # Primary source, validated
+    MEDIUM = auto()  # Secondary source or computed
+    LOW = auto()  # Fallback or estimated
+    STALE = auto()  # Data is outdated
 
 
 # =============================================================================
 # Data Result Types
 # =============================================================================
 
+
 @dataclass
 class DataResult:
     """Standard result wrapper for all data source responses"""
+
     success: bool
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -90,6 +96,7 @@ class DataResult:
 @dataclass
 class SourceMetadata:
     """Metadata about a data source"""
+
     name: str
     category: DataCategory
     frequency: DataFrequency
@@ -106,40 +113,42 @@ class SourceMetadata:
 # Protocol Interfaces (Interface Segregation Principle)
 # =============================================================================
 
+
 class Fetchable(Protocol):
     """Protocol for sources that can fetch data"""
+
     def fetch(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult: ...
 
 
 class BatchFetchable(Protocol):
     """Protocol for sources that support batch fetching"""
+
     def fetch_batch(self, symbols: List[str], as_of_date: Optional[date] = None) -> Dict[str, DataResult]: ...
 
 
 class Refreshable(Protocol):
     """Protocol for sources that support data refresh"""
+
     def refresh(self, symbol: Optional[str] = None) -> bool: ...
 
 
 class Cacheable(Protocol):
     """Protocol for sources that support caching"""
+
     def get_cached(self, symbol: str) -> Optional[DataResult]: ...
     def invalidate_cache(self, symbol: Optional[str] = None) -> None: ...
 
 
 class HistoricalFetchable(Protocol):
     """Protocol for sources that support historical data"""
-    def fetch_historical(
-        self,
-        symbol: str,
-        start_date: date,
-        end_date: date
-    ) -> DataResult: ...
+
+    def fetch_historical(self, symbol: str, start_date: date, end_date: date) -> DataResult: ...
 
 
 # =============================================================================
 # Abstract Base Classes
 # =============================================================================
+
 
 class DataSource(ABC):
     """
@@ -256,12 +265,7 @@ class MarketDataSource(DataSource):
         super().__init__(name, DataCategory.MARKET_DATA, frequency)
 
     @abstractmethod
-    def fetch_historical(
-        self,
-        symbol: str,
-        start_date: date,
-        end_date: date
-    ) -> DataResult:
+    def fetch_historical(self, symbol: str, start_date: date, end_date: date) -> DataResult:
         """Fetch historical data range"""
         pass
 
@@ -284,6 +288,7 @@ class SentimentDataSource(DataSource):
 # Composite Pattern for Multiple Sources
 # =============================================================================
 
+
 class CompositeDataSource(DataSource):
     """
     Combines multiple data sources with fallback logic.
@@ -296,7 +301,7 @@ class CompositeDataSource(DataSource):
         name: str,
         category: DataCategory,
         sources: List[DataSource],
-        strategy: str = "first_success"  # or "merge", "best_quality"
+        strategy: str = "first_success",  # or "merge", "best_quality"
     ):
         super().__init__(name, category, DataFrequency.DAILY)
         self.sources = sources
@@ -380,8 +385,10 @@ class CompositeDataSource(DataSource):
 # Observer Pattern for Data Updates
 # =============================================================================
 
+
 class DataUpdateObserver(Protocol):
     """Protocol for observing data updates"""
+
     def on_data_updated(self, source: str, symbol: str, data: DataResult) -> None: ...
 
 

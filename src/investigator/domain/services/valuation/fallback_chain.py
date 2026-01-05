@@ -32,14 +32,15 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class FallbackReason(Enum):
     """Reason for using fallback."""
+
     DATA_MISSING = "data_missing"
     CALCULATION_ERROR = "calculation_error"
     INVALID_OUTPUT = "invalid_output"
@@ -50,6 +51,7 @@ class FallbackReason(Enum):
 @dataclass
 class FallbackResult:
     """Result of attempting a fallback."""
+
     original_model: str
     fallback_model: Optional[str]
     reason: FallbackReason
@@ -71,6 +73,7 @@ class FallbackResult:
 @dataclass
 class FallbackChainConfig:
     """Configuration for a model's fallback chain."""
+
     model: str
     fallbacks: List[str]
     penalties: List[float]  # Confidence penalty for each fallback level
@@ -118,26 +121,22 @@ class FallbackChain:
     # Default fallback chains
     # Format: model -> [fallback1, fallback2, ...]
     DEFAULT_CHAINS = {
-        'dcf': ['pe', 'ps', 'ev_ebitda'],
-        'damodaran_dcf': ['dcf', 'pe', 'ps'],
-        'pe': ['ps', 'ev_ebitda', 'pb'],
-        'ps': ['ev_revenue', 'ev_ebitda'],
-        'ggm': ['dcf', 'pe', 'ps'],
-        'ev_ebitda': ['pe', 'ps'],
-        'pb': ['ps', 'ev_revenue'],
-        'ev_revenue': ['ps'],
-        'rule_of_40': ['ps', 'ev_revenue'],
-        'saas': ['ps', 'rule_of_40', 'ev_revenue'],
+        "dcf": ["pe", "ps", "ev_ebitda"],
+        "damodaran_dcf": ["dcf", "pe", "ps"],
+        "pe": ["ps", "ev_ebitda", "pb"],
+        "ps": ["ev_revenue", "ev_ebitda"],
+        "ggm": ["dcf", "pe", "ps"],
+        "ev_ebitda": ["pe", "ps"],
+        "pb": ["ps", "ev_revenue"],
+        "ev_revenue": ["ps"],
+        "rule_of_40": ["ps", "ev_revenue"],
+        "saas": ["ps", "rule_of_40", "ev_revenue"],
     }
 
     # Default penalties by fallback level
     DEFAULT_PENALTIES = [0.90, 0.80, 0.70, 0.60]
 
-    def __init__(
-        self,
-        chains: Optional[Dict[str, List[str]]] = None,
-        penalties: Optional[List[float]] = None
-    ):
+    def __init__(self, chains: Optional[Dict[str, List[str]]] = None, penalties: Optional[List[float]] = None):
         """
         Initialize fallback chain.
 
@@ -155,16 +154,10 @@ class FallbackChain:
         self._configs: Dict[str, FallbackChainConfig] = {}
         for model, fallbacks in self.chains.items():
             self._configs[model] = FallbackChainConfig(
-                model=model,
-                fallbacks=fallbacks,
-                penalties=self.penalties[:len(fallbacks)]
+                model=model, fallbacks=fallbacks, penalties=self.penalties[: len(fallbacks)]
             )
 
-    def get_fallback(
-        self,
-        model: str,
-        failed_models: Optional[List[str]] = None
-    ) -> Optional[Tuple[str, float]]:
+    def get_fallback(self, model: str, failed_models: Optional[List[str]] = None) -> Optional[Tuple[str, float]]:
         """
         Get the next fallback model for a failed model.
 
@@ -234,11 +227,7 @@ class FallbackChain:
             return 0.70  # Conservative penalty
 
     def execute_with_fallbacks(
-        self,
-        model_type: str,
-        executor_func: Callable[..., Any],
-        max_fallbacks: int = 3,
-        **kwargs
+        self, model_type: str, executor_func: Callable[..., Any], max_fallbacks: int = 3, **kwargs
     ) -> Tuple[Optional[Any], FallbackResult]:
         """
         Execute a valuation with automatic fallbacks.
@@ -263,24 +252,30 @@ class FallbackChain:
 
                 # Success
                 if fallback_level == 0:
-                    return (result, FallbackResult(
-                        original_model=model_type,
-                        fallback_model=None,
-                        reason=FallbackReason.DATA_MISSING,  # Placeholder
-                        confidence_penalty=1.0,
-                        fallback_level=0,
-                        notes=["Primary model succeeded"]
-                    ))
+                    return (
+                        result,
+                        FallbackResult(
+                            original_model=model_type,
+                            fallback_model=None,
+                            reason=FallbackReason.DATA_MISSING,  # Placeholder
+                            confidence_penalty=1.0,
+                            fallback_level=0,
+                            notes=["Primary model succeeded"],
+                        ),
+                    )
                 else:
                     penalty = self.get_penalty(model_type, current_model)
-                    return (result, FallbackResult(
-                        original_model=model_type,
-                        fallback_model=current_model,
-                        reason=FallbackReason.CALCULATION_ERROR,
-                        confidence_penalty=penalty,
-                        fallback_level=fallback_level,
-                        notes=[f"Used fallback after {', '.join(failed_models)} failed"]
-                    ))
+                    return (
+                        result,
+                        FallbackResult(
+                            original_model=model_type,
+                            fallback_model=current_model,
+                            reason=FallbackReason.CALCULATION_ERROR,
+                            confidence_penalty=penalty,
+                            fallback_level=fallback_level,
+                            notes=[f"Used fallback after {', '.join(failed_models)} failed"],
+                        ),
+                    )
 
             except Exception as e:
                 logger.warning(f"Model {current_model} failed: {e}")
@@ -297,19 +292,20 @@ class FallbackChain:
                     break
 
         # All attempts failed
-        return (None, FallbackResult(
-            original_model=model_type,
-            fallback_model=None,
-            reason=FallbackReason.CALCULATION_ERROR,
-            confidence_penalty=0.0,
-            fallback_level=fallback_level,
-            notes=[f"All models failed: {', '.join(failed_models)}"]
-        ))
+        return (
+            None,
+            FallbackResult(
+                original_model=model_type,
+                fallback_model=None,
+                reason=FallbackReason.CALCULATION_ERROR,
+                confidence_penalty=0.0,
+                fallback_level=fallback_level,
+                notes=[f"All models failed: {', '.join(failed_models)}"],
+            ),
+        )
 
     def get_applicable_models(
-        self,
-        available_data: Dict[str, bool],
-        preferred_order: Optional[List[str]] = None
+        self, available_data: Dict[str, bool], preferred_order: Optional[List[str]] = None
     ) -> List[Tuple[str, float]]:
         """
         Get list of applicable models based on available data.
@@ -323,13 +319,13 @@ class FallbackChain:
         """
         # Data requirements by model
         requirements = {
-            'dcf': ['fcf', 'discount_rate'],
-            'pe': ['eps', 'pe_ratio'],
-            'ps': ['revenue', 'ps_ratio'],
-            'ggm': ['dividend', 'payout_ratio'],
-            'ev_ebitda': ['ebitda', 'enterprise_value'],
-            'pb': ['book_value'],
-            'rule_of_40': ['revenue_growth', 'fcf_margin'],
+            "dcf": ["fcf", "discount_rate"],
+            "pe": ["eps", "pe_ratio"],
+            "ps": ["revenue", "ps_ratio"],
+            "ggm": ["dividend", "payout_ratio"],
+            "ev_ebitda": ["ebitda", "enterprise_value"],
+            "pb": ["book_value"],
+            "rule_of_40": ["revenue_growth", "fcf_margin"],
         }
 
         applicable: List[Tuple[str, float]] = []

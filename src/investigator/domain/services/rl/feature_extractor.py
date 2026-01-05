@@ -32,9 +32,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from investigator.domain.services.rl.models import (
-    ValuationContext,
-    GrowthStage,
     CompanySize,
+    GrowthStage,
+    ValuationContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,20 @@ class ValuationContextExtractor:
         debt_to_equity = self._safe_get_float(ratios, "debt_to_equity", 0.0)
         gross_margin = self._safe_get_float(ratios, "gross_margin", 0.0)
         operating_margin = self._safe_get_float(ratios, "operating_margin", 0.0)
+        net_margin = self._safe_get_float(ratios, "net_margin", 0.0)
+
+        # Calculate net margin from financials if not in ratios
+        if net_margin == 0.0:
+            revenue = financials.get("total_revenue") or financials.get("revenue") or 0
+            net_income = financials.get("net_income") or 0
+            if revenue > 0:
+                net_margin = net_income / revenue
+
+        # Calculate margin bin for RL learning
+        margin_bin = self._calculate_margin_bin(net_margin)
+
+        # Check if industry is structurally low-margin
+        is_low_margin_industry = self._is_low_margin_industry(sector, industry)
 
         # Extract data quality
         data_quality_score = self._safe_get_float(data_quality, "overall_score", 50.0)
@@ -160,8 +174,7 @@ class ValuationContextExtractor:
         tech_ind = market_context.get("technical_indicators", {})
         rsi_14 = self._safe_get_float(tech_ind, "rsi_14", 50.0)
         macd_histogram = self._normalize_macd_histogram(
-            self._safe_get_float(tech_ind, "macd_histogram", 0.0),
-            current_price or 100.0
+            self._safe_get_float(tech_ind, "macd_histogram", 0.0), current_price or 100.0
         )
         obv_trend = self._safe_get_float(tech_ind, "obv_trend", 0.0)  # Already -1 to 1
         adx_14 = self._safe_get_float(tech_ind, "adx_14", 25.0)
@@ -198,6 +211,9 @@ class ValuationContextExtractor:
             debt_to_equity=min(3.0, debt_to_equity),  # Cap at 300%
             gross_margin=gross_margin,
             operating_margin=operating_margin,
+            net_margin=net_margin,
+            margin_bin=margin_bin,
+            is_low_margin_industry=is_low_margin_industry,
             data_quality_score=data_quality_score,
             quarters_available=quarters_available,
             technical_trend=technical_trend,
@@ -261,6 +277,9 @@ class ValuationContextExtractor:
                 context.debt_to_equity / 3.0,  # 0-1 (capped at 300%)
                 context.gross_margin,  # 0-1
                 context.operating_margin,  # 0-1
+                self._normalize_margin(context.net_margin),  # 0-1
+                context.margin_bin / 3.0,  # 0-1 (0-3 bins)
+                1.0 if context.is_low_margin_industry else 0.0,  # Binary flag
                 context.data_quality_score / 100.0,  # 0-1
                 min(1.0, context.quarters_available / 8.0),  # 0-1 (cap at 8 quarters)
                 (context.technical_trend + 1) / 2,  # 0-1 (from -1 to 1)
@@ -356,6 +375,9 @@ class ValuationContextExtractor:
             "debt_to_equity_norm",
             "gross_margin",
             "operating_margin",
+            "net_margin_norm",
+            "margin_bin_norm",
+            "is_low_margin_industry",
             "data_quality_norm",
             "quarters_available_norm",
             "technical_trend_norm",
@@ -589,6 +611,104 @@ class ValuationContextExtractor:
         """Normalize margin to 0-1."""
         # Map -30% to +50% -> 0 to 1
         return max(0.0, min(1.0, (margin + 0.3) / 0.8))
+
+    def _calculate_margin_bin(self, net_margin: float) -> int:
+        """
+        Categorize net margin into bins for RL learning.
+
+        Bins:
+            0: very_low (<2%) - PS weight should be minimal
+            1: low (2-5%) - PS weight should be reduced
+            2: medium (5-10%) - normal PS weight
+            3: high (>10%) - PS weight appropriate
+
+        Args:
+            net_margin: Net profit margin as decimal (e.g., 0.05 for 5%)
+
+        Returns:
+            Bin index (0-3)
+        """
+        if net_margin < 0.02:
+            return 0  # very_low
+        elif net_margin < 0.05:
+            return 1  # low
+        elif net_margin < 0.10:
+            return 2  # medium
+        else:
+            return 3  # high
+
+    def _is_low_margin_industry(self, sector: str, industry: str) -> bool:
+        """
+        Check if industry is known to have structurally low margins (<5%).
+
+        These industries should have reduced PS weight because:
+        - High revenue × any P/S multiple = absurdly high fair value
+        - P/E or EV/EBITDA are more appropriate for low-margin businesses
+
+        Args:
+            sector: Company sector
+            industry: Company industry
+
+        Returns:
+            True if industry is structurally low-margin
+        """
+        if not industry:
+            return False
+
+        industry_lower = industry.lower()
+
+        # Low-margin industries (typically <5% net margin)
+        low_margin_industries = [
+            # Retail (1-3% margins)
+            "department",
+            "specialty retail",
+            "discount stores",
+            "warehouse clubs",
+            "food chains",
+            "grocery",
+            "supermarket",
+            "consumer electronics/video chains",
+            # Hardware/Manufacturing (3-8% margins for most)
+            "computer manufacturing",
+            "computer hardware",
+            # Contract manufacturing / EMS (2-4% margins)
+            "electrical products",  # FLEX, JBL - EMS companies
+            "electronic components",
+            # Airlines (2-5% margins, highly cyclical)
+            "air freight",
+            "airlines",
+            "airline",
+            # Food processing (3-5% margins)
+            "meat/poultry/fish",
+            "packaged foods",
+            "food processing",
+            "farm products",
+            "farming/seeds",
+            # Healthcare services with thin margins
+            "hospital",
+            "nursing",
+            "medical/nursing services",
+            # Insurance and managed care (process large premiums, thin margins)
+            "insurance",
+            "insurers",
+            "managed health care",
+            "managed care",
+            "health care distribution",
+            # Telecom/Cable (can have high capex eating into margins)
+            "cable",
+            "pay television",
+            # Energy transmission
+            "oil/gas transmission",
+            "gas distribution",
+            # Beverages (varies, but many are low margin)
+            "beverages",
+        ]
+
+        for term in low_margin_industries:
+            if term in industry_lower:
+                return True
+
+        return False
 
     def _extract_insider_features(
         self,

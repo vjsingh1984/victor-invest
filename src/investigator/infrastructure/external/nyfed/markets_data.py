@@ -56,12 +56,13 @@ GSCPI_URL = "https://www.newyorkfed.org/medialibrary/media/research/policy/gscpi
 
 class RecessionRiskLevel(Enum):
     """Classification of recession risk."""
-    VERY_LOW = "very_low"      # < 10%
-    LOW = "low"                # 10-20%
-    MODERATE = "moderate"      # 20-35%
-    ELEVATED = "elevated"      # 35-50%
-    HIGH = "high"              # 50-70%
-    VERY_HIGH = "very_high"    # > 70%
+
+    VERY_LOW = "very_low"  # < 10%
+    LOW = "low"  # 10-20%
+    MODERATE = "moderate"  # 20-35%
+    ELEVATED = "elevated"  # 35-50%
+    HIGH = "high"  # 50-70%
+    VERY_HIGH = "very_high"  # > 70%
 
 
 @dataclass
@@ -78,6 +79,7 @@ class RecessionProbability:
         risk_level: Classified risk level
         historical_avg: Historical average probability
     """
+
     date: date
     probability: float
     spread_10y_3m: Optional[float] = None
@@ -128,12 +130,13 @@ class RecessionProbability:
 
 class GSCPILevel(Enum):
     """Classification of GSCPI levels."""
-    VERY_LOW = "very_low"        # < -1.5 std dev
-    LOW = "low"                  # -1.5 to -0.5 std dev
-    NORMAL = "normal"            # -0.5 to 0.5 std dev
-    ELEVATED = "elevated"        # 0.5 to 1.5 std dev
-    HIGH = "high"                # 1.5 to 2.5 std dev
-    VERY_HIGH = "very_high"      # > 2.5 std dev
+
+    VERY_LOW = "very_low"  # < -1.5 std dev
+    LOW = "low"  # -1.5 to -0.5 std dev
+    NORMAL = "normal"  # -0.5 to 0.5 std dev
+    ELEVATED = "elevated"  # 0.5 to 1.5 std dev
+    HIGH = "high"  # 1.5 to 2.5 std dev
+    VERY_HIGH = "very_high"  # > 2.5 std dev
 
 
 @dataclass
@@ -151,6 +154,7 @@ class GSCPIData:
         one_month_change: Change from prior month
         yoy_change: Year-over-year change
     """
+
     date: date
     value: float
     level: GSCPILevel = GSCPILevel.NORMAL
@@ -261,18 +265,13 @@ class NYFedDataClient:
         FRED series: RECPROUSM156N (Smoothed U.S. Recession Probabilities)
         """
         try:
-            from investigator.infrastructure.external.fred.macro_indicators import (
-                get_macro_indicator_service
-            )
+            from investigator.infrastructure.external.fred.macro_indicators import get_macro_indicator_service
 
             service = get_macro_indicator_service()
 
             # Get recession probability from FRED
             loop = asyncio.get_event_loop()
-            value = await loop.run_in_executor(
-                None,
-                lambda: service.get_latest_value('RECPROUSM156N')
-            )
+            value = await loop.run_in_executor(None, lambda: service.get_latest_value("RECPROUSM156N"))
 
             if value is not None:
                 return RecessionProbability(
@@ -296,8 +295,9 @@ class NYFedDataClient:
         where spread is the 10Y-3M Treasury spread in percentage points.
         """
         try:
-            from investigator.infrastructure.external.treasury import get_treasury_client
             import math
+
+            from investigator.infrastructure.external.treasury import get_treasury_client
 
             treasury = get_treasury_client()
             curve = await treasury.get_yield_curve()
@@ -354,27 +354,19 @@ class NYFedDataClient:
         FRED series: GSCPI (Global Supply Chain Pressure Index)
         """
         try:
-            from investigator.infrastructure.external.fred.macro_indicators import (
-                get_macro_indicator_service
-            )
+            from investigator.infrastructure.external.fred.macro_indicators import get_macro_indicator_service
 
             service = get_macro_indicator_service()
             loop = asyncio.get_event_loop()
 
             # Get current value
-            value = await loop.run_in_executor(
-                None,
-                lambda: service.get_latest_value('GSCPI')
-            )
+            value = await loop.run_in_executor(None, lambda: service.get_latest_value("GSCPI"))
 
             if value is None:
                 return None
 
             # Try to get historical for change calculations
-            history = await loop.run_in_executor(
-                None,
-                lambda: service.get_time_series('GSCPI', days=400)
-            )
+            history = await loop.run_in_executor(None, lambda: service.get_time_series("GSCPI", days=400))
 
             one_month_change = None
             yoy_change = None
@@ -382,11 +374,11 @@ class NYFedDataClient:
             if history and len(history) > 1:
                 # Calculate month-over-month change
                 if len(history) >= 2:
-                    one_month_change = value - history[1].get('value', value)
+                    one_month_change = value - history[1].get("value", value)
 
                 # Calculate year-over-year change
                 if len(history) >= 13:
-                    yoy_change = value - history[12].get('value', value)
+                    yoy_change = value - history[12].get("value", value)
 
             return GSCPIData(
                 date=date.today(),
@@ -402,10 +394,7 @@ class NYFedDataClient:
 
         return None
 
-    async def get_recession_probability_history(
-        self,
-        months: int = 24
-    ) -> List[Dict[str, Any]]:
+    async def get_recession_probability_history(self, months: int = 24) -> List[Dict[str, Any]]:
         """Get historical recession probability.
 
         Args:
@@ -415,16 +404,13 @@ class NYFedDataClient:
             List of {date, probability, risk_level} dictionaries
         """
         try:
-            from investigator.infrastructure.external.fred.macro_indicators import (
-                get_macro_indicator_service
-            )
+            from investigator.infrastructure.external.fred.macro_indicators import get_macro_indicator_service
 
             service = get_macro_indicator_service()
             loop = asyncio.get_event_loop()
 
             history = await loop.run_in_executor(
-                None,
-                lambda: service.get_time_series('RECPROUSM156N', days=months * 31)
+                None, lambda: service.get_time_series("RECPROUSM156N", days=months * 31)
             )
 
             if not history:
@@ -433,14 +419,20 @@ class NYFedDataClient:
             result = []
             for entry in history[:months]:
                 prob = RecessionProbability(
-                    date=datetime.strptime(entry['date'], '%Y-%m-%d').date() if isinstance(entry.get('date'), str) else entry.get('date', date.today()),
-                    probability=float(entry.get('value', 0)),
+                    date=(
+                        datetime.strptime(entry["date"], "%Y-%m-%d").date()
+                        if isinstance(entry.get("date"), str)
+                        else entry.get("date", date.today())
+                    ),
+                    probability=float(entry.get("value", 0)),
                 )
-                result.append({
-                    'date': str(prob.date),
-                    'probability': prob.probability,
-                    'risk_level': prob.risk_level.value,
-                })
+                result.append(
+                    {
+                        "date": str(prob.date),
+                        "probability": prob.probability,
+                        "risk_level": prob.risk_level.value,
+                    }
+                )
 
             return result
 

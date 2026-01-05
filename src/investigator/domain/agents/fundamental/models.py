@@ -11,8 +11,8 @@ Updated: 2025-12-29 (TD3 value_type fix)
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class ValueType(Enum):

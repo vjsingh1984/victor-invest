@@ -30,15 +30,15 @@ import os
 import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from investigator.domain.services.rl.models import ValuationContext
 from investigator.domain.services.rl.feature_extractor import (
-    ValuationContextExtractor,
     GICS_SECTORS,
+    ValuationContextExtractor,
 )
+from investigator.domain.services.rl.models import ValuationContext
 
 logger = logging.getLogger(__name__)
 

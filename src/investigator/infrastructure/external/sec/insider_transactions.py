@@ -44,11 +44,13 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
 import aiohttp
 import requests
 
 try:
     import certifi
+
     SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 except ImportError:
     SSL_CONTEXT = ssl.create_default_context()
@@ -58,21 +60,22 @@ logger = logging.getLogger(__name__)
 
 class TransactionType(Enum):
     """SEC Form 4 transaction codes."""
-    PURCHASE = "P"           # Open market or private purchase
-    SALE = "S"               # Open market or private sale
-    GRANT = "A"              # Grant, award, or other acquisition
-    DISPOSITION = "D"        # Disposition to issuer
-    GIFT = "G"               # Gift
-    EXERCISE = "M"           # Exercise or conversion
-    CONVERSION = "C"         # Conversion of derivative
-    TAX_PAYMENT = "F"        # Payment of tax withholding
-    DISCRETIONARY = "I"      # Discretionary transaction
+
+    PURCHASE = "P"  # Open market or private purchase
+    SALE = "S"  # Open market or private sale
+    GRANT = "A"  # Grant, award, or other acquisition
+    DISPOSITION = "D"  # Disposition to issuer
+    GIFT = "G"  # Gift
+    EXERCISE = "M"  # Exercise or conversion
+    CONVERSION = "C"  # Conversion of derivative
+    TAX_PAYMENT = "F"  # Payment of tax withholding
+    DISCRETIONARY = "I"  # Discretionary transaction
     OTHER_ACQUISITION = "J"  # Other acquisition
-    EQUITY_SWAP = "K"        # Equity swap or similar
+    EQUITY_SWAP = "K"  # Equity swap or similar
     SMALL_ACQUISITION = "L"  # Small acquisition under Rule 16a-6
-    WILL_TRUST = "W"         # Acquisition or disposition by will or laws of descent
-    EXERCISE_OOM = "X"       # Exercise of out-of-money derivative
-    OTHER = "Z"              # Other
+    WILL_TRUST = "W"  # Acquisition or disposition by will or laws of descent
+    EXERCISE_OOM = "X"  # Exercise of out-of-money derivative
+    OTHER = "Z"  # Other
 
     @classmethod
     def from_code(cls, code: str) -> Optional["TransactionType"]:
@@ -107,6 +110,7 @@ class TransactionType(Enum):
 @dataclass
 class InsiderTransaction:
     """Represents a single insider transaction."""
+
     transaction_date: Optional[date] = None
     transaction_code: Optional[str] = None
     transaction_type: Optional[TransactionType] = None
@@ -128,6 +132,7 @@ class InsiderTransaction:
 @dataclass
 class ReportingOwner:
     """Represents the insider filing the form."""
+
     cik: Optional[str] = None
     name: str = ""
     title: str = ""
@@ -144,10 +149,14 @@ class ReportingOwner:
 
         title_lower = self.title.lower()
         key_titles = [
-            "chief executive", "ceo",
-            "chief financial", "cfo",
-            "chief operating", "coo",
-            "chief technology", "cto",
+            "chief executive",
+            "ceo",
+            "chief financial",
+            "cfo",
+            "chief operating",
+            "coo",
+            "chief technology",
+            "cto",
             "president",
         ]
 
@@ -164,6 +173,7 @@ class ReportingOwner:
 @dataclass
 class Form4Filing:
     """Represents a parsed Form 4 filing."""
+
     accession_number: str = ""
     filing_date: Optional[date] = None
     issuer_cik: Optional[str] = None
@@ -176,18 +186,12 @@ class Form4Filing:
     @property
     def total_purchase_value(self) -> float:
         """Total value of purchase transactions."""
-        return sum(
-            t.total_value for t in self.transactions
-            if t.transaction_type and t.transaction_type.is_buy
-        )
+        return sum(t.total_value for t in self.transactions if t.transaction_type and t.transaction_type.is_buy)
 
     @property
     def total_sale_value(self) -> float:
         """Total value of sale transactions."""
-        return sum(
-            t.total_value for t in self.transactions
-            if t.transaction_type and t.transaction_type.is_sell
-        )
+        return sum(t.total_value for t in self.transactions if t.transaction_type and t.transaction_type.is_sell)
 
     @property
     def net_value(self) -> float:
@@ -316,7 +320,7 @@ class InsiderTransactionFetcher:
                     "User-Agent": self.USER_AGENT,
                     "Accept-Encoding": "gzip, deflate",
                 },
-                timeout=30
+                timeout=30,
             )
             response.raise_for_status()
             return response.text
@@ -324,12 +328,7 @@ class InsiderTransactionFetcher:
             logger.error(f"Error fetching {url}: {e}")
             return None
 
-    async def fetch_recent_filings(
-        self,
-        symbol: str,
-        days: int = 30,
-        cik: Optional[str] = None
-    ) -> List[Form4Filing]:
+    async def fetch_recent_filings(self, symbol: str, days: int = 30, cik: Optional[str] = None) -> List[Form4Filing]:
         """Fetch recent Form 4 filings for a symbol.
 
         Args:
@@ -356,6 +355,7 @@ class InsiderTransactionFetcher:
 
         try:
             import json
+
             data = json.loads(content)
 
             filings = []
@@ -379,15 +379,10 @@ class InsiderTransactionFetcher:
                             # Fetch and parse the XML
                             accession = accession_numbers[i].replace("-", "")
                             # Use www.sec.gov for XML files (data.sec.gov returns 403)
-                            base_url = (
-                                f"{self.SEC_BASE_URL}/Archives/edgar/data/"
-                                f"{int(cik)}/{accession}"
-                            )
+                            base_url = f"{self.SEC_BASE_URL}/Archives/edgar/data/" f"{int(cik)}/{accession}"
 
                             # Get the actual Form 4 XML (not XSLT-transformed view)
-                            xml_url = await self._find_form4_xml_url(
-                                base_url, primary_docs[i]
-                            )
+                            xml_url = await self._find_form4_xml_url(base_url, primary_docs[i])
 
                             if xml_url:
                                 xml_content = await self._rate_limited_request(xml_url)
@@ -475,11 +470,7 @@ class InsiderTransactionFetcher:
             logger.error(f"Error parsing Form 4 XML: {e}")
             return None
 
-    def _parse_transaction(
-        self,
-        elem: ET.Element,
-        is_derivative: bool = False
-    ) -> Optional[InsiderTransaction]:
+    def _parse_transaction(self, elem: ET.Element, is_derivative: bool = False) -> Optional[InsiderTransaction]:
         """Parse a single transaction element."""
         try:
             trans = InsiderTransaction(is_derivative=is_derivative)
@@ -532,9 +523,7 @@ class InsiderTransactionFetcher:
 
         return default
 
-    async def _find_form4_xml_url(
-        self, base_url: str, primary_doc: str
-    ) -> Optional[str]:
+    async def _find_form4_xml_url(self, base_url: str, primary_doc: str) -> Optional[str]:
         """Find the actual Form 4 XML file URL.
 
         The primaryDocument field often points to XSLT-transformed views

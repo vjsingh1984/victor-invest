@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import psycopg2
 from sqlalchemy import text
 
@@ -25,16 +26,19 @@ from investigator.config import get_config
 
 # Import from Clean Architecture
 from investigator.domain.models import InvestmentRecommendation
-from patterns.analysis.peer_comparison import get_peer_comparison_analyzer  # TODO: Move to investigator.domain.services
-from patterns.llm.llm_facade import create_llm_facade  # TODO: Move to investigator.infrastructure.llm
-from investigator.infrastructure.ui import ASCIIArt
 from investigator.infrastructure.cache import CacheManager, CacheType, get_cache_manager
-from investigator.infrastructure.database.db import DatabaseManager, get_llm_responses_dao  # TODO: Move to investigator.infrastructure.database
+from investigator.infrastructure.database.db import (  # TODO: Move to investigator.infrastructure.database
+    DatabaseManager,
+    get_llm_responses_dao,
+)
 from investigator.infrastructure.reporting import (
     PDFReportGenerator,
     ReportConfig,
     WeeklyReportGenerator,
 )
+from investigator.infrastructure.ui import ASCIIArt
+from patterns.analysis.peer_comparison import get_peer_comparison_analyzer  # TODO: Move to investigator.domain.services
+from patterns.llm.llm_facade import create_llm_facade  # TODO: Move to investigator.infrastructure.llm
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -308,10 +312,10 @@ class InvestmentSynthesizer:
             if quarterly_metrics and len(quarterly_metrics) >= 4 and dcf_valuation is None:
                 try:
                     symbol_logger.info("Calculating DCF (Discounted Cash Flow) valuation with unified terminal growth")
-                    from investigator.domain.services.valuation.dcf import DCFValuation
-                    from investigator.domain.services.terminal_growth_calculator import TerminalGrowthCalculator
-                    from investigator.domain.services.valuation_framework_planner import ValuationFrameworkPlanner
                     from investigator.domain.services.fcf_growth_calculator import FCFGrowthCalculator
+                    from investigator.domain.services.terminal_growth_calculator import TerminalGrowthCalculator
+                    from investigator.domain.services.valuation.dcf import DCFValuation
+                    from investigator.domain.services.valuation_framework_planner import ValuationFrameworkPlanner
 
                     # Step 1: Create DCF instance
                     dcf_analyzer = DCFValuation(
@@ -323,9 +327,9 @@ class InvestmentSynthesizer:
 
                     # Step 2: Calculate Rule of 40 to get metrics for terminal growth
                     rule_of_40_result = dcf_analyzer._calculate_rule_of_40()
-                    rule_of_40_score = rule_of_40_result.get('score', 0)
-                    revenue_growth_pct = rule_of_40_result.get('revenue_growth_pct', 0)
-                    profit_margin_pct = rule_of_40_result.get('profit_margin_pct', 0)
+                    rule_of_40_score = rule_of_40_result.get("score", 0)
+                    revenue_growth_pct = rule_of_40_result.get("revenue_growth_pct", 0)
+                    profit_margin_pct = rule_of_40_result.get("profit_margin_pct", 0)
 
                     # Step 3: Calculate FCF margin
                     fcf_calc = FCFGrowthCalculator(symbol)
@@ -336,37 +340,34 @@ class InvestmentSynthesizer:
                     # Get market cap from latest quarterly metrics
                     market_cap_billions = 0.0
                     if quarterly_metrics:
-                        latest_market_cap = quarterly_metrics[-1].get('market_cap', 0)
+                        latest_market_cap = quarterly_metrics[-1].get("market_cap", 0)
                         market_cap_billions = latest_market_cap / 1e9 if latest_market_cap > 0 else 0.0
 
                     # Step 5: Create ValuationFrameworkPlanner
                     planner = ValuationFrameworkPlanner(
                         symbol=symbol,
                         sector=sector,
-                        industry='',  # Not critical for classification
-                        market_cap_billions=market_cap_billions
+                        industry="",  # Not critical for classification
+                        market_cap_billions=market_cap_billions,
                     )
 
                     # Step 6: Classify company stage
                     company_stage = planner.classify_company_stage(
-                        revenue_growth_pct=revenue_growth_pct,
-                        fcf_margin_pct=fcf_margin_pct
+                        revenue_growth_pct=revenue_growth_pct, fcf_margin_pct=fcf_margin_pct
                     )
 
                     # Step 7: Create TerminalGrowthCalculator
                     terminal_calc = TerminalGrowthCalculator(
-                        symbol=symbol,
-                        sector=sector,
-                        base_terminal_growth=0.035  # 3.5% base for tech
+                        symbol=symbol, sector=sector, base_terminal_growth=0.035  # 3.5% base for tech
                     )
 
                     # Step 8: Calculate unified terminal growth
                     terminal_result = terminal_calc.calculate_terminal_growth(
                         rule_of_40_score=rule_of_40_score,
                         revenue_growth_pct=revenue_growth_pct,
-                        fcf_margin_pct=fcf_margin_pct
+                        fcf_margin_pct=fcf_margin_pct,
                     )
-                    terminal_growth_rate = terminal_result['terminal_growth_rate']
+                    terminal_growth_rate = terminal_result["terminal_growth_rate"]
 
                     symbol_logger.info(
                         f"Unified Terminal Growth: {terminal_growth_rate*100:.2f}% "
@@ -376,9 +377,7 @@ class InvestmentSynthesizer:
                     )
 
                     # Step 9: Calculate DCF with unified terminal growth rate
-                    dcf_valuation = dcf_analyzer.calculate_dcf_valuation(
-                        terminal_growth_rate=terminal_growth_rate
-                    )
+                    dcf_valuation = dcf_analyzer.calculate_dcf_valuation(terminal_growth_rate=terminal_growth_rate)
 
                     if dcf_valuation:
                         fair_value = dcf_valuation.get("fair_value_per_share", 0)
@@ -4792,7 +4791,9 @@ Your responses must be precise, quantitative, and suitable for institutional inv
 
             model_info = {
                 "model": metadata["model"],
-                "temperature": self.config.ollama.temperatures.get_temperature('balanced'),  # Synthesis uses balanced temperature (0.1)
+                "temperature": self.config.ollama.temperatures.get_temperature(
+                    "balanced"
+                ),  # Synthesis uses balanced temperature (0.1)
                 "top_p": 0.9,
                 "num_ctx": 32768,
                 "num_predict": 4096,
@@ -5312,179 +5313,6 @@ Respond with detailed JSON investment analysis."""
         except Exception as e:
             self.main_logger.warning(f"Error extracting technical signals: {e}")
             return {}
-
-        # Create sector/industry context for better analysis
-        sector_context = self._get_sector_context(symbol)
-        market_environment = self._get_market_environment_context()
-
-        prompt = f"""You are a senior portfolio manager and CFA charterholder with 25+ years of experience synthesizing complex financial analyses for institutional investment decisions. You have deep expertise in:
-
-• Multi-timeframe fundamental analysis across economic cycles
-• Advanced technical analysis and market microstructure
-• Risk-adjusted portfolio construction and position sizing
-• Quantitative valuation models and relative value analysis
-• Macro-economic impact assessment on sector rotation
-• ESG integration and sustainable investing frameworks
-
-Your task is to synthesize comprehensive analyses for {symbol} into an actionable investment recommendation suitable for a $2B+ institutional portfolio.
-
-=== COMPANY PROFILE & CONTEXT ===
-Symbol: {symbol}
-Sector Context: {sector_context}
-Current Market Environment: {market_environment}
-Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}
-
-=== COMPREHENSIVE FUNDAMENTAL ANALYSIS ===
-{chr(10).join(fundamental_summaries) if fundamental_summaries else "[INSUFFICIENT FUNDAMENTAL DATA - HIGH RISK FLAG]"}
-
-=== QUARTERLY PERFORMANCE EVOLUTION ===
-{''.join([f"{chr(10)}{q['period']} ({q['form']}): {q['content'][:800]}{chr(10)}" for q in quarterly_trends]) if quarterly_trends else "[LIMITED QUARTERLY DATA AVAILABLE]"}
-
-=== COMPREHENSIVE TECHNICAL ANALYSIS ===
-{technical_analysis if technical_analysis else "[NO TECHNICAL ANALYSIS AVAILABLE - TIMING UNCERTAINTY]"}
-
-=== EXTRACTED TECHNICAL SIGNALS ===
-Key Technical Signals: {', '.join(technical_signals[:10]) if technical_signals else 'None extracted'}
-
-=== CURRENT FINANCIAL SNAPSHOT ===
-Revenue (TTM): ${fund_data.get('revenue', 0):,.0f}
-Net Income (TTM): ${fund_data.get('net_income', 0):,.0f}
-Earnings Per Share: ${fund_data.get('eps', 0):.2f}
-Total Assets: ${fund_data.get('total_assets', 0):,.0f}
-Total Liabilities: ${fund_data.get('total_liabilities', 0):,.0f}
-Shareholders' Equity: ${fund_data.get('shareholders_equity', 0):,.0f}
-Operating Cash Flow: ${fund_data.get('operating_cash_flow', 0):,.0f}
-Free Cash Flow: ${fund_data.get('free_cash_flow', 0):,.0f}
-
-=== VALUATION & QUALITY METRICS ===
-P/E Ratio: {fund_data.get('pe_ratio', 'N/A')} | Industry Avg: {fund_data.get('industry_pe', 'N/A')}
-P/B Ratio: {fund_data.get('pb_ratio', 'N/A')} | PEG Ratio: {fund_data.get('peg_ratio', 'N/A')}
-EV/EBITDA: {fund_data.get('ev_ebitda', 'N/A')} | P/S Ratio: {fund_data.get('ps_ratio', 'N/A')}
-Debt/Equity: {fund_data.get('debt_to_equity', 'N/A')} | Interest Coverage: {fund_data.get('interest_coverage', 'N/A')}
-Current Ratio: {fund_data.get('current_ratio', 'N/A')} | Quick Ratio: {fund_data.get('quick_ratio', 'N/A')}
-ROE: {fund_data.get('roe', 'N/A')}% | ROA: {fund_data.get('roa', 'N/A')}% | ROIC: {fund_data.get('roic', 'N/A')}%
-Gross Margin: {fund_data.get('gross_margin', 'N/A')}% | Operating Margin: {fund_data.get('operating_margin', 'N/A')}%
-Net Margin: {fund_data.get('profit_margin', 'N/A')}% | FCF Margin: {fund_data.get('fcf_margin', 'N/A')}%
-
-=== REAL-TIME MARKET DATA ===
-Current Price: ${tech_data.get('current_price', 0):.2f}
-Intraday Range: ${tech_data.get('day_low', 0):.2f} - ${tech_data.get('day_high', 0):.2f}
-Price Performance:
-• 1 Day: {tech_data.get('price_change_1d', 0):+.2f}% | Volume vs Avg: {tech_data.get('volume_ratio', 1):.1f}x
-• 1 Week: {tech_data.get('price_change_1w', 0):+.2f}% | Relative Strength: {tech_data.get('relative_strength', 'N/A')}
-• 1 Month: {tech_data.get('price_change_1m', 0):+.2f}% | Beta: {tech_data.get('beta', 'N/A')}
-• 3 Months: {tech_data.get('price_change_3m', 0):+.2f}% | 52W High: ${tech_data.get('week_52_high', 0):.2f}
-• YTD: {tech_data.get('price_change_ytd', 0):+.2f}% | 52W Low: ${tech_data.get('week_52_low', 0):.2f}
-
-=== TECHNICAL STRUCTURE ANALYSIS ===
-Moving Averages Alignment:
-• SMA 20: ${tech_data.get('sma_20', 0):.2f} | Position vs Price: {self._calculate_ma_position(tech_data.get('current_price', 0), tech_data.get('sma_20', 0))}
-• SMA 50: ${tech_data.get('sma_50', 0):.2f} | Golden/Death Cross: {self._check_ma_cross(tech_data.get('sma_50', 0), tech_data.get('sma_200', 0))}
-• SMA 200: ${tech_data.get('sma_200', 0):.2f} | Trend Strength: {self._assess_trend_strength(tech_data)}
-
-Momentum & Oscillators:
-• RSI (14): {tech_data.get('rsi', 0):.1f} | Stochastic: {tech_data.get('stochastic', 'N/A')}
-• MACD: {tech_data.get('macd', 0):.4f} | Williams %R: {tech_data.get('williams_r', 'N/A')}
-• MACD Signal: {tech_data.get('macd_signal', 0):.4f} | Money Flow Index: {tech_data.get('mfi', 'N/A')}
-• MACD Histogram: {tech_data.get('macd_histogram', 0):.4f} | Rate of Change: {tech_data.get('roc', 'N/A')}%
-
-Volatility & Risk Metrics:
-• Bollinger Upper: ${tech_data.get('bollinger_upper', 0):.2f} | ATR (14): ${tech_data.get('atr', 0):.2f}
-• Bollinger Lower: ${tech_data.get('bollinger_lower', 0):.2f} | Volatility (20D): {tech_data.get('volatility_20d', 'N/A')}%
-• BB Position: {self._calculate_bb_position(tech_data)} | VIX Correlation: {tech_data.get('vix_correlation', 'N/A')}
-
-Volume & Liquidity Analysis:
-• Current Volume: {tech_data.get('volume', 0):,} | Volume Trend: {self._assess_volume_trend(tech_data)}
-• 20-Day Avg Volume: {tech_data.get('avg_volume_20', 0):,} | On-Balance Volume: {tech_data.get('obv', 'N/A')}
-• Volume-Price Relationship: {self._assess_volume_price_relationship(tech_data)}
-
-=== INSTITUTIONAL SYNTHESIS REQUIREMENTS ===
-
-Provide a comprehensive institutional-grade investment synthesis addressing:
-
-**I. EXECUTIVE SUMMARY & RECOMMENDATION**
-1. **FINAL RECOMMENDATION**: [STRONG BUY/BUY/HOLD/SELL/STRONG SELL]
-   • Weight fundamental quality (60%) vs technical timing (40%)
-   • Consider risk-adjusted returns and Sharpe ratio implications
-   • Account for correlation with existing portfolio holdings
-
-2. **INVESTMENT SCORE**: [1.0-10.0] (single decimal precision)
-   • Fundamental Quality Score (1-10): ___
-   • Technical Timing Score (1-10): ___
-   • Risk-Adjusted Score (1-10): ___
-   • **Overall Composite Score**: ___
-
-3. **CONFIDENCE LEVEL**: [HIGH/MEDIUM/LOW] + Percentage (e.g., "HIGH - 85%")
-   • Data quality assessment (completeness, recency, reliability)
-   • Analysis convergence between fundamental and technical views
-   • Market regime appropriateness
-
-**II. STRATEGIC INVESTMENT THESIS** (3-4 detailed paragraphs)
-• **Value Creation Narrative**: Synthesize core business strengths, competitive positioning, and growth catalysts from fundamental analysis
-• **Market Timing & Entry Strategy**: Integrate technical signals, momentum factors, and optimal entry/exit levels
-• **Risk-Return Profile**: Quantify expected returns, downside protection, and correlation benefits for portfolio construction
-• **Investment Horizon Alignment**: Match thesis durability with recommended holding period
-
-**III. MULTI-TIMEFRAME CATALYSTS** (5-7 detailed points)
-• **Near-term (0-3 months)**: Technical breakouts, earnings events, product launches
-• **Medium-term (3-12 months)**: Fundamental inflection points, market share gains, operational improvements
-• **Long-term (1-3 years)**: Strategic positioning, industry transformation, ESG factors
-• **Macro catalysts**: Economic cycle positioning, interest rate sensitivity, currency impacts
-
-**IV. COMPREHENSIVE RISK ASSESSMENT** (6-8 detailed points)
-• **Business/Fundamental Risks**: Competition, regulation, execution, cyclicality
-• **Technical/Market Risks**: Support breaks, momentum reversals, correlation shifts
-• **Macro/Systematic Risks**: Economic slowdown, geopolitical events, sector rotation
-• **Liquidity/Operational Risks**: Position sizing constraints, execution challenges
-• **ESG/Governance Risks**: Environmental liabilities, social license, board effectiveness
-
-**V. PRECISION PRICE TARGETS & SCENARIOS**
-• **12-month Base Case Target**: $XXX.XX (probability: XX%)
-  - Methodology: DCF, comparable multiples, technical projections
-• **Bull Case Target**: $XXX.XX (probability: XX%) - Key assumptions
-• **Bear Case Target**: $XXX.XX (probability: XX%) - Risk scenario triggers
-• **Technical Levels**: Support: $XXX.XX | Resistance: $XXX.XX | Stop-loss: $XXX.XX
-
-**VI. INSTITUTIONAL PORTFOLIO IMPLEMENTATION**
-• **Position Sizing**: [1-5% / STARTER | 5-10% / MODERATE | 10-15% / LARGE | 15%+ / CONCENTRATED]
-  - Risk budgeting: Expected volatility, Value-at-Risk, correlation impact
-  - Liquidity requirements: Average daily volume, market impact analysis
-
-• **Time Horizon**: [SHORT (0-6M) | MEDIUM (6M-2Y) | LONG (2Y+)]
-  - Investment committee review schedule
-  - Rebalancing triggers and thresholds
-
-• **Implementation Strategy**:
-  - Entry: Optimal execution algorithm (TWAP, VWAP, Implementation Shortfall)
-  - Hedging: Currency, sector, market beta considerations
-  - Monitoring: Key performance indicators and risk metrics
-
-**VII. ACTIONABLE EXECUTION PLAN**
-• **Phase 1 - Entry Strategy**:
-  - Primary entry zone: $XXX.XX - $XXX.XX
-  - Secondary accumulation level: $XXX.XX
-  - Maximum allocation timeframe: X weeks
-  - Market condition dependencies
-
-• **Phase 2 - Active Management**:
-  - Profit-taking levels: 25% at $XXX, 50% at $XXX
-  - Stop-loss discipline: Hard stop at $XXX (XX% below entry)
-  - Rebalancing triggers: Fundamental deterioration, technical breakdown
-
-• **Phase 3 - Exit Strategy**:
-  - Target achievement: Systematic profit-taking plan
-  - Thesis invalidation: Clear exit criteria and timeline
-  - Tax optimization: Long-term capital gains considerations
-
-**VIII. MONITORING & REVIEW FRAMEWORK**
-• **Weekly Monitoring**: Technical levels, volume patterns, relative performance
-• **Monthly Review**: Fundamental metrics, earnings revisions, competitive dynamics
-• **Quarterly Assessment**: Strategic progress, thesis validation, position sizing optimization
-• **Annual Strategy Review**: Long-term positioning, portfolio construction efficiency
-
-Provide specific, quantitative analysis with clear reasoning for each recommendation. Focus on actionable insights that justify the investment decision for a fiduciary standard institutional portfolio management context."""
-
-        return prompt
 
     def _get_sector_context(self, symbol: str) -> str:
         """Get sector and industry context for the symbol"""

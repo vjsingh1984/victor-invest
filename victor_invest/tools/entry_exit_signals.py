@@ -82,6 +82,7 @@ class EntryExitSignalTool(BaseTool):
                 get_entry_exit_engine,
                 get_signal_integrator,
             )
+
             self._engine = get_entry_exit_engine()
             self._integrator = get_signal_integrator()
             self._initialized = True
@@ -92,6 +93,7 @@ class EntryExitSignalTool(BaseTool):
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "generate_signals",
         symbol: str = "",
         current_price: float = 0.0,
@@ -255,7 +257,7 @@ class EntryExitSignalTool(BaseTool):
             metadata={
                 "tool": "entry_exit_signals",
                 "action": "generate_signals",
-            }
+            },
         )
 
     async def _get_entry_signals(
@@ -353,9 +355,7 @@ class EntryExitSignalTool(BaseTool):
             atr=effective_atr,
         )
 
-        return ToolResult.success_result(
-            data=self._entry_zone_to_dict(entry_zone) if entry_zone else {}
-        )
+        return ToolResult.success_result(data=self._entry_zone_to_dict(entry_zone) if entry_zone else {})
 
     async def _integrate_signals(
         self,
@@ -402,9 +402,11 @@ class EntryExitSignalTool(BaseTool):
     def _signal_to_dict(self, signal) -> Dict[str, Any]:
         """Convert EntrySignal to dict."""
         return {
-            "signal_type": signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type),
+            "signal_type": (
+                signal.signal_type.value if hasattr(signal.signal_type, "value") else str(signal.signal_type)
+            ),
             "price_level": round(signal.price_level, 2),
-            "confidence": signal.confidence.value if hasattr(signal.confidence, 'value') else str(signal.confidence),
+            "confidence": signal.confidence.value if hasattr(signal.confidence, "value") else str(signal.confidence),
             "rationale": signal.rationale,
             "risk_reward_ratio": round(signal.risk_reward_ratio, 2),
             "stop_loss": round(signal.stop_loss, 2),
@@ -419,9 +421,11 @@ class EntryExitSignalTool(BaseTool):
     def _exit_signal_to_dict(self, signal) -> Dict[str, Any]:
         """Convert ExitSignal to dict."""
         return {
-            "signal_type": signal.signal_type.value if hasattr(signal.signal_type, 'value') else str(signal.signal_type),
+            "signal_type": (
+                signal.signal_type.value if hasattr(signal.signal_type, "value") else str(signal.signal_type)
+            ),
             "price_level": round(signal.price_level, 2),
-            "confidence": signal.confidence.value if hasattr(signal.confidence, 'value') else str(signal.confidence),
+            "confidence": signal.confidence.value if hasattr(signal.confidence, "value") else str(signal.confidence),
             "rationale": signal.rationale,
             "urgency": signal.urgency,
             "partial_exit_pct": round(signal.partial_exit_pct, 1),
@@ -433,9 +437,11 @@ class EntryExitSignalTool(BaseTool):
             "lower_bound": round(zone.lower_bound, 2),
             "upper_bound": round(zone.upper_bound, 2),
             "ideal_entry": round(zone.ideal_entry, 2),
-            "timing": zone.timing.value if hasattr(zone.timing, 'value') else str(zone.timing),
-            "scaling_strategy": zone.scaling_strategy.value if hasattr(zone.scaling_strategy, 'value') else str(zone.scaling_strategy),
-            "confidence": zone.confidence.value if hasattr(zone.confidence, 'value') else str(zone.confidence),
+            "timing": zone.timing.value if hasattr(zone.timing, "value") else str(zone.timing),
+            "scaling_strategy": (
+                zone.scaling_strategy.value if hasattr(zone.scaling_strategy, "value") else str(zone.scaling_strategy)
+            ),
+            "confidence": zone.confidence.value if hasattr(zone.confidence, "value") else str(zone.confidence),
             "rationale": zone.rationale,
             "recommended_allocation_pct": round(zone.recommended_allocation_pct, 1),
             "max_position_size_pct": round(zone.max_position_size_pct, 1),
@@ -454,20 +460,22 @@ class EntryExitSignalTool(BaseTool):
 
         entry_signals = []
         if upside > 0.10:
-            entry_signals.append({
-                "signal_type": "VALUATION_BASED",
-                "price_level": round(current_price, 2),
-                "confidence": "MEDIUM",
-                "rationale": f"Trading at {abs(upside)*100:.1f}% discount to fair value",
-                "risk_reward_ratio": round(upside / 0.05, 2),  # Assume 5% stop loss
-                "stop_loss": round(current_price * 0.95, 2),
-                "stop_loss_pct": 5.0,
-                "target_price": round(fv, 2),
-                "target_pct": round(upside * 100, 1),
-                "expected_holding_days": 90,
-                "volume_confirmation": False,
-                "trend_alignment": False,
-            })
+            entry_signals.append(
+                {
+                    "signal_type": "VALUATION_BASED",
+                    "price_level": round(current_price, 2),
+                    "confidence": "MEDIUM",
+                    "rationale": f"Trading at {abs(upside)*100:.1f}% discount to fair value",
+                    "risk_reward_ratio": round(upside / 0.05, 2),  # Assume 5% stop loss
+                    "stop_loss": round(current_price * 0.95, 2),
+                    "stop_loss_pct": 5.0,
+                    "target_price": round(fv, 2),
+                    "target_pct": round(upside * 100, 1),
+                    "expected_holding_days": 90,
+                    "volume_confirmation": False,
+                    "trend_alignment": False,
+                }
+            )
 
         return ToolResult.success_result(
             data={
@@ -497,7 +505,13 @@ class EntryExitSignalTool(BaseTool):
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["generate_signals", "get_entry_signals", "get_exit_signals", "get_entry_zone", "integrate_signals"],
+                    "enum": [
+                        "generate_signals",
+                        "get_entry_signals",
+                        "get_exit_signals",
+                        "get_entry_zone",
+                        "integrate_signals",
+                    ],
                     "description": "Action to perform",
                     "default": "generate_signals",
                 },

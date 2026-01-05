@@ -5,14 +5,11 @@ Provides SEC filing data including insider transactions (Form 4),
 institutional holdings (Form 13F), and quarterly financials.
 """
 
+import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
-import logging
 
-from ..base import (
-    DataSource, DataResult, SourceMetadata,
-    DataCategory, DataFrequency, DataQuality
-)
+from ..base import DataCategory, DataFrequency, DataQuality, DataResult, DataSource, SourceMetadata
 from ..registry import register_source
 
 logger = logging.getLogger(__name__)
@@ -49,8 +46,9 @@ class InsiderTransactionSource(DataSource):
     def _fetch_impl(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
         """Fetch insider transaction data"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             target_date = as_of_date or date.today()
@@ -59,7 +57,8 @@ class InsiderTransactionSource(DataSource):
             with engine.connect() as conn:
                 # Get recent transactions from form4_filings
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             owner_name,
                             filing_date,
@@ -76,8 +75,9 @@ class InsiderTransactionSource(DataSource):
                         AND filing_date <= :target_date
                         ORDER BY filing_date DESC
                         LIMIT 50
-                    """),
-                    {"symbol": symbol, "start_date": start_date, "target_date": target_date}
+                    """
+                    ),
+                    {"symbol": symbol, "start_date": start_date, "target_date": target_date},
                 )
 
                 transactions = []
@@ -107,7 +107,8 @@ class InsiderTransactionSource(DataSource):
 
                 # Get sentiment score
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             sentiment_score,
                             buy_count,
@@ -119,8 +120,9 @@ class InsiderTransactionSource(DataSource):
                         WHERE symbol = :symbol
                         ORDER BY calculation_date DESC
                         LIMIT 1
-                    """),
-                    {"symbol": symbol}
+                    """
+                    ),
+                    {"symbol": symbol},
                 )
                 sentiment_row = result.fetchone()
 
@@ -216,15 +218,17 @@ class InstitutionalHoldingsSource(DataSource):
     def _fetch_impl(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
         """Fetch institutional holdings data"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
 
             with engine.connect() as conn:
                 # Get latest holdings - join with institutions for manager name
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             i.name as manager_name,
                             h.shares,
@@ -237,8 +241,9 @@ class InstitutionalHoldingsSource(DataSource):
                         WHERE h.symbol = :symbol
                         ORDER BY f.report_quarter DESC, h.value_thousands DESC
                         LIMIT 100
-                    """),
-                    {"symbol": symbol}
+                    """
+                    ),
+                    {"symbol": symbol},
                 )
 
                 holdings = []
@@ -254,11 +259,13 @@ class InstitutionalHoldingsSource(DataSource):
                     # Only include holdings from latest quarter
                     if row[3] == latest_date:
                         value_dollars = float(row[2]) * 1000 if row[2] else None
-                        holdings.append({
-                            "manager": row[0],
-                            "shares": int(row[1]) if row[1] else None,
-                            "value": value_dollars,
-                        })
+                        holdings.append(
+                            {
+                                "manager": row[0],
+                                "shares": int(row[1]) if row[1] else None,
+                                "value": value_dollars,
+                            }
+                        )
                         total_shares += int(row[1]) if row[1] else 0
                         total_value += value_dollars or 0
                         holder_count += 1
@@ -327,8 +334,9 @@ class SECQuarterlySource(DataSource):
     def _fetch_impl(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
         """Fetch quarterly financial data"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             target_date = as_of_date or date.today()
@@ -336,7 +344,8 @@ class SECQuarterlySource(DataSource):
             with engine.connect() as conn:
                 # quarterly_metrics stores data in JSONB metrics_data column
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             fiscal_year,
                             fiscal_period,
@@ -346,29 +355,34 @@ class SECQuarterlySource(DataSource):
                         WHERE symbol = :symbol
                         ORDER BY fiscal_year DESC, fiscal_period DESC
                         LIMIT 8
-                    """),
-                    {"symbol": symbol}
+                    """
+                    ),
+                    {"symbol": symbol},
                 )
 
                 quarters = []
                 for row in result:
                     metrics = row[2] or {}  # JSONB data
-                    quarters.append({
-                        "fiscal_year": row[0],
-                        "fiscal_period": row[1],
-                        "revenue": metrics.get("revenue") or metrics.get("revenues"),
-                        "net_income": metrics.get("net_income") or metrics.get("netIncome"),
-                        "operating_income": metrics.get("operating_income") or metrics.get("operatingIncome"),
-                        "gross_profit": metrics.get("gross_profit") or metrics.get("grossProfit"),
-                        "eps_basic": metrics.get("eps_basic") or metrics.get("basicEPS"),
-                        "eps_diluted": metrics.get("eps_diluted") or metrics.get("dilutedEPS"),
-                        "total_assets": metrics.get("total_assets") or metrics.get("totalAssets"),
-                        "total_liabilities": metrics.get("total_liabilities") or metrics.get("totalLiabilities"),
-                        "stockholders_equity": metrics.get("stockholders_equity") or metrics.get("stockholdersEquity"),
-                        "operating_cash_flow": metrics.get("operating_cash_flow") or metrics.get("operatingCashFlow"),
-                        "free_cash_flow": metrics.get("free_cash_flow") or metrics.get("freeCashFlow"),
-                        "calculated_at": row[3].isoformat() if row[3] else None,
-                    })
+                    quarters.append(
+                        {
+                            "fiscal_year": row[0],
+                            "fiscal_period": row[1],
+                            "revenue": metrics.get("revenue") or metrics.get("revenues"),
+                            "net_income": metrics.get("net_income") or metrics.get("netIncome"),
+                            "operating_income": metrics.get("operating_income") or metrics.get("operatingIncome"),
+                            "gross_profit": metrics.get("gross_profit") or metrics.get("grossProfit"),
+                            "eps_basic": metrics.get("eps_basic") or metrics.get("basicEPS"),
+                            "eps_diluted": metrics.get("eps_diluted") or metrics.get("dilutedEPS"),
+                            "total_assets": metrics.get("total_assets") or metrics.get("totalAssets"),
+                            "total_liabilities": metrics.get("total_liabilities") or metrics.get("totalLiabilities"),
+                            "stockholders_equity": metrics.get("stockholders_equity")
+                            or metrics.get("stockholdersEquity"),
+                            "operating_cash_flow": metrics.get("operating_cash_flow")
+                            or metrics.get("operatingCashFlow"),
+                            "free_cash_flow": metrics.get("free_cash_flow") or metrics.get("freeCashFlow"),
+                            "calculated_at": row[3].isoformat() if row[3] else None,
+                        }
+                    )
 
             if not quarters:
                 return DataResult(
@@ -386,7 +400,9 @@ class SECQuarterlySource(DataSource):
                 growth["revenue_yoy"] = (latest["revenue"] - yoy_quarter["revenue"]) / abs(yoy_quarter["revenue"]) * 100
             if yoy_quarter and latest.get("net_income") and yoy_quarter.get("net_income"):
                 if yoy_quarter["net_income"] > 0:
-                    growth["net_income_yoy"] = (latest["net_income"] - yoy_quarter["net_income"]) / yoy_quarter["net_income"] * 100
+                    growth["net_income_yoy"] = (
+                        (latest["net_income"] - yoy_quarter["net_income"]) / yoy_quarter["net_income"] * 100
+                    )
 
             return DataResult(
                 success=True,

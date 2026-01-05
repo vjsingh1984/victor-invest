@@ -108,14 +108,13 @@ Parameters:
         """Initialize SEC infrastructure components."""
         try:
             # Lazy import to avoid circular dependencies
+            from investigator.infrastructure.sec.companyfacts_extractor import get_sec_companyfacts_extractor
             from investigator.infrastructure.sec.sec_api import SECApiClient
             from investigator.infrastructure.sec.xbrl_parser import XBRLParser
-            from investigator.infrastructure.sec.companyfacts_extractor import (
-                get_sec_companyfacts_extractor
-            )
 
             if self.config is None:
                 from investigator.config import get_config
+
                 self.config = get_config()
 
             self._sec_client = SECApiClient(config=self.config)
@@ -131,12 +130,13 @@ Parameters:
 
     async def execute(
         self,
-        symbol: str,
+        _exec_ctx: Dict[str, Any],
+        symbol: str = "",
         action: str = "get_company_facts",
         form_type: str = "10-K",
         period: str = "latest",
         limit: int = 5,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute SEC filing operation.
 
@@ -185,16 +185,10 @@ Parameters:
         except Exception as e:
             logger.error(f"SECFilingTool execute error for {symbol}: {e}")
             return ToolResult.error_result(
-                f"SEC filing operation failed: {str(e)}",
-                metadata={"symbol": symbol, "action": action}
+                f"SEC filing operation failed: {str(e)}", metadata={"symbol": symbol, "action": action}
             )
 
-    async def _get_filing(
-        self,
-        symbol: str,
-        form_type: str,
-        period: str
-    ) -> ToolResult:
+    async def _get_filing(self, symbol: str, form_type: str, period: str) -> ToolResult:
         """Get full filing content for a symbol.
 
         Args:
@@ -206,16 +200,11 @@ Parameters:
             ToolResult with filing content and metadata
         """
         try:
-            filing_data = await self._sec_client.get_filing_by_symbol(
-                symbol=symbol,
-                form_type=form_type,
-                period=period
-            )
+            filing_data = await self._sec_client.get_filing_by_symbol(symbol=symbol, form_type=form_type, period=period)
 
             if not filing_data:
                 return ToolResult.error_result(
-                    f"No {form_type} filing found for {symbol}",
-                    metadata={"symbol": symbol, "form_type": form_type}
+                    f"No {form_type} filing found for {symbol}", metadata={"symbol": symbol, "form_type": form_type}
                 )
 
             return ToolResult.success_result(
@@ -233,8 +222,8 @@ Parameters:
                     "source": "sec_edgar",
                     "form_type": form_type,
                     "period": period,
-                    "truncated": len(filing_data.get("text", "")) > 50000
-                }
+                    "truncated": len(filing_data.get("text", "")) > 50000,
+                },
             )
 
         except Exception as e:
@@ -253,17 +242,13 @@ Parameters:
         try:
             # Run synchronous method in thread pool
             loop = asyncio.get_event_loop()
-            facts_data = await loop.run_in_executor(
-                None,
-                self._facts_extractor.get_company_facts,
-                symbol
-            )
+            facts_data = await loop.run_in_executor(None, self._facts_extractor.get_company_facts, symbol)
 
             if not facts_data:
                 return ToolResult.error_result(
                     f"No company facts found for {symbol}. "
                     "The symbol may not be in the cache. Consider triggering SEC data fetch.",
-                    metadata={"symbol": symbol}
+                    metadata={"symbol": symbol},
                 )
 
             return ToolResult.success_result(
@@ -277,20 +262,15 @@ Parameters:
                 },
                 metadata={
                     "source": facts_data.get("source", "unknown"),
-                    "has_us_gaap": "us-gaap" in facts_data.get("facts", {})
-                }
+                    "has_us_gaap": "us-gaap" in facts_data.get("facts", {}),
+                },
             )
 
         except Exception as e:
             logger.error(f"Error getting company facts for {symbol}: {e}")
             return ToolResult.error_result(f"Failed to get company facts: {str(e)}")
 
-    async def _search_filings(
-        self,
-        symbol: str,
-        form_type: str,
-        limit: int
-    ) -> ToolResult:
+    async def _search_filings(self, symbol: str, form_type: str, limit: int) -> ToolResult:
         """Search for recent filings.
 
         Args:
@@ -302,26 +282,16 @@ Parameters:
             ToolResult with list of filing metadata
         """
         try:
-            filings = await self._sec_client.search_filings(
-                symbol=symbol,
-                form_type=form_type,
-                limit=limit
-            )
+            filings = await self._sec_client.search_filings(symbol=symbol, form_type=form_type, limit=limit)
 
             if not filings:
                 return ToolResult.error_result(
-                    f"No {form_type} filings found for {symbol}",
-                    metadata={"symbol": symbol, "form_type": form_type}
+                    f"No {form_type} filings found for {symbol}", metadata={"symbol": symbol, "form_type": form_type}
                 )
 
             return ToolResult.success_result(
-                data={
-                    "symbol": symbol,
-                    "form_type": form_type,
-                    "count": len(filings),
-                    "filings": filings
-                },
-                metadata={"source": "sec_edgar", "limit": limit}
+                data={"symbol": symbol, "form_type": form_type, "count": len(filings), "filings": filings},
+                metadata={"source": "sec_edgar", "limit": limit},
             )
 
         except Exception as e:
@@ -340,32 +310,28 @@ Parameters:
         try:
             # Run synchronous method in thread pool
             loop = asyncio.get_event_loop()
-            metrics = await loop.run_in_executor(
-                None,
-                self._facts_extractor.extract_financial_metrics,
-                symbol
-            )
+            metrics = await loop.run_in_executor(None, self._facts_extractor.extract_financial_metrics, symbol)
 
-            if not metrics or all(v is None for k, v in metrics.items() if k not in ['symbol', 'cik', 'company_name', 'data_date', 'source', 'fiscal_year', 'fiscal_period']):
+            if not metrics or all(
+                v is None
+                for k, v in metrics.items()
+                if k not in ["symbol", "cik", "company_name", "data_date", "source", "fiscal_year", "fiscal_period"]
+            ):
                 return ToolResult.error_result(
-                    f"No financial metrics available for {symbol}",
-                    metadata={"symbol": symbol}
+                    f"No financial metrics available for {symbol}", metadata={"symbol": symbol}
                 )
 
             # Calculate financial ratios
             ratios = await loop.run_in_executor(
-                None,
-                self._facts_extractor.calculate_financial_ratios,
-                symbol,
-                None  # current_price
+                None, self._facts_extractor.calculate_financial_ratios, symbol, None  # current_price
             )
 
             # Get shares outstanding from multiple possible fields
             shares_outstanding = (
-                metrics.get("shares_outstanding") or
-                metrics.get("common_stock_shares_outstanding") or
-                metrics.get("weighted_average_shares_diluted") or
-                metrics.get("weighted_average_diluted_shares_outstanding")
+                metrics.get("shares_outstanding")
+                or metrics.get("common_stock_shares_outstanding")
+                or metrics.get("weighted_average_shares_diluted")
+                or metrics.get("weighted_average_diluted_shares_outstanding")
             )
 
             return ToolResult.success_result(
@@ -434,10 +400,7 @@ Parameters:
                         "backlog_to_revenue": self._calculate_backlog_ratio(metrics),
                     },
                 },
-                metadata={
-                    "source": metrics.get("source", "unknown"),
-                    "data_date": metrics.get("data_date")
-                }
+                metadata={"source": metrics.get("source", "unknown"), "data_date": metrics.get("data_date")},
             )
 
         except Exception as e:
@@ -517,7 +480,7 @@ Parameters:
                     "financial_data": parsed_data.get("financial_data", {}),
                     "metrics": metrics,
                 },
-                metadata={"source": "xbrl_parser"}
+                metadata={"source": "xbrl_parser"},
             )
 
         except Exception as e:
@@ -529,36 +492,33 @@ Parameters:
         return {
             "type": "object",
             "properties": {
-                "symbol": {
-                    "type": "string",
-                    "description": "Stock ticker symbol (e.g., AAPL, MSFT)"
-                },
+                "symbol": {"type": "string", "description": "Stock ticker symbol (e.g., AAPL, MSFT)"},
                 "action": {
                     "type": "string",
                     "enum": ["get_filing", "get_company_facts", "search_filings", "extract_metrics", "parse_xbrl"],
                     "description": "Action to perform",
-                    "default": "get_company_facts"
+                    "default": "get_company_facts",
                 },
                 "form_type": {
                     "type": "string",
                     "enum": ["10-K", "10-Q", "8-K", "10-K/A", "10-Q/A"],
                     "description": "SEC form type",
-                    "default": "10-K"
+                    "default": "10-K",
                 },
                 "period": {
                     "type": "string",
                     "description": "Filing period (e.g., 'latest', '2024-Q3')",
-                    "default": "latest"
+                    "default": "latest",
                 },
                 "limit": {
                     "type": "integer",
                     "description": "Maximum filings to return for search",
                     "default": 5,
                     "minimum": 1,
-                    "maximum": 20
-                }
+                    "maximum": 20,
+                },
             },
-            "required": ["symbol"]
+            "required": ["symbol"],
         }
 
     def close(self) -> None:

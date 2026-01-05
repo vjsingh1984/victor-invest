@@ -18,8 +18,8 @@ from investigator.domain.services.valuation.models.base import (
     ModelNotApplicable,
     ValuationModelResult,
 )
-from investigator.domain.services.valuation.models.company_profile import CompanyProfile, DataQualityFlag
 from investigator.domain.services.valuation.models.common import baseline_multiple_context, clamp
+from investigator.domain.services.valuation.models.company_profile import CompanyProfile, DataQualityFlag
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +121,7 @@ class EVEBITDAModel(BaseValuationModel):
     def estimate_confidence(self, raw_output: Dict[str, Any]) -> float:
         diagnostics = self._build_diagnostics(target_multiple=raw_output.get("target_multiple"))
         return clamp(
-            0.5 * diagnostics.data_quality_score
-            + 0.35 * diagnostics.fit_score
-            + 0.15 * diagnostics.calibration_score,
+            0.5 * diagnostics.data_quality_score + 0.35 * diagnostics.fit_score + 0.15 * diagnostics.calibration_score,
             0.0,
             1.0,
         )
@@ -192,11 +190,7 @@ class EVEBITDAModel(BaseValuationModel):
             diagnostics.flags.append("HIGH_LEVERAGE")
             diagnostics.fit_score = clamp(diagnostics.fit_score - 0.1, 0.0, 1.0)
 
-        if (
-            target_multiple
-            and self.enterprise_value is not None
-            and self.ttm_ebitda not in (None, 0)
-        ):
+        if target_multiple and self.enterprise_value is not None and self.ttm_ebitda not in (None, 0):
             try:
                 observed_multiple = float(self.enterprise_value) / float(self.ttm_ebitda)
                 delta = abs(observed_multiple - target_multiple) / target_multiple

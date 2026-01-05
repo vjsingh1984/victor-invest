@@ -2,14 +2,15 @@
 Unit tests for ABTestingFramework.
 """
 
-import pytest
 from datetime import date
 
-from investigator.domain.services.rl.monitoring.ab_testing import (
-    ABTestingFramework,
-    ABTestConfig,
-)
+import pytest
+
 from investigator.domain.services.rl.models import ABTestGroup
+from investigator.domain.services.rl.monitoring.ab_testing import (
+    ABTestConfig,
+    ABTestingFramework,
+)
 
 
 class TestABTestingFramework:
@@ -151,7 +152,7 @@ class TestABTestRecommendations:
 
     def test_recommend_action_insufficient_data(self):
         """Test recommendation with insufficient data."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         # Create a mock db manager that returns empty results
         mock_db = MagicMock()
@@ -164,7 +165,7 @@ class TestABTestRecommendations:
         mock_db.get_session.return_value = mock_session
 
         # Patch get_db_manager before creating framework
-        with patch('investigator.domain.services.rl.monitoring.ab_testing.get_db_manager', return_value=mock_db):
+        with patch("investigator.domain.services.rl.monitoring.ab_testing.get_db_manager", return_value=mock_db):
             config = ABTestConfig(min_samples_per_group=10)
             framework = ABTestingFramework(config=config)
             recommendation = framework.recommend_action()
@@ -180,9 +181,7 @@ class TestHashDistribution:
 
     def test_hash_uniformity(self):
         """Test that hash produces uniform distribution."""
-        framework = ABTestingFramework(
-            config=ABTestConfig(rl_traffic_pct=0.50)
-        )
+        framework = ABTestingFramework(config=ABTestConfig(rl_traffic_pct=0.50))
 
         # Large sample
         rl_count = 0

@@ -9,60 +9,57 @@ Tests cover:
 - DeterministicCompetitiveAnalyzer
 """
 
+from typing import Any, Dict, List
+
 import pytest
-from typing import Dict, Any, List
+
+from investigator.domain.services.deterministic_competitive_analyzer import (
+    SECTOR_PROFILES,
+    CompetitiveContext,
+    DeterministicCompetitiveAnalyzer,
+    MarketPosition,
+    MoatWidth,
+    analyze_competitive_position,
+)
+from investigator.domain.services.deterministic_conflict_resolver import (
+    Conflict,
+    ConflictSeverity,
+    ConflictType,
+    DataQualityConflictDetector,
+    DeterministicConflictResolver,
+    RecommendationConflictDetector,
+    TimeHorizonConflictDetector,
+    reconcile_conflicts,
+)
+from investigator.domain.services.deterministic_insight_extractor import (
+    DeterministicInsightExtractor,
+    FundamentalInsightExtractor,
+    MetricThresholds,
+    SECInsightExtractor,
+    TechnicalInsightExtractor,
+    extract_key_insights,
+)
 
 # Import all services
 from investigator.domain.services.deterministic_valuation_synthesizer import (
     DeterministicValuationSynthesizer,
-    SynthesisContext,
     ModelContribution,
-    ValuationStance,
-    ThresholdBasedStanceDeterminer,
     RiskBasedMarginOfSafetyCalculator,
+    SynthesisContext,
     TemplateBasedExplanationGenerator,
+    ThresholdBasedStanceDeterminer,
+    ValuationStance,
     synthesize_valuation,
 )
-
-from investigator.domain.services.deterministic_conflict_resolver import (
-    DeterministicConflictResolver,
-    Conflict,
-    ConflictType,
-    ConflictSeverity,
-    RecommendationConflictDetector,
-    TimeHorizonConflictDetector,
-    DataQualityConflictDetector,
-    reconcile_conflicts,
-)
-
 from investigator.domain.services.template_thesis_generator import (
+    CoreNarrativeGenerator,
+    InvestmentStance,
     TemplateBasedThesisGenerator,
     ThesisContext,
-    InvestmentStance,
     TimeHorizon,
-    CoreNarrativeGenerator,
     ValueDriversGenerator,
     generate_investment_thesis,
 )
-
-from investigator.domain.services.deterministic_insight_extractor import (
-    DeterministicInsightExtractor,
-    FundamentalInsightExtractor,
-    TechnicalInsightExtractor,
-    SECInsightExtractor,
-    MetricThresholds,
-    extract_key_insights,
-)
-
-from investigator.domain.services.deterministic_competitive_analyzer import (
-    DeterministicCompetitiveAnalyzer,
-    CompetitiveContext,
-    MoatWidth,
-    MarketPosition,
-    SECTOR_PROFILES,
-    analyze_competitive_position,
-)
-
 
 # ============================================================================
 # Test Fixtures
@@ -78,28 +75,16 @@ def sample_model_contributions() -> List[ModelContribution]:
             fair_value=150.0,
             weight=0.40,
             is_applicable=True,
-            assumptions={"growth_rate": 0.08, "discount_rate": 0.10}
+            assumptions={"growth_rate": 0.08, "discount_rate": 0.10},
         ),
         ModelContribution(
-            model_name="pe",
-            fair_value=145.0,
-            weight=0.30,
-            is_applicable=True,
-            assumptions={"target_pe": 22.5}
+            model_name="pe", fair_value=145.0, weight=0.30, is_applicable=True, assumptions={"target_pe": 22.5}
         ),
         ModelContribution(
-            model_name="ps",
-            fair_value=160.0,
-            weight=0.20,
-            is_applicable=True,
-            assumptions={"target_ps": 5.5}
+            model_name="ps", fair_value=160.0, weight=0.20, is_applicable=True, assumptions={"target_ps": 5.5}
         ),
         ModelContribution(
-            model_name="ggm",
-            fair_value=None,
-            weight=0.0,
-            is_applicable=False,
-            reason="Dividend payout below threshold"
+            model_name="ggm", fair_value=None, weight=0.0, is_applicable=False, reason="Dividend payout below threshold"
         ),
     ]
 
@@ -120,7 +105,7 @@ def sample_synthesis_context(sample_model_contributions) -> SynthesisContext:
         industry="Consumer Electronics",
         model_contributions=sample_model_contributions,
         notes=["Strong brand value", "High R&D investment"],
-        archetypes=["cash_cow", "dividend_payer"]
+        archetypes=["cash_cow", "dividend_payer"],
     )
 
 
@@ -156,7 +141,7 @@ def sample_fundamental_analysis() -> Dict[str, Any]:
         "analysis": {
             "strengths": ["Strong cash flow", "Market leader"],
             "weaknesses": ["Supply chain risks", "Competition"],
-        }
+        },
     }
 
 
@@ -194,7 +179,7 @@ def sample_sec_analysis() -> Dict[str, Any]:
         "risks": [
             {"description": "Regulatory compliance costs increasing"},
             {"description": "International trade tensions"},
-        ]
+        ],
     }
 
 
@@ -431,7 +416,10 @@ class TestTemplateBasedThesisGenerator:
         thesis = generator.generate(context)
 
         # Should reflect bearish stance
-        assert "downside" in thesis.core_investment_narrative.lower() or "caution" in thesis.core_investment_narrative.lower()
+        assert (
+            "downside" in thesis.core_investment_narrative.lower()
+            or "caution" in thesis.core_investment_narrative.lower()
+        )
 
     def test_time_horizon_determination(self):
         """Test time horizon determination logic."""
@@ -441,19 +429,30 @@ class TestTemplateBasedThesisGenerator:
 
         # High growth = long term
         growth_context = ThesisContext(
-            symbol="X", company_name="X", sector="Technology",
-            industry=None, overall_score=70, confidence=75,
-            upside=0.10, current_price=100, fair_value=110,
+            symbol="X",
+            company_name="X",
+            sector="Technology",
+            industry=None,
+            overall_score=70,
+            confidence=75,
+            upside=0.10,
+            current_price=100,
+            fair_value=110,
             revenue_growth=0.25,  # High growth
         )
         assert "3-5" in determiner.determine(growth_context)
 
         # Overvalued = short term
         overvalued_context = ThesisContext(
-            symbol="X", company_name="X", sector="Technology",
-            industry=None, overall_score=70, confidence=75,
+            symbol="X",
+            company_name="X",
+            sector="Technology",
+            industry=None,
+            overall_score=70,
+            confidence=75,
             upside=-0.20,  # Overvalued
-            current_price=100, fair_value=80,
+            current_price=100,
+            fair_value=80,
         )
         assert "6-12" in determiner.determine(overvalued_context)
 
@@ -513,12 +512,7 @@ class TestDeterministicInsightExtractor:
         assert insight.source == "sec"
         assert insight.confidence >= 40  # SEC data is authoritative
 
-    def test_extract_all_insights(
-        self,
-        sample_fundamental_analysis,
-        sample_technical_analysis,
-        sample_sec_analysis
-    ):
+    def test_extract_all_insights(self, sample_fundamental_analysis, sample_technical_analysis, sample_sec_analysis):
         """Test extracting insights from all sources."""
         extractor = DeterministicInsightExtractor()
         insights = extractor.extract(
@@ -532,11 +526,7 @@ class TestDeterministicInsightExtractor:
         assert insights.sec is not None
         assert "quantitative" in insights.to_dict()
 
-    def test_extract_key_insights_convenience_function(
-        self,
-        sample_fundamental_analysis,
-        sample_technical_analysis
-    ):
+    def test_extract_key_insights_convenience_function(self, sample_fundamental_analysis, sample_technical_analysis):
         """Test the drop-in replacement function."""
         result = extract_key_insights(
             fundamental=sample_fundamental_analysis,
@@ -608,7 +598,10 @@ class TestDeterministicCompetitiveAnalyzer:
         assert analysis.market_position_and_share.assessment == "Niche Player"
 
         # Low metrics = limited moat
-        assert "Limited" in analysis.competitive_advantages_moat.assessment or "Narrow" in analysis.competitive_advantages_moat.assessment
+        assert (
+            "Limited" in analysis.competitive_advantages_moat.assessment
+            or "Narrow" in analysis.competitive_advantages_moat.assessment
+        )
 
     def test_sector_profiles_exist(self):
         """Test that key sector profiles are defined."""
@@ -645,7 +638,7 @@ class TestDeterministicCompetitiveAnalyzer:
                 "market_data": {"market_cap": 2_500_000_000_000},
                 "ratios": {"profit_margin": 0.25, "roe": 0.45},
                 "sector": "Technology",
-            }
+            },
         )
 
         assert isinstance(result, dict)
@@ -662,12 +655,7 @@ class TestDeterministicCompetitiveAnalyzer:
 class TestDeterministicServicesIntegration:
     """Integration tests for deterministic services working together."""
 
-    def test_full_synthesis_pipeline(
-        self,
-        sample_fundamental_analysis,
-        sample_technical_analysis,
-        sample_sec_analysis
-    ):
+    def test_full_synthesis_pipeline(self, sample_fundamental_analysis, sample_technical_analysis, sample_sec_analysis):
         """Test running through a complete synthesis pipeline."""
         # 1. Extract insights
         insights = extract_key_insights(
@@ -703,7 +691,7 @@ class TestDeterministicServicesIntegration:
                 "market_data": {"market_cap": 2_500_000_000_000},
                 "ratios": sample_fundamental_analysis.get("ratios", {}),
                 "sector": "Technology",
-            }
+            },
         )
 
         assert "strategic_positioning_score" in competitive
@@ -725,11 +713,7 @@ class TestDeterministicServicesIntegration:
         assert "fair_value_estimate" in valuation
         assert "valuation_stance" in valuation
 
-    def test_all_services_return_dict(
-        self,
-        sample_fundamental_analysis,
-        sample_technical_analysis
-    ):
+    def test_all_services_return_dict(self, sample_fundamental_analysis, sample_technical_analysis):
         """Ensure all convenience functions return dicts for API compatibility."""
         # All should return dicts
         result1 = extract_key_insights(fundamental=sample_fundamental_analysis)
@@ -745,10 +729,7 @@ class TestDeterministicServicesIntegration:
         )
         assert isinstance(result3, dict)
 
-        result4 = analyze_competitive_position(
-            symbol="X",
-            company_data={"sector": "Technology"}
-        )
+        result4 = analyze_competitive_position(symbol="X", company_data={"sector": "Technology"})
         assert isinstance(result4, dict)
 
         result5 = synthesize_valuation(

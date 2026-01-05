@@ -110,6 +110,7 @@ Investment Signals:
             # Initialize DataSourceManager for consolidated data access
             try:
                 from investigator.domain.services.data_sources.manager import DataSourceManager
+
                 self._data_source_manager = DataSourceManager()
                 logger.info("DataSourceManager initialized for institutional holdings")
             except ImportError as e:
@@ -125,6 +126,7 @@ Investment Signals:
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "holdings",
         symbol: Optional[str] = None,
         limit: int = 20,
@@ -132,7 +134,7 @@ Investment Signals:
         cik: Optional[str] = None,
         query: Optional[str] = None,
         quarter: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute institutional holdings query.
 
@@ -186,22 +188,16 @@ Investment Signals:
 
             else:
                 return ToolResult.error_result(
-                    f"Unknown action: {action}. Valid actions: "
-                    "holdings, top_holders, changes, institution, search"
+                    f"Unknown action: {action}. Valid actions: " "holdings, top_holders, changes, institution, search"
                 )
 
         except Exception as e:
             logger.error(f"InstitutionalHoldingsTool execute error: {e}")
             return ToolResult.error_result(
-                f"Institutional holdings query failed: {str(e)}",
-                metadata={"action": action, "symbol": symbol}
+                f"Institutional holdings query failed: {str(e)}", metadata={"action": action, "symbol": symbol}
             )
 
-    async def _get_holdings(
-        self,
-        symbol: str,
-        quarter: Optional[str] = None
-    ) -> ToolResult:
+    async def _get_holdings(self, symbol: str, quarter: Optional[str] = None) -> ToolResult:
         """Get institutional holdings for a symbol.
 
         Uses DataSourceManager for consolidated data access when available,
@@ -219,20 +215,24 @@ Investment Signals:
                     top_holders = inst_data.get("top_holders", [])
 
                     # Create ownership-like structure for signal calculation
-                    ownership_proxy = type("OwnershipProxy", (), {
-                        "num_institutions": summary.get("total_holders", 0),
-                        "total_shares": summary.get("total_shares", 0),
-                        "total_value": summary.get("total_value", 0),
-                        "qoq_change_pct": None,  # Not available from DataSourceManager
-                        "to_dict": lambda self: {
-                            "symbol": symbol,
-                            "num_institutions": self.num_institutions,
-                            "total_shares": self.total_shares,
-                            "total_value": self.total_value,
-                            "top_holders": top_holders,
-                            "report_date": inst_data.get("report_date"),
-                        }
-                    })()
+                    ownership_proxy = type(
+                        "OwnershipProxy",
+                        (),
+                        {
+                            "num_institutions": summary.get("total_holders", 0),
+                            "total_shares": summary.get("total_shares", 0),
+                            "total_value": summary.get("total_value", 0),
+                            "qoq_change_pct": None,  # Not available from DataSourceManager
+                            "to_dict": lambda self: {
+                                "symbol": symbol,
+                                "num_institutions": self.num_institutions,
+                                "total_shares": self.total_shares,
+                                "total_value": self.total_value,
+                                "top_holders": top_holders,
+                                "report_date": inst_data.get("report_date"),
+                            },
+                        },
+                    )()
 
                     signal = self._calculate_ownership_signal(ownership_proxy)
 
@@ -245,7 +245,7 @@ Investment Signals:
                             "source": "sec_form_13f",
                             "data_source": "data_source_manager",
                             "signal": signal["level"],
-                        }
+                        },
                     )
             except Exception as e:
                 logger.debug(f"DataSourceManager fallback to fetcher: {e}")
@@ -262,7 +262,7 @@ Investment Signals:
                     "message": "No institutional holdings data found",
                     "num_institutions": 0,
                 },
-                warnings=["No 13F data available for this symbol"]
+                warnings=["No 13F data available for this symbol"],
             )
 
         # Calculate signal based on ownership
@@ -277,7 +277,7 @@ Investment Signals:
                 "source": "sec_form_13f",
                 "data_source": "fetcher",
                 "signal": signal["level"],
-            }
+            },
         )
 
     async def _get_top_holders(self, symbol: str, limit: int = 20) -> ToolResult:
@@ -310,7 +310,7 @@ Investment Signals:
                             metadata={
                                 "source": "sec_form_13f",
                                 "data_source": "data_source_manager",
-                            }
+                            },
                         )
             except Exception as e:
                 logger.debug(f"DataSourceManager fallback to fetcher for top_holders: {e}")
@@ -326,7 +326,7 @@ Investment Signals:
                     "top_holders": [],
                     "message": "No institutional holders found",
                 },
-                warnings=["No 13F data available for this symbol"]
+                warnings=["No 13F data available for this symbol"],
             )
 
         # Calculate total value from top holders
@@ -343,14 +343,10 @@ Investment Signals:
             metadata={
                 "source": "sec_form_13f",
                 "data_source": "fetcher",
-            }
+            },
         )
 
-    async def _get_ownership_changes(
-        self,
-        symbol: str,
-        quarters: int = 4
-    ) -> ToolResult:
+    async def _get_ownership_changes(self, symbol: str, quarters: int = 4) -> ToolResult:
         """Get ownership changes over multiple quarters."""
         changes = await self._fetcher.get_ownership_changes(symbol, quarters)
 
@@ -361,7 +357,7 @@ Investment Signals:
                     "changes": [],
                     "message": "No historical ownership data found",
                 },
-                warnings=["Insufficient 13F history for this symbol"]
+                warnings=["Insufficient 13F history for this symbol"],
             )
 
         # Analyze trend
@@ -377,14 +373,10 @@ Investment Signals:
             metadata={
                 "source": "sec_form_13f",
                 "trend": trend["direction"],
-            }
+            },
         )
 
-    async def _get_institution_holdings(
-        self,
-        cik: str,
-        quarter: Optional[str] = None
-    ) -> ToolResult:
+    async def _get_institution_holdings(self, cik: str, quarter: Optional[str] = None) -> ToolResult:
         """Get holdings for a specific institution."""
         holdings = await self._fetcher.get_institution_holdings(cik, quarter)
 
@@ -425,14 +417,10 @@ Investment Signals:
             metadata={
                 "source": "sec_form_13f",
                 "positions_shown": len(holdings_data),
-            }
+            },
         )
 
-    async def _search_institutions(
-        self,
-        query: str,
-        limit: int = 20
-    ) -> ToolResult:
+    async def _search_institutions(self, query: str, limit: int = 20) -> ToolResult:
         """Search for institutions by name."""
         institutions = await self._fetcher.search_institutions(query, limit)
 
@@ -462,7 +450,7 @@ Investment Signals:
             },
             metadata={
                 "source": "sec_form_13f",
-            }
+            },
         )
 
     def _calculate_ownership_signal(self, ownership) -> Dict[str, Any]:
@@ -484,56 +472,34 @@ Investment Signals:
         if ownership.qoq_change_pct is not None:
             if ownership.qoq_change_pct > 10:
                 signal["level"] = "bullish"
-                signal["factors"].append(
-                    f"Strong institutional buying (+{ownership.qoq_change_pct:.1f}% QoQ)"
-                )
+                signal["factors"].append(f"Strong institutional buying (+{ownership.qoq_change_pct:.1f}% QoQ)")
             elif ownership.qoq_change_pct > 5:
                 signal["level"] = "moderately_bullish"
-                signal["factors"].append(
-                    f"Moderate institutional buying (+{ownership.qoq_change_pct:.1f}% QoQ)"
-                )
+                signal["factors"].append(f"Moderate institutional buying (+{ownership.qoq_change_pct:.1f}% QoQ)")
             elif ownership.qoq_change_pct < -10:
                 signal["level"] = "bearish"
-                signal["factors"].append(
-                    f"Strong institutional selling ({ownership.qoq_change_pct:.1f}% QoQ)"
-                )
+                signal["factors"].append(f"Strong institutional selling ({ownership.qoq_change_pct:.1f}% QoQ)")
             elif ownership.qoq_change_pct < -5:
                 signal["level"] = "moderately_bearish"
-                signal["factors"].append(
-                    f"Moderate institutional selling ({ownership.qoq_change_pct:.1f}% QoQ)"
-                )
+                signal["factors"].append(f"Moderate institutional selling ({ownership.qoq_change_pct:.1f}% QoQ)")
 
         # Check number of institutions
         if ownership.num_institutions > 100:
-            signal["factors"].append(
-                f"High institutional interest ({ownership.num_institutions} holders)"
-            )
+            signal["factors"].append(f"High institutional interest ({ownership.num_institutions} holders)")
         elif ownership.num_institutions < 10:
-            signal["factors"].append(
-                f"Low institutional interest ({ownership.num_institutions} holders)"
-            )
+            signal["factors"].append(f"Low institutional interest ({ownership.num_institutions} holders)")
 
         # Set interpretation
         if signal["level"] == "bullish":
-            signal["interpretation"] = (
-                "Strong institutional accumulation suggests positive outlook"
-            )
+            signal["interpretation"] = "Strong institutional accumulation suggests positive outlook"
         elif signal["level"] == "bearish":
-            signal["interpretation"] = (
-                "Significant institutional distribution warrants caution"
-            )
+            signal["interpretation"] = "Significant institutional distribution warrants caution"
         elif signal["level"] == "moderately_bullish":
-            signal["interpretation"] = (
-                "Moderate institutional buying indicates growing interest"
-            )
+            signal["interpretation"] = "Moderate institutional buying indicates growing interest"
         elif signal["level"] == "moderately_bearish":
-            signal["interpretation"] = (
-                "Moderate institutional selling may indicate reduced conviction"
-            )
+            signal["interpretation"] = "Moderate institutional selling may indicate reduced conviction"
         else:
-            signal["interpretation"] = (
-                "Institutional ownership relatively stable"
-            )
+            signal["interpretation"] = "Institutional ownership relatively stable"
 
         return signal
 
@@ -581,16 +547,10 @@ Investment Signals:
             )
         elif abs(avg_change) <= 5:
             direction = "stable"
-            interpretation = (
-                f"Stable institutional ownership "
-                f"(avg {avg_change:+.1f}% per quarter)"
-            )
+            interpretation = f"Stable institutional ownership " f"(avg {avg_change:+.1f}% per quarter)"
         else:
             direction = "mixed"
-            interpretation = (
-                f"Mixed institutional activity "
-                f"({up_quarters} up, {down_quarters} down quarters)"
-            )
+            interpretation = f"Mixed institutional activity " f"({up_quarters} up, {down_quarters} down quarters)"
 
         # Total change over period
         first_shares = changes[0].get("total_shares", 0)
@@ -615,34 +575,14 @@ Investment Signals:
                     "type": "string",
                     "enum": ["holdings", "top_holders", "changes", "institution", "search"],
                     "description": "Type of institutional holdings query",
-                    "default": "holdings"
+                    "default": "holdings",
                 },
-                "symbol": {
-                    "type": "string",
-                    "description": "Stock ticker symbol"
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximum results to return",
-                    "default": 20
-                },
-                "quarters": {
-                    "type": "integer",
-                    "description": "Number of quarters for change analysis",
-                    "default": 4
-                },
-                "cik": {
-                    "type": "string",
-                    "description": "Institution CIK for institution action"
-                },
-                "query": {
-                    "type": "string",
-                    "description": "Search query for search action"
-                },
-                "quarter": {
-                    "type": "string",
-                    "description": "Specific quarter (e.g., '2024-Q4')"
-                }
+                "symbol": {"type": "string", "description": "Stock ticker symbol"},
+                "limit": {"type": "integer", "description": "Maximum results to return", "default": 20},
+                "quarters": {"type": "integer", "description": "Number of quarters for change analysis", "default": 4},
+                "cik": {"type": "string", "description": "Institution CIK for institution action"},
+                "query": {"type": "string", "description": "Search query for search action"},
+                "quarter": {"type": "string", "description": "Specific quarter (e.g., '2024-Q4')"},
             },
-            "required": []
+            "required": [],
         }
