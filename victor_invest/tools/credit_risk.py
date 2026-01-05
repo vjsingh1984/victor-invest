@@ -112,7 +112,8 @@ Returns distress tier (1-5), valuation discount (0-50%), and detailed score brea
 
     async def execute(
         self,
-        symbol: str,
+        _exec_ctx: Dict[str, Any],
+        symbol: str = "",
         action: str = "composite",
         **kwargs
     ) -> ToolResult:

@@ -177,7 +177,8 @@ Returns cache data, operation status, or statistics.
 
     async def execute(
         self,
-        action: str,
+        _exec_ctx: Dict[str, Any],
+        action: str = "",
         cache_type: Optional[str] = None,
         key: Optional[Union[Dict, Tuple]] = None,
         value: Optional[Dict[str, Any]] = None,

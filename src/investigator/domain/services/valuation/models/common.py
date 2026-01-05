@@ -32,7 +32,37 @@ def clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(value, upper))
 
 
-@dataclass(slots=True)
+def clamp_fair_value(
+    fair_value: float,
+    current_price: float,
+    max_upside_multiple: float = 5.0,
+    min_downside_multiple: float = 0.1,
+) -> float:
+    """
+    Cap fair value to reasonable bounds relative to current price.
+
+    This prevents extreme outliers from distorting blended fair values.
+    For example, a P/S model producing 10x upside due to high revenue per share.
+
+    Args:
+        fair_value: Calculated fair value from a model
+        current_price: Current stock price
+        max_upside_multiple: Max fair value as multiple of price (default 5x = 400% upside)
+        min_downside_multiple: Min fair value as multiple of price (default 0.1x = -90% downside)
+
+    Returns:
+        Clamped fair value within reasonable bounds
+    """
+    if current_price <= 0:
+        return fair_value
+
+    max_fv = current_price * max_upside_multiple
+    min_fv = current_price * min_downside_multiple
+
+    return clamp(fair_value, min_fv, max_fv)
+
+
+@dataclass
 class MultipleModelContext:
     company_profile: CompanyProfile
     data_quality_score: float = 0.0

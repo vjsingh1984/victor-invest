@@ -75,7 +75,8 @@ class ToolResult:
 
     Attributes:
         success: Whether the tool execution succeeded
-        data: The result data if successful (can be any dict structure)
+        output: The result data if successful (can be any structure).
+               Named 'output' for compatibility with Victor framework.
         error: Error message if execution failed
         warnings: Optional list of non-fatal warnings encountered
         metadata: Optional metadata about the execution (timing, source, etc.)
@@ -84,7 +85,7 @@ class ToolResult:
         # Successful result
         result = ToolResult(
             success=True,
-            data={"fair_value": 150.25, "upside": 12.5},
+            output={"fair_value": 150.25, "upside": 12.5},
             metadata={"model": "DCF", "execution_time_ms": 234}
         )
 
@@ -96,7 +97,7 @@ class ToolResult:
         )
     """
     success: bool
-    data: Optional[Dict[str, Any]] = None
+    output: Optional[Any] = None  # Named 'output' for Victor framework compatibility
     error: Optional[str] = None
     warnings: Optional[List[str]] = field(default_factory=list)
     metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
@@ -108,11 +109,17 @@ class ToolResult:
         if self.metadata is None:
             self.metadata = {}
 
+    @property
+    def data(self) -> Optional[Any]:
+        """Alias for output (backward compatibility)."""
+        return self.output
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary for serialization."""
         return {
             "success": self.success,
-            "data": self.data,
+            "output": self.output,
+            "data": self.output,  # Backward compatibility
             "error": self.error,
             "warnings": self.warnings,
             "metadata": self.metadata,
@@ -128,7 +135,7 @@ class ToolResult:
         """Factory method for successful results."""
         return cls(
             success=True,
-            data=data,
+            output=data,  # Map data arg to output field
             warnings=warnings or [],
             metadata=metadata or {}
         )
@@ -205,10 +212,13 @@ class BaseTool(ABC):
             await self.initialize()
 
     @abstractmethod
-    async def execute(self, **kwargs) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs) -> ToolResult:
         """Execute the tool with provided parameters.
 
         Args:
+            _exec_ctx: Framework execution context (reserved name to avoid collision
+                      with tool parameters). Contains shared resources. This aligns
+                      with Victor framework's BaseTool signature for compatibility.
             **kwargs: Tool-specific parameters (documented in subclasses)
 
         Returns:

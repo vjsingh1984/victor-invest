@@ -57,9 +57,12 @@ workflow handler registry. YAML workflows reference handlers by path.
 """
 
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from victor.framework.workflows import BaseYAMLWorkflowProvider
+
+if TYPE_CHECKING:
+    from victor.workflows.executor import WorkflowResult
 
 from victor_invest.workflows.graphs import (
     build_comprehensive_graph,
@@ -67,6 +70,7 @@ from victor_invest.workflows.graphs import (
     build_quick_graph,
     build_standard_graph,
     run_analysis,
+    run_yaml_analysis,
 )
 from victor_invest.workflows.state import AnalysisMode, AnalysisWorkflowState
 from victor_invest.workflows.rl_backtest import (
@@ -96,7 +100,10 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
         # List available workflows
         print(provider.get_workflow_names())
 
-        # Stream investment analysis
+        # Direct execution (compute-only workflows)
+        result = await provider.run_workflow("comprehensive", {"symbol": "AAPL"})
+
+        # Streaming (requires orchestrator for agent nodes)
         async for chunk in provider.astream("comprehensive", orchestrator, {"symbol": "AAPL"}):
             print(f"[{chunk.progress:.0f}%] {chunk.event_type.value}")
     """
@@ -161,6 +168,108 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
         }
         return mapping.get(task_type.lower())
 
+    async def run_agentic_workflow(
+        self,
+        workflow_name: str,
+        context: Optional[Dict[str, Any]] = None,
+        provider: str = "ollama",
+        model: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> "WorkflowResult":
+        """Execute a YAML workflow with full agent node support.
+
+        Uses Victor's public Agent.create() API for proper orchestrator creation,
+        enabling agent nodes for LLM reasoning. This approach:
+        - Leverages Victor's unified provider abstraction
+        - Applies vertical-specific configuration automatically
+        - Follows the framework's golden path for agent creation
+
+        For compute-only workflows, use the simpler `run_workflow()` method
+        inherited from BaseYAMLWorkflowProvider.
+
+        Args:
+            workflow_name: Name of the YAML workflow (e.g., "comprehensive")
+            context: Initial context data (e.g., {"symbol": "AAPL"})
+            provider: LLM provider ("ollama", "anthropic", "openai")
+            model: Model identifier. If None, uses provider default.
+            timeout: Optional overall timeout in seconds (default: 300)
+
+        Returns:
+            WorkflowResult with execution outcome and outputs
+
+        Raises:
+            ValueError: If workflow_name is not found
+
+        Example:
+            provider = InvestmentWorkflowProvider()
+            result = await provider.run_agentic_workflow(
+                "comprehensive",
+                {"symbol": "AAPL"},
+                provider="ollama",
+                model="gpt-oss:20b",
+            )
+            if result.success:
+                synthesis = result.context.get("synthesis")
+                print(f"Recommendation: {synthesis.get('recommendation')}")
+        """
+        from victor.framework import Agent
+        from victor.core.verticals import VerticalRegistry
+        from victor.workflows.executor import WorkflowExecutor
+        from victor_invest.vertical import InvestmentVertical
+        from victor_invest.role_provider import register_investment_role_provider
+
+        workflow = self.get_workflow(workflow_name)
+        if not workflow:
+            raise ValueError(f"Unknown workflow: {workflow_name}")
+
+        # Resolve model from config if not specified
+        if model is None and provider == "ollama":
+            try:
+                from investigator.config import get_config
+                config = get_config()
+                model = config.ollama.models.get("synthesis", "gpt-oss:20b")
+            except Exception:
+                model = "gpt-oss:20b"
+
+        # Register InvestmentVertical with Victor's registry if not already registered
+        # This enables third-party verticals to work with Agent.create()
+        if not VerticalRegistry.get("investment"):
+            VerticalRegistry.register(InvestmentVertical)
+
+        # Register investment-specific role provider for subagent tool selection
+        # This ensures subagents use investment tools instead of coding tools
+        register_investment_role_provider()
+
+        # Use Victor's public Agent.create() API - the golden path
+        # This properly handles provider setup, vertical integration, and component assembly
+        agent = await Agent.create(
+            provider=provider,
+            model=model,
+            vertical=InvestmentVertical,
+            temperature=0.3,
+            max_tokens=4096,
+        )
+
+        # Get underlying orchestrator for workflow execution
+        orchestrator = agent.get_orchestrator()
+
+        # Create executor with proper orchestrator
+        executor = WorkflowExecutor(
+            orchestrator,
+            max_parallel=4,
+            default_timeout=timeout or 300.0,
+        )
+
+        # Execute workflow with initial context
+        return await executor.execute(
+            workflow,
+            initial_context=context or {},
+            timeout=timeout,
+        )
+
+    # run_workflow() is inherited from BaseYAMLWorkflowProvider
+    # It executes compute-only YAML workflows without requiring a full orchestrator
+
 
 # Register Investment domain handlers when this module is loaded
 from victor_invest.handlers import register_handlers as _register_handlers
@@ -181,6 +290,7 @@ __all__ = [
     "build_comprehensive_graph",
     # Analysis convenience
     "run_analysis",
+    "run_yaml_analysis",
     # RL Backtest state
     "RLBacktestWorkflowState",
     # RL Backtest graph builders

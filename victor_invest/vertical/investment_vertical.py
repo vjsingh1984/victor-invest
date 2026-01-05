@@ -301,6 +301,56 @@ class InvestmentVertical(VerticalBase):
         return cls._get_cached_extension("workflow", _create)
 
     @classmethod
+    async def create_orchestrator(
+        cls,
+        provider: str = "ollama",
+        model: Optional[str] = None,
+    ) -> Any:
+        """Create an AgentOrchestrator for YAML workflow execution.
+
+        This creates a Victor AgentOrchestrator configured with the Investment
+        vertical's tools and prompts. The orchestrator can be used with
+        WorkflowExecutor for executing YAML workflows with agent nodes.
+
+        Args:
+            provider: LLM provider name (ollama, anthropic, openai).
+            model: Model identifier. If None, uses config default.
+
+        Returns:
+            Configured AgentOrchestrator instance.
+
+        Example:
+            orchestrator = await InvestmentVertical.create_orchestrator(
+                provider="ollama",
+                model="gpt-oss:20b"
+            )
+            executor = workflow_provider.create_executor(orchestrator)
+            result = await executor.execute(workflow, context)
+        """
+        from victor.framework import Agent
+
+        # Get default model from investigator config if not specified
+        if model is None and provider == "ollama":
+            try:
+                from investigator.config import get_config
+                config = get_config()
+                model = config.ollama.models.get("synthesis", "gpt-oss:20b")
+            except Exception:
+                model = "gpt-oss:20b"
+
+        # Create Agent with Investment vertical
+        agent = await Agent.create(
+            provider=provider,
+            model=model,
+            tools=cls.get_tools(),
+            vertical=cls,
+            temperature=0.3,
+        )
+
+        # Return the underlying orchestrator
+        return agent.get_orchestrator()
+
+    @classmethod
     async def run_analysis(
         cls,
         symbol: str,

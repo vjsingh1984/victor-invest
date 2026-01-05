@@ -29,6 +29,10 @@ workflows:
         type: compute
         name: "Fetch SEC Data"
         handler: fetch_sec_data
+        credentials_required:
+          - type: database
+            name: sec
+            required: true
         constraints:
           llm_allowed: false
           timeout: 60
@@ -38,6 +42,10 @@ workflows:
         type: compute
         name: "Fetch Market Data"
         handler: fetch_market_data
+        credentials_required:
+          - type: database
+            name: stock
+            required: true
         constraints:
           llm_allowed: false
           timeout: 30
@@ -60,12 +68,38 @@ workflows:
         name: "Parallel Analysis"
         parallel_nodes: [fundamental_analysis, technical_analysis, market_context_analysis]
         join_strategy: all
+        next: [identify_peers]
+
+      # =====================================================================
+      # Stage 2.5: Peer Identification (after market context for sector/industry)
+      # =====================================================================
+      - id: identify_peers
+        type: compute
+        name: "Identify Peers"
+        handler: identify_peers
+        credentials_required:
+          - type: database
+            name: stock
+            required: true  # For peer symbol lookups
+        constraints:
+          llm_allowed: false
+          timeout: 15
+        input_mapping:
+          market_context: market_context
+        output: peer_data
         next: [check_data_quality]
 
       - id: fundamental_analysis
         type: compute
         name: "Fundamental Analysis"
         handler: run_fundamental_analysis
+        credentials_required:
+          - type: database
+            name: sec
+            required: true
+          - type: database
+            name: stock
+            required: false  # For current price lookup
         constraints:
           llm_allowed: false
           timeout: 60
@@ -77,6 +111,10 @@ workflows:
         type: compute
         name: "Technical Analysis"
         handler: run_technical_analysis
+        credentials_required:
+          - type: database
+            name: stock
+            required: false  # Can use cached data
         constraints:
           llm_allowed: false
           timeout: 30
@@ -134,35 +172,21 @@ workflows:
         next: [synthesize]
 
       # =====================================================================
-      # Stage 4: LLM-Enhanced Synthesis
+      # Stage 4: LLM-Enhanced Synthesis (Compute Node with LLM Handler)
       # =====================================================================
+      # Uses RunSynthesisHandler which internally calls LLM for intelligent
+      # synthesis with rule-based fallback if LLM is unavailable.
       - id: synthesize
-        type: agent
+        type: compute
         name: "Investment Synthesis"
-        role: investment_analyst
-        goal: |
-          Synthesize all analysis results into a comprehensive investment recommendation.
-
-          You have access to:
-          1. **Fundamental Analysis** - valuation models, financial metrics, growth rates
-          2. **Technical Analysis** - price trends, indicators, support/resistance levels
-          3. **Market Context** - sector performance, macro environment, volatility regime
-
-          Provide:
-          - Clear BUY/HOLD/SELL recommendation with conviction level
-          - Price target with methodology explanation
-          - Key catalysts that could drive the stock higher
-          - Key risks that investors should monitor
-          - Concise investment thesis narrative
-
-          Be specific and actionable. Avoid generic statements.
-        tool_budget: 0
-        llm_config:
-          temperature: 0.3
-          max_tokens: 4000
+        handler: run_synthesis
+        constraints:
+          llm_allowed: true
+          timeout: 300
         input_mapping:
-          fundamental_analysis: fundamental_analysis
+          symbol: symbol
           technical_analysis: technical_analysis
+          fundamental_analysis: fundamental_analysis
           market_context: market_context
         output: synthesis
         next: [generate_report]

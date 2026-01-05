@@ -131,6 +131,7 @@ Investment Signals by Regime:
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "summary",
         **kwargs
     ) -> ToolResult:

@@ -151,6 +151,7 @@ class RLBacktestTool(BaseTool):
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "run_backtest",
         symbol: str = "",
         lookback_months: Optional[List[int]] = None,

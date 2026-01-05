@@ -131,7 +131,8 @@ Parameters:
 
     async def execute(
         self,
-        symbol: str,
+        _exec_ctx: Dict[str, Any],
+        symbol: str = "",
         action: str = "get_company_facts",
         form_type: str = "10-K",
         period: str = "latest",

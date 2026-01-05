@@ -165,6 +165,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "get_summary",
         category: Optional[str] = None,
         indicators: Optional[List[str]] = None,

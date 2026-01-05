@@ -496,6 +496,122 @@ async def run_market_context_analysis(state_input) -> dict:
     return _state_to_dict(state)
 
 
+async def _run_llm_synthesis(
+    symbol: str,
+    technical: dict,
+    fundamental: dict,
+    market_context: dict,
+    composite_score: float,
+    rule_based_recommendation: str,
+) -> Optional[dict]:
+    """Use LLM to generate intelligent investment synthesis.
+
+    Args:
+        symbol: Stock ticker symbol
+        technical: Technical analysis data
+        fundamental: Fundamental analysis data
+        market_context: Market context data
+        composite_score: Rule-based composite score
+        rule_based_recommendation: Rule-based recommendation
+
+    Returns:
+        LLM synthesis dict with executive_summary, catalysts, risks, etc.
+        Returns None if LLM fails.
+    """
+    import json
+
+    try:
+        from investigator.config import get_config
+        from investigator.infrastructure.llm import OllamaClient
+
+        config = get_config()
+        client = OllamaClient(config)
+
+        # Extract key technical data
+        trend = technical.get("trend", {})
+        current_price = trend.get("current_price", "N/A")
+        overall_signal = trend.get("overall_signal", "neutral")
+        signal_pcts = trend.get("signal_percentages", {})
+
+        sr = technical.get("support_resistance", {})
+        week_52 = sr.get("52_week", {})
+        support = sr.get("support_levels", {}).get("support_1", "N/A")
+        resistance = sr.get("resistance_levels", {}).get("resistance_1", "N/A")
+
+        # Extract market context
+        sector = market_context.get("sector", "Unknown")
+        rel_perf = market_context.get("relative_performance_vs_spy", 0)
+        beta = market_context.get("beta", 1.0)
+
+        # Format fundamental data
+        fund_summary = "Fundamental data not available."
+        if fundamental and fundamental.get("status") == "success":
+            valuation = fundamental.get("valuation_models", {})
+            if valuation.get("composite_fair_value"):
+                fund_summary = f"Composite Fair Value: ${valuation['composite_fair_value']:.2f}"
+            if valuation.get("composite_upside_percent"):
+                fund_summary += f", Upside: {valuation['composite_upside_percent']:.1f}%"
+
+        # Build prompt
+        prompt = f"""You are an expert investment analyst. Synthesize the following analysis data for {symbol} into a coherent investment recommendation.
+
+## Technical Analysis
+- Current Price: ${current_price}
+- Overall Signal: {overall_signal}
+- Bullish Signals: {signal_pcts.get('bullish_pct', 0):.0f}%
+- Bearish Signals: {signal_pcts.get('bearish_pct', 0):.0f}%
+- Support Level: ${support}
+- Resistance Level: ${resistance}
+- 52-Week Range: ${week_52.get('low', 'N/A')} - ${week_52.get('high', 'N/A')}
+
+## Market Context
+- Sector: {sector}
+- Relative Performance vs SPY: {rel_perf:.1f}%
+- Beta: {beta:.2f}
+
+## Fundamental Analysis
+{fund_summary}
+
+## Rule-Based Analysis
+- Composite Score: {composite_score:.1f}/100
+- Initial Recommendation: {rule_based_recommendation}
+
+Based on this analysis, provide a JSON response with:
+{{
+    "executive_summary": "2-3 sentence investment thesis explaining the recommendation",
+    "recommendation": "BUY/HOLD/SELL",
+    "confidence": "HIGH/MEDIUM/LOW",
+    "key_catalysts": ["catalyst 1", "catalyst 2", "catalyst 3"],
+    "key_risks": ["risk 1", "risk 2", "risk 3"],
+    "reasoning": "Brief explanation of the recommendation"
+}}
+
+Respond ONLY with the JSON object, no other text."""
+
+        model = config.ollama.models.get("synthesis", "gpt-oss:20b")
+
+        response = await client.generate(
+            prompt=prompt,
+            model=model,
+            options={"temperature": 0.3, "num_predict": 1024},
+        )
+
+        response_text = response.get("response", "")
+
+        # Parse JSON response
+        start = response_text.find("{")
+        end = response_text.rfind("}") + 1
+        if start >= 0 and end > start:
+            json_str = response_text[start:end]
+            return json.loads(json_str)
+
+        return None
+
+    except Exception as e:
+        logger.warning(f"LLM synthesis error: {e}")
+        return None
+
+
 async def run_synthesis(state_input) -> dict:
     """Synthesize all analysis results into final output.
 
@@ -598,6 +714,20 @@ async def run_synthesis(state_input) -> dict:
             recommendation_action = "STRONG SELL"
             confidence = "high"
 
+        # Try LLM synthesis for enhanced narrative
+        llm_synthesis = None
+        try:
+            llm_synthesis = await _run_llm_synthesis(
+                state.symbol,
+                state.technical_analysis or {},
+                state.fundamental_analysis or {},
+                state.market_context or {},
+                composite_score,
+                recommendation_action,
+            )
+        except Exception as e:
+            logger.warning(f"LLM synthesis failed, using rule-based: {e}")
+
         state.synthesis = {
             "symbol": state.symbol,
             "analyses_included": available_analyses,
@@ -607,16 +737,25 @@ async def run_synthesis(state_input) -> dict:
             "agent_spec": SYNTHESIS_AGENT_SPEC.name,
             "mode": state.mode.value,
             "status": "success",
+            # LLM-generated content (if available)
+            "synthesis_method": "llm" if llm_synthesis else "rule_based",
+            "executive_summary": llm_synthesis.get("executive_summary", "") if llm_synthesis else "",
+            "key_catalysts": llm_synthesis.get("key_catalysts", []) if llm_synthesis else [],
+            "key_risks": llm_synthesis.get("key_risks", []) if llm_synthesis else [],
+            "reasoning": llm_synthesis.get("reasoning", "") if llm_synthesis else "",
         }
 
         state.recommendation = {
             "symbol": state.symbol,
-            "action": recommendation_action,
+            "action": llm_synthesis.get("recommendation", recommendation_action) if llm_synthesis else recommendation_action,
             "composite_score": round(composite_score, 2),
-            "confidence": confidence,
+            "confidence": llm_synthesis.get("confidence", confidence) if llm_synthesis else confidence,
             "analyses_included": available_analyses,
             "thresholds_used": thresholds,
             "errors_during_analysis": state.errors,
+            "executive_summary": llm_synthesis.get("executive_summary", "") if llm_synthesis else "",
+            "key_catalysts": llm_synthesis.get("key_catalysts", []) if llm_synthesis else [],
+            "key_risks": llm_synthesis.get("key_risks", []) if llm_synthesis else [],
         }
 
         state.mark_step_completed("synthesis")
@@ -923,12 +1062,154 @@ async def run_analysis(
         return state
 
 
+async def run_yaml_analysis(
+    symbol: str,
+    mode: AnalysisMode = AnalysisMode.STANDARD,
+) -> AnalysisWorkflowState:
+    """Run analysis using YAML workflow with BaseYAMLProvider and handlers.
+
+    This execution path uses the YAML workflow definitions with registered
+    compute handlers from handlers.py. The handlers implement the actual
+    business logic including LLM synthesis via OllamaClient.
+
+    This approach provides:
+    - YAML-defined workflow DAG for flexibility
+    - Handlers.py for actual implementation
+    - LLM synthesis via RunSynthesisHandler with OllamaClient
+    - Escape hatches for complex conditions
+
+    Args:
+        symbol: Stock ticker symbol to analyze.
+        mode: Analysis mode (default: STANDARD).
+
+    Returns:
+        Final AnalysisWorkflowState with results including LLM synthesis.
+
+    Example:
+        result = await run_yaml_analysis("AAPL", AnalysisMode.COMPREHENSIVE)
+        print(result.synthesis)  # LLM-synthesized investment narrative
+    """
+    from victor_invest.workflows import InvestmentWorkflowProvider
+    from victor_invest.handlers import HANDLERS
+
+    # Map mode to workflow name
+    workflow_map = {
+        AnalysisMode.QUICK: "quick",
+        AnalysisMode.STANDARD: "standard",
+        AnalysisMode.COMPREHENSIVE: "comprehensive",
+    }
+    workflow_name = workflow_map.get(mode, "standard")
+
+    logger.info(f"Running YAML workflow '{workflow_name}' for {symbol} using handlers")
+
+    # Initialize workflow provider
+    provider = InvestmentWorkflowProvider()
+
+    # Get the workflow definition
+    workflow = provider.get_workflow(workflow_name)
+    if not workflow:
+        raise ValueError(f"Workflow '{workflow_name}' not found")
+
+    # Create workflow context
+    class WorkflowContext:
+        """Simple context for workflow execution."""
+
+        def __init__(self, initial_data: dict):
+            self._data = initial_data.copy()
+
+        def get(self, key: str, default=None):
+            return self._data.get(key, default)
+
+        def set(self, key: str, value):
+            self._data[key] = value
+
+        def all(self) -> dict:
+            return self._data.copy()
+
+    # Create mock node for handlers
+    class MockNode:
+        def __init__(self, node_id: str, output_key: str = None):
+            self.id = node_id
+            self.output_key = output_key
+
+    ctx = WorkflowContext({
+        "symbol": symbol.upper(),
+        "mode": mode.value,
+    })
+
+    # Phase 1: Fetch data in parallel
+    logger.info(f"Fetching data in parallel for {symbol}")
+
+    async def execute_handler(handler_name: str, node_id: str, output_key: str):
+        handler = HANDLERS.get(handler_name)
+        if handler:
+            try:
+                result = await handler(MockNode(node_id, output_key), ctx, None)
+                return result.output if hasattr(result, 'output') else {}
+            except Exception as e:
+                logger.warning(f"Handler {handler_name} failed: {e}")
+                return {"status": "error", "error": str(e)}
+        return {"status": "error", "error": f"Handler {handler_name} not found"}
+
+    # Execute data fetches in parallel
+    sec_result, market_result = await asyncio.gather(
+        execute_handler("fetch_sec_data", "fetch_sec_data", "sec_data"),
+        execute_handler("fetch_market_data", "fetch_market_data", "market_data"),
+    )
+    ctx.set("sec_data", sec_result)
+    ctx.set("market_data", market_result)
+
+    # Phase 2: Run analyses in parallel
+    logger.info(f"Running analyses in parallel for {symbol}")
+
+    fundamental_result, technical_result, market_context_result = await asyncio.gather(
+        execute_handler("run_fundamental_analysis", "fundamental_analysis", "fundamental_analysis"),
+        execute_handler("run_technical_analysis", "technical_analysis", "technical_analysis"),
+        execute_handler("run_market_context_analysis", "market_context_analysis", "market_context"),
+    )
+    ctx.set("fundamental_analysis", fundamental_result)
+    ctx.set("technical_analysis", technical_result)
+    ctx.set("market_context", market_context_result)
+
+    # Phase 3: LLM Synthesis using RunSynthesisHandler
+    logger.info(f"Running LLM synthesis for {symbol}")
+    synthesis_result = await execute_handler("run_synthesis", "synthesize", "synthesis")
+    ctx.set("synthesis", synthesis_result)
+
+    # Build recommendation from synthesis
+    synthesis = ctx.get("synthesis", {})
+    recommendation = {
+        "action": synthesis.get("recommendation", "HOLD"),
+        "confidence": synthesis.get("confidence", "MEDIUM"),
+        "key_catalysts": synthesis.get("key_catalysts", []),
+        "key_risks": synthesis.get("key_risks", []),
+        "executive_summary": synthesis.get("executive_summary", ""),
+        "reasoning": synthesis.get("reasoning", ""),
+    }
+    ctx.set("recommendation", recommendation)
+
+    # Convert to AnalysisWorkflowState
+    return AnalysisWorkflowState(
+        symbol=symbol.upper(),
+        mode=mode,
+        fundamental_analysis=ctx.get("fundamental_analysis"),
+        technical_analysis=ctx.get("technical_analysis"),
+        market_context=ctx.get("market_context"),
+        synthesis=ctx.get("synthesis"),
+        recommendation=ctx.get("recommendation"),
+        errors=[],
+    )
+
+
 __all__ = [
     # Graph builders
     "build_quick_graph",
     "build_standard_graph",
     "build_comprehensive_graph",
     "build_graph_for_mode",
+    # Execution helpers
+    "run_analysis",
+    "run_yaml_analysis",
     # Node functions (for testing/extension)
     "fetch_sec_data",
     "fetch_market_data",

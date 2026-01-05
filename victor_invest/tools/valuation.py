@@ -210,7 +210,8 @@ Returns fair value estimates, model assumptions, and upside/downside vs current 
 
     async def execute(
         self,
-        symbol: str,
+        _exec_ctx: Dict[str, Any],
+        symbol: str = "",
         model: str = "all",
         quarterly_metrics: Optional[List[Dict]] = None,
         multi_year_data: Optional[List[Dict]] = None,
@@ -364,6 +365,7 @@ Returns fair value estimates, model assumptions, and upside/downside vs current 
 
                     # Get financial metrics from SEC (action is "extract_metrics")
                     metrics_result = await sec_tool.execute(
+                        {},  # _exec_ctx (required)
                         symbol=symbol,
                         action="extract_metrics"
                     )

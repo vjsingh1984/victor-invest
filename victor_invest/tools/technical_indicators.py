@@ -130,7 +130,8 @@ Returns calculated indicators as structured data suitable for analysis.
 
     async def execute(
         self,
-        symbol: str,
+        _exec_ctx: Dict[str, Any],
+        symbol: str = "",
         action: str = "calculate_all",
         days: int = 365,
         recent_days: int = 30,

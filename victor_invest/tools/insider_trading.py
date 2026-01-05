@@ -118,7 +118,8 @@ values, and cluster detection flags.
 
     async def execute(
         self,
-        symbol: str,
+        _exec_ctx: Dict[str, Any],
+        symbol: str = "",
         action: str = "sentiment",
         days: int = 90,
         significant_only: bool = False,

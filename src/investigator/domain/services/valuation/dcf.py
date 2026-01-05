@@ -1140,7 +1140,13 @@ class DCFValuation:
                         # Calculate geometric mean: (current / 2y_ago) ^ (1/2) - 1
                         # This gives CAGR over 2 years using 3 data points (current, 1y ago, 2y ago)
                         if ttm_2y_ago > 0:
-                            revenue_growth = (current_ttm / ttm_2y_ago) ** (1.0 / 2.0) - 1.0
+                            ratio = current_ttm / ttm_2y_ago
+                            # Protect against negative ratio (would produce complex number)
+                            if ratio <= 0:
+                                logger.warning(f"⚠️ {self.symbol} - Cannot compute geometric mean: negative ratio ({ratio:.3f}). Using 0.")
+                                revenue_growth = 0.0
+                            else:
+                                revenue_growth = ratio ** (1.0 / 2.0) - 1.0
 
                             # Validate against 1-year YoY for sanity check
                             yoy_growth = ((current_ttm - ttm_1y_ago) / ttm_1y_ago if ttm_1y_ago > 0 else 0)
@@ -2410,8 +2416,18 @@ class DCFValuation:
                 # Full 12 quarters available - use geometric mean for stability
                 ratio1 = 1 + (growth_current_vs_prior1 / 100)
                 ratio2 = 1 + (growth_prior1_vs_prior2 / 100)
-                geometric_mean_ratio = (ratio1 * ratio2) ** 0.5
-                yoy_growth_pct = (geometric_mean_ratio - 1) * 100
+                # Protect against negative product (would produce complex number)
+                ratio_product = ratio1 * ratio2
+                if ratio_product <= 0:
+                    # Fallback to simple growth if product is negative (severe decline)
+                    logger.warning(
+                        f"⚠️ {self.symbol} - Cannot compute geometric mean: negative ratio product "
+                        f"(ratio1={ratio1:.3f}, ratio2={ratio2:.3f}). Using simple growth."
+                    )
+                    yoy_growth_pct = growth_current_vs_prior1
+                else:
+                    geometric_mean_ratio = ratio_product ** 0.5
+                    yoy_growth_pct = (geometric_mean_ratio - 1) * 100
 
                 logger.info(
                     f"🔍 [REVENUE_GROWTH] {self.symbol} - TTM Revenue Growth (Geometric Mean - 12 quarters):\n"

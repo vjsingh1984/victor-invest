@@ -70,13 +70,16 @@ class DatabaseMarketDataFetcher:
             config.analysis, "low_volume_notice_min_days", 30
         )  # only escalate low volume when we have a reasonable sample size
 
-        # Database connection parameters for read-only market data database
+        # Database connection parameters using unified credential manager
+        from investigator.infrastructure.credentials import get_database_credentials
+
+        creds = get_database_credentials("stock")
         self.db_config = {
-            "host": "${DB_HOST:-localhost}",
-            "port": 5432,
-            "database": "stock",  # Based on the psql command showing stock-# prompt
-            "username": "investigator",
-            "password": "investigator",
+            "host": creds.host,
+            "port": creds.port,
+            "database": creds.database,
+            "username": creds.username,
+            "password": creds.password,
         }
 
         # Create database engine with connection pooling

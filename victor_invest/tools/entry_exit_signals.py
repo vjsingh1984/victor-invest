@@ -92,6 +92,7 @@ class EntryExitSignalTool(BaseTool):
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "generate_signals",
         symbol: str = "",
         current_price: float = 0.0,

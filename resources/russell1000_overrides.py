@@ -138,7 +138,7 @@ RUSSELL1000_OVERRIDES = {
     "CACC": ("Finance", "Finance: Consumer Services"),
     "CACI": ("Technology", "EDP Services"),
     "CAG": ("Consumer Staples", "Packaged Foods"),
-    "CAH": ("Health Care", "Other Pharmaceuticals"),
+    "CAH": ("Health Care", "Health Care Distribution"),  # Cardinal Health - drug distributor, low-margin
     "CAR": ("Consumer Discretionary", "Rental/Leasing Companies"),
     "CARR": ("Consumer Discretionary", "Wholesale Distributors"),
     "CASY": ("Miscellaneous", "Diversified Commercial Services"),
@@ -170,7 +170,7 @@ RUSSELL1000_OVERRIDES = {
     "CHRW": ("Consumer Discretionary", "Oil Refining/Marketing"),
     "CHTR": ("Technology", "Telecommunications Equipment"),  # P0-1: Telecom equipment is Technology
     "CHWY": ("Consumer Discretionary", "Catalog/Specialty Distribution"),
-    "CI": ("Health Care", "Medical Specialities"),
+    "CI": ("Health Care", "Managed Health Care"),  # Health insurance/managed care,
     "CIEN": ("Technology", "Telecommunications Equipment"),  # P0-1: Telecom equipment is Technology
     "CINF": ("Finance", "Property-Casualty Insurers"),
     "CIVI": ("Energy", "Oil & Gas Production"),
@@ -184,7 +184,7 @@ RUSSELL1000_OVERRIDES = {
     "CMI": ("Industrials", "Construction/Ag Equipment/Trucks"),
     "CMS": ("Utilities", "Power Generation"),
     "CNA": ("Finance", "Property-Casualty Insurers"),
-    "CNC": ("Health Care", "Medical Specialities"),
+    "CNC": ("Health Care", "Managed Health Care"),  # Health insurance/managed care - use insurance valuation
     "CNM": ("Industrials", "Industrial Machinery/Components"),
     "CNP": ("Utilities", "Electric Utilities: Central"),
     "CNXC": ("Technology", "Computer Software: Prepackaged Software"),
@@ -281,7 +281,7 @@ RUSSELL1000_OVERRIDES = {
     "ELAN": ("Health Care", "Biotechnology: Pharmaceutical Preparations"),
     "ELF": ("Consumer Discretionary", "Package Goods/Cosmetics"),
     "ELS": ("Real Estate", "Real Estate Investment Trusts"),
-    "ELV": ("Health Care", "Medical Specialities"),
+    "ELV": ("Health Care", "Managed Health Care"),  # Health insurance/managed care,
     "EME": ("Industrials", "Engineering & Construction"),
     "EMN": ("Industrials", "Major Chemicals"),
     "EMR": ("Industrials", "Industrial Machinery/Components"),
@@ -372,6 +372,7 @@ RUSSELL1000_OVERRIDES = {
     "GNTX": ("Consumer Discretionary", "Auto Parts:O.E.M."),
     "GOOG": ("Technology", "Internet and Information Services"),
     "GOOGL": ("Technology", "Internet and Information Services"),
+    "GOLD": ("Basic Materials", "Precious Metals"),  # Barrick Gold - gold mining
     "GPC": ("Consumer Discretionary", "Automotive Aftermarket"),
     "GPK": ("Basic Materials", "Paper"),
     "GPN": ("Consumer Discretionary", "Business Services"),
@@ -413,7 +414,7 @@ RUSSELL1000_OVERRIDES = {
     "HSY": ("Consumer Staples", "Specialty Foods"),
     "HUBB": ("Technology", "Industrial Machinery/Components"),
     "HUBS": ("Technology", "Computer Software: Prepackaged Software"),
-    "HUM": ("Health Care", "Medical Specialities"),
+    "HUM": ("Health Care", "Managed Health Care"),  # Health insurance/managed care,
     "HUN": ("Industrials", "Major Chemicals"),
     "HWM": ("Industrials", "Military/Government/Technical"),
     "HXL": ("Industrials", "Industrial Machinery/Components"),
@@ -423,6 +424,7 @@ RUSSELL1000_OVERRIDES = {
     "ICE": ("Finance", "Investment Bankers/Brokers/Service"),
     "IDA": ("Utilities", "Electric Utilities: Central"),
     "IDXX": ("Health Care", "Biotechnology: In Vitro & In Vivo Diagnostic Substances"),
+    "IEP": ("Finance", "Diversified Investments"),  # Icahn Enterprises - holding company
     "IEX": ("Industrials", "Fluid Controls"),
     "IFF": ("Industrials", "Major Chemicals"),
     "ILMN": ("Health Care", "Medical Specialities"),
@@ -529,7 +531,7 @@ RUSSELL1000_OVERRIDES = {
     "MAT": ("Consumer Discretionary", "Recreational Games/Products/Toys"),
     "MCD": ("Consumer Discretionary", "Restaurants"),
     "MCHP": ("Technology", "Semiconductors"),
-    "MCK": ("Health Care", "Other Pharmaceuticals"),
+    "MCK": ("Health Care", "Health Care Distribution"),  # McKesson - drug distributor, low-margin
     "MCO": ("Finance", "Advertising"),
     "MDB": ("Technology", "Retail: Computer Software & Peripheral Equipment"),
     "MDLZ": ("Consumer Staples", "Meat/Poultry/Fish"),
@@ -551,7 +553,7 @@ RUSSELL1000_OVERRIDES = {
     "MMM": ("Industrials", "Consumer Electronics/Appliances"),
     "MNST": ("Consumer Staples", "Beverages (Production/Distribution)"),
     "MO": ("Health Care", "Medicinal Chemicals and Botanical Products"),
-    "MOH": ("Health Care", "Medical Specialities"),
+    "MOH": ("Health Care", "Managed Health Care"),  # Health insurance/managed care,
     "MORN": ("Finance", "Advertising"),
     "MOS": ("Industrials", "Agricultural Chemicals"),
     "MP": ("Basic Materials", "Precious Metals"),
@@ -844,7 +846,7 @@ RUSSELL1000_OVERRIDES = {
     "UHS": ("Health Care", "Hospital/Nursing Management"),
     "UI": ("Technology", "Radio And Television Broadcasting And Communications Equipment"),
     "ULTA": ("Consumer Cyclical", "Specialty Retail"),
-    "UNH": ("Health Care", "Medical Specialities"),
+    "UNH": ("Health Care", "Managed Health Care"),  # Health insurance/managed care,
     "UNM": ("Finance", "Accident &Health Insurance"),
     "UNP": ("Industrials", "Railroads"),
     "UPS": ("Consumer Discretionary", "Air Freight/Delivery Services"),

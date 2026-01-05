@@ -613,9 +613,10 @@ class DataSourceFacade:
         """Get or create the stock database engine (lazy initialization)."""
         if self._stock_engine is None:
             from sqlalchemy import create_engine
+            from investigator.domain.services.market_data import get_stock_db_url
 
             self._stock_engine = create_engine(
-                "postgresql://stockuser:${STOCK_DB_PASSWORD}@${STOCK_DB_HOST}:5432/stock",
+                get_stock_db_url(),
                 pool_size=3,
                 max_overflow=5,
                 pool_pre_ping=True,

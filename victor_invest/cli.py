@@ -14,6 +14,7 @@ Usage:
 import asyncio
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -25,16 +26,285 @@ from rich.table import Table
 # Victor framework imports (from local wheel)
 try:
     from victor.framework import Agent, Event, EventType
+    from victor.core.protocols import OrchestratorProtocol
+    from victor.workflows.streaming import WorkflowEventType
 except ImportError:
     # Fallback for development without victor installed
     Agent = None
     Event = None
     EventType = None
+    OrchestratorProtocol = None
+    WorkflowEventType = None
 
 from victor_invest.vertical import InvestmentVertical
-from victor_invest.workflows import AnalysisMode, run_analysis as workflow_run_analysis
+from victor_invest.workflows import (
+    AnalysisMode,
+    AnalysisWorkflowState,
+    InvestmentWorkflowProvider,
+    run_analysis,
+)
 
 console = Console()
+
+
+def _convert_workflow_result_to_state(workflow_result, symbol: str, mode: str) -> AnalysisWorkflowState:
+    """Convert Victor WorkflowResult to AnalysisWorkflowState for CLI compatibility.
+
+    Args:
+        workflow_result: WorkflowResult from YAML workflow execution
+        symbol: Stock symbol
+        mode: Analysis mode string
+
+    Returns:
+        AnalysisWorkflowState with extracted data from workflow context
+    """
+    ctx = workflow_result.context
+
+    # Extract outputs from workflow context
+    fundamental = ctx.get("fundamental_analysis", {})
+    technical = ctx.get("technical_analysis", {})
+    market_context = ctx.get("market_context", {})
+    synthesis = ctx.get("synthesis", {})
+
+    # Build recommendation from synthesis
+    recommendation = {}
+    if synthesis:
+        recommendation = {
+            "action": synthesis.get("recommendation", "HOLD"),
+            "confidence": synthesis.get("confidence", "MEDIUM"),
+            "price_target": synthesis.get("price_target"),
+            "thesis": synthesis.get("executive_summary", ""),
+        }
+
+    # Collect any errors from failed nodes
+    errors = []
+    for node_id, node_result in ctx.node_results.items():
+        if node_result.error:
+            errors.append(f"{node_id}: {node_result.error}")
+
+    return AnalysisWorkflowState(
+        symbol=symbol.upper(),
+        mode=AnalysisMode(mode),
+        fundamental_analysis=fundamental,
+        technical_analysis=technical,
+        market_context=market_context,
+        synthesis=synthesis,
+        recommendation=recommendation,
+        errors=errors,
+    )
+
+
+def _convert_to_investment_recommendation(result, symbol: str):
+    """Convert AnalysisWorkflowState to InvestmentRecommendation for PDF generation.
+
+    Args:
+        result: AnalysisWorkflowState from workflow execution
+        symbol: Stock symbol
+
+    Returns:
+        InvestmentRecommendation instance for PDF report generation
+    """
+    from investigator.domain.models import InvestmentRecommendation
+
+    # Extract data from actual workflow structure
+    synthesis = result.synthesis or {}
+    recommendation_data = result.recommendation or {}
+    technical = result.technical_analysis or {}
+    fundamental = result.fundamental_analysis or {}
+    market_context = result.market_context or {}
+
+    # Extract composite score from synthesis (0-100 scale)
+    composite_score = synthesis.get("composite_score", 50.0)
+    individual_scores = synthesis.get("individual_scores", {})
+
+    # Map to expected score format
+    overall_score = composite_score
+    technical_score = individual_scores.get("technical", composite_score)
+    fundamental_score = individual_scores.get("fundamental", composite_score)
+    market_context_score = individual_scores.get("market_context", 50.0)
+
+    # Sub-scores default to composite if not available
+    income_score = fundamental_score
+    cashflow_score = fundamental_score
+    balance_score = fundamental_score
+    growth_score = fundamental_score
+    value_score = fundamental_score
+    business_quality_score = fundamental_score
+
+    # Extract recommendation details
+    final_recommendation = recommendation_data.get("action", "HOLD")
+    conviction_level = recommendation_data.get("confidence", "MEDIUM").upper()
+
+    # Extract price data from technical analysis (nested in trend or support_resistance)
+    trend_data = technical.get("trend", {})
+    sr_data = technical.get("support_resistance", {})
+
+    current_price = trend_data.get("current_price") or sr_data.get("current_price")
+
+    # Extract support/resistance levels for stop loss and price target
+    support_levels = sr_data.get("support_levels", {})
+    resistance_levels = sr_data.get("resistance_levels", {})
+    week_52 = sr_data.get("52_week", {})
+
+    stop_loss = support_levels.get("support_1")
+    price_target = resistance_levels.get("resistance_1")
+
+    # Check if LLM synthesis is available (new format with executive_summary, key_catalysts, etc.)
+    synthesis_method = synthesis.get("synthesis_method", "rule_based")
+    llm_executive_summary = synthesis.get("executive_summary", "")
+    llm_key_catalysts = synthesis.get("key_catalysts", [])
+    llm_key_risks = synthesis.get("key_risks", [])
+    llm_reasoning = synthesis.get("reasoning", "")
+
+    # Build investment thesis from available data
+    trend_signal = trend_data.get("overall_signal", "neutral")
+    signal_counts = trend_data.get("signal_counts", {})
+    bullish_pct = trend_data.get("signal_percentages", {}).get("bullish_pct", 0)
+    bearish_pct = trend_data.get("signal_percentages", {}).get("bearish_pct", 0)
+
+    # Use LLM executive summary if available, otherwise build from technical data
+    if llm_executive_summary:
+        investment_thesis = llm_executive_summary
+        if llm_reasoning:
+            investment_thesis += f" {llm_reasoning}"
+    else:
+        # Build meaningful thesis from technical data
+        thesis_parts = []
+        if current_price:
+            thesis_parts.append(f"{symbol} is currently trading at ${current_price:.2f}")
+        if week_52:
+            high_52 = week_52.get("high")
+            low_52 = week_52.get("low")
+            if high_52 and low_52 and current_price:
+                range_position = (current_price - low_52) / (high_52 - low_52) * 100
+                thesis_parts.append(f"at {range_position:.0f}% of its 52-week range (${low_52:.2f} - ${high_52:.2f})")
+
+        thesis_parts.append(f"The technical outlook is {trend_signal} with {bullish_pct:.0f}% bullish and {bearish_pct:.0f}% bearish signals.")
+        thesis_parts.append(f"Composite analysis score: {composite_score:.1f}/100.")
+
+        if final_recommendation == "BUY":
+            thesis_parts.append("The analysis suggests accumulating shares at current levels.")
+        elif final_recommendation == "SELL":
+            thesis_parts.append("The analysis suggests reducing exposure.")
+        else:
+            thesis_parts.append("The analysis suggests maintaining current positions.")
+
+        investment_thesis = " ".join(thesis_parts)
+
+    # Extract key insights from technical signals
+    signals = trend_data.get("signals", {})
+    key_insights = []
+    if signals:
+        for category, indicators in signals.items():
+            if isinstance(indicators, dict):
+                for indicator, signal in indicators.items():
+                    if signal in ["bullish", "bearish"]:
+                        key_insights.append(f"{indicator.upper()}: {signal}")
+
+    # Use LLM catalysts/risks if available, otherwise build from technical levels
+    if llm_key_catalysts:
+        key_catalysts = llm_key_catalysts
+    else:
+        key_catalysts = []
+        if price_target and current_price:
+            upside = ((price_target - current_price) / current_price) * 100
+            key_catalysts.append(f"Near-term resistance at ${price_target:.2f} ({upside:.1f}% upside)")
+        if week_52.get("high") and current_price:
+            upside_52 = ((week_52["high"] - current_price) / current_price) * 100
+            key_catalysts.append(f"52-week high of ${week_52['high']:.2f} ({upside_52:.1f}% from current)")
+
+    if llm_key_risks:
+        key_risks = llm_key_risks
+    else:
+        key_risks = []
+        if stop_loss and current_price:
+            downside = ((current_price - stop_loss) / current_price) * 100
+            key_risks.append(f"Support at ${stop_loss:.2f} ({downside:.1f}% downside)")
+        if week_52.get("low") and current_price:
+            downside_52 = ((current_price - week_52["low"]) / current_price) * 100
+            key_risks.append(f"52-week low of ${week_52['low']:.2f} ({downside_52:.1f}% below current)")
+
+    # Entry/exit strategies based on levels
+    key_levels = trend_data.get("key_levels", {})
+    pivot = key_levels.get("pivot")
+    support = key_levels.get("support")
+    resistance = key_levels.get("resistance")
+
+    if support and current_price:
+        entry_strategy = f"Consider entries near support at ${support:.2f} (current: ${current_price:.2f})"
+    else:
+        entry_strategy = "Scale into position at current market levels"
+
+    if resistance:
+        exit_strategy = f"Consider taking profits near resistance at ${resistance:.2f}"
+    else:
+        exit_strategy = "Target-based exit with trailing stop loss"
+
+    # Time horizon and position size based on score
+    if composite_score >= 70:
+        time_horizon = "MEDIUM-TERM"
+        position_size = "MODERATE"
+    elif composite_score >= 50:
+        time_horizon = "LONG-TERM"
+        position_size = "SMALL"
+    else:
+        time_horizon = "LONG-TERM"
+        position_size = "SMALL"
+
+    # Data quality - check what analyses were included
+    analyses_included = synthesis.get("analyses_included", [])
+    data_completeness = len(analyses_included) / 4.0  # 4 possible: fundamental, technical, market_context, valuation
+    data_quality_score = min(data_completeness, 1.0)
+
+    # Build synthesis details with all available data
+    synthesis_details = {
+        "synthesis": synthesis,
+        "recommendation": recommendation_data,
+        "technical_trend": trend_data,
+        "support_resistance": sr_data,
+        "market_context": market_context,
+    }
+
+    return InvestmentRecommendation(
+        symbol=symbol.upper(),
+        overall_score=overall_score,
+        fundamental_score=fundamental_score,
+        technical_score=technical_score,
+        income_score=income_score,
+        cashflow_score=cashflow_score,
+        balance_score=balance_score,
+        growth_score=growth_score,
+        value_score=value_score,
+        business_quality_score=business_quality_score,
+        recommendation=final_recommendation,
+        confidence=conviction_level,
+        price_target=price_target,
+        current_price=current_price,
+        investment_thesis=investment_thesis,
+        time_horizon=time_horizon,
+        position_size=position_size,
+        key_catalysts=key_catalysts[:5],
+        key_risks=key_risks[:5],
+        key_insights=key_insights[:10],
+        entry_strategy=entry_strategy,
+        exit_strategy=exit_strategy,
+        stop_loss=stop_loss,
+        analysis_timestamp=datetime.now(),
+        data_quality_score=data_quality_score,
+        analysis_thinking=synthesis.get("reasoning"),
+        synthesis_details=json.dumps(synthesis_details, default=str),
+        # Include technical levels for report
+        support_resistance={
+            "current_price": current_price,
+            "support_1": support_levels.get("support_1"),
+            "support_2": support_levels.get("support_2"),
+            "resistance_1": resistance_levels.get("resistance_1"),
+            "resistance_2": resistance_levels.get("resistance_2"),
+            "52_week_high": week_52.get("high"),
+            "52_week_low": week_52.get("low"),
+            "pivot": pivot,
+        },
+    )
 
 
 def validate_victor_installed():
@@ -88,6 +358,12 @@ def cli():
     default=True,
     help="Stream output as analysis progresses",
 )
+@click.option(
+    "--report",
+    is_flag=True,
+    default=False,
+    help="Generate PDF investment report using LLM synthesis",
+)
 def analyze(
     symbol: str,
     mode: str,
@@ -95,6 +371,7 @@ def analyze(
     provider: str,
     model: Optional[str],
     stream: bool,
+    report: bool,
 ):
     """Run investment analysis on a stock symbol.
 
@@ -108,9 +385,11 @@ def analyze(
     console.print(f"Symbol: [green]{symbol.upper()}[/green]")
     console.print(f"Mode: [yellow]{mode}[/yellow]")
     console.print(f"Provider: [cyan]{provider}[/cyan]")
+    if report:
+        console.print(f"Report: [magenta]PDF generation enabled[/magenta]")
     console.print()
 
-    asyncio.run(_run_analysis(symbol, mode, output, provider, model, stream))
+    asyncio.run(_run_analysis(symbol, mode, output, provider, model, stream, report))
 
 
 async def _run_analysis(
@@ -120,9 +399,20 @@ async def _run_analysis(
     provider: str,
     model: Optional[str],
     stream: bool,
+    report: bool = False,
 ):
-    """Execute the analysis workflow."""
-    analysis_mode = AnalysisMode(mode)
+    """Execute the analysis workflow using InvestmentWorkflowProvider.
+
+    Uses Victor's agentic workflow execution for proper LLM integration:
+    - Compute handlers for data collection (SEC, market data, technicals)
+    - Agent nodes for LLM synthesis via Victor's SubAgentOrchestrator
+    - Proper provider/model abstraction through Victor framework
+    """
+    # Initialize workflow provider (loads YAML workflows, registers handlers)
+    workflow_provider = InvestmentWorkflowProvider()
+
+    # Map mode to workflow name
+    workflow_name = workflow_provider.get_workflow_for_task_type(mode) or mode
 
     with Progress(
         SpinnerColumn(),
@@ -132,10 +422,23 @@ async def _run_analysis(
         task = progress.add_task(f"Analyzing {symbol.upper()}...", total=None)
 
         try:
-            # Execute workflow using the convenience function
-            result = await workflow_run_analysis(symbol.upper(), analysis_mode)
-
+            # Execute YAML workflow with full agent node support
+            # Uses Victor's SubAgentOrchestrator for LLM synthesis
+            workflow_result = await workflow_provider.run_agentic_workflow(
+                workflow_name,
+                context={"symbol": symbol.upper()},
+                provider=provider,
+                model=model,
+                timeout=300.0,
+            )
             progress.update(task, description="Analysis complete!")
+
+            if not workflow_result.success:
+                console.print(f"[red]Workflow failed: {workflow_result.error}[/red]")
+                return
+
+            # Convert WorkflowResult to AnalysisWorkflowState for compatibility
+            result = _convert_workflow_result_to_state(workflow_result, symbol, mode)
 
         except Exception as e:
             console.print(f"[red]Error during analysis: {e}[/red]")
@@ -167,6 +470,31 @@ async def _run_analysis(
             json.dump(result_dict, f, indent=2, default=str)
 
         console.print(f"\n[green]Results saved to: {result_file}[/green]")
+
+    # Generate PDF report if requested
+    if report:
+        try:
+            console.print("\n[bold]Generating PDF report...[/bold]")
+
+            # Convert workflow result to InvestmentRecommendation format
+            recommendation = _convert_to_investment_recommendation(result, symbol)
+
+            # Initialize synthesizer for PDF generation
+            from investigator.application import InvestmentSynthesizer
+
+            synthesizer = InvestmentSynthesizer()
+
+            # Generate PDF report
+            report_path = synthesizer.generate_report([recommendation], report_type="synthesis")
+
+            console.print(f"[green]✅ PDF report generated: {report_path}[/green]")
+
+        except ImportError as e:
+            console.print(f"[red]❌ PDF generation requires investigator package: {e}[/red]")
+        except Exception as e:
+            console.print(f"[red]❌ Failed to generate PDF report: {e}[/red]")
+            import traceback
+            traceback.print_exc()
 
 
 def _display_results(result, symbol: str):
@@ -460,6 +788,245 @@ def inspect_cache(symbol, verbose):
                 console.print(f"  {key}: {value}")
         else:
             console.print("  No statistics available (specify --symbol for symbol-specific info)")
+
+
+@cli.command("from-batch")
+@click.argument("jsonl_path", type=click.Path(exists=True))
+@click.option(
+    "--symbols",
+    "-s",
+    help="Comma-separated symbols to process (default: all successful)",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    default="reports/batch",
+    help="Output directory for reports",
+)
+@click.option(
+    "--min-upside",
+    type=float,
+    default=None,
+    help="Only process symbols with upside >= this percentage",
+)
+@click.option(
+    "--tier",
+    type=click.Choice(["BUY", "HOLD", "SELL"]),
+    default=None,
+    help="Only process symbols with this tier classification",
+)
+def from_batch(jsonl_path: str, symbols: Optional[str], output: str, min_upside: Optional[float], tier: Optional[str]):
+    """Generate professional reports from batch analysis results.
+
+    Reads cached batch results and generates PDF reports without re-running analysis.
+
+    Example:
+        victor-invest from-batch batch_results/batch_analysis_results.jsonl
+        victor-invest from-batch results.jsonl --symbols AAPL,MSFT,GOOGL
+        victor-invest from-batch results.jsonl --min-upside 10 --tier BUY
+    """
+    import json
+    from pathlib import Path
+
+    console.print(f"\n[bold blue]Generate Reports from Batch Results[/bold blue]")
+    console.print(f"Source: [green]{jsonl_path}[/green]")
+
+    # Load batch results
+    results = []
+    with open(jsonl_path, 'r') as f:
+        for line in f:
+            if line.strip():
+                try:
+                    results.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    console.print(f"Loaded: {len(results)} results")
+
+    # Filter results
+    filtered = []
+    symbol_filter = set(s.upper() for s in symbols.split(',')) if symbols else None
+
+    for r in results:
+        # Must be successful
+        if not r.get('success', False):
+            continue
+
+        # Must have required data for report
+        if not r.get('fair_value') or not r.get('current_price'):
+            continue
+
+        # Apply symbol filter
+        if symbol_filter and r.get('symbol') not in symbol_filter:
+            continue
+
+        # Apply upside filter
+        if min_upside is not None:
+            upside = r.get('upside_pct', 0) or 0
+            if upside < min_upside:
+                continue
+
+        # Apply tier filter
+        if tier and r.get('tier', '').upper() != tier:
+            continue
+
+        filtered.append(r)
+
+    console.print(f"Filtered: {len(filtered)} symbols for report generation")
+
+    if not filtered:
+        console.print("[yellow]No symbols match the criteria. No reports generated.[/yellow]")
+        return
+
+    # Generate reports
+    output_path = Path(output)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from investigator.infrastructure.reporting.professional_report import ProfessionalReportGenerator
+
+        generator = ProfessionalReportGenerator(output_dir=output_path)
+
+        success_count = 0
+        for r in filtered:
+            symbol = r.get('symbol', 'UNKNOWN')
+            console.print(f"  Generating report for [cyan]{symbol}[/cyan]...")
+
+            try:
+                # Convert batch result to report data format
+                report_data = _convert_batch_result_to_report_data(r)
+                report_path = generator.generate_report(report_data)
+
+                if report_path:
+                    success_count += 1
+                    console.print(f"    [green]✓ {report_path}[/green]")
+                else:
+                    console.print(f"    [yellow]⚠ No report generated[/yellow]")
+
+            except Exception as e:
+                console.print(f"    [red]✗ Error: {e}[/red]")
+
+        console.print(f"\n[bold green]Reports generated: {success_count}/{len(filtered)}[/bold green]")
+        console.print(f"Output directory: {output_path}")
+
+    except ImportError as e:
+        console.print(f"[red]Error: Report generator not available: {e}[/red]")
+        console.print("Ensure investigator package is installed.")
+
+
+def _convert_batch_result_to_report_data(batch_result: dict) -> dict:
+    """Convert batch analysis result to report-ready data format.
+
+    Args:
+        batch_result: SymbolResult from batch JSONL
+
+    Returns:
+        Dict compatible with ProfessionalReportGenerator
+    """
+    symbol = batch_result.get('symbol', 'UNKNOWN')
+    fair_value = batch_result.get('fair_value')
+    current_price = batch_result.get('current_price')
+    upside_pct = batch_result.get('upside_pct', 0)
+    tier = batch_result.get('tier', 'HOLD')
+    model_fair_values = batch_result.get('model_fair_values', {})
+    model_weights = batch_result.get('model_weights', {})
+    sector = batch_result.get('sector', '')
+    market_cap = batch_result.get('market_cap')
+
+    # Map tier to recommendation
+    rec_map = {
+        'BUY': ('BUY', 'HIGH'),
+        'STRONG_BUY': ('STRONG BUY', 'HIGH'),
+        'HOLD': ('HOLD', 'MEDIUM'),
+        'SELL': ('SELL', 'LOW'),
+        'STRONG_SELL': ('STRONG SELL', 'LOW'),
+    }
+    recommendation, confidence = rec_map.get(tier.upper(), ('HOLD', 'MEDIUM'))
+
+    # Calculate scores from upside
+    if upside_pct is not None and upside_pct > 0:
+        overall_score = min(50 + upside_pct * 2, 95)  # Scale upside to score
+    else:
+        overall_score = max(50 + (upside_pct or 0) * 2, 10)
+
+    fundamental_score = overall_score + 5 if upside_pct and upside_pct > 10 else overall_score
+    technical_score = overall_score - 5 if upside_pct and upside_pct < 0 else overall_score
+
+    # Calculate stop loss (10% below current)
+    stop_loss = current_price * 0.90 if current_price else None
+
+    # Build valuation models section
+    valuation_models = {}
+    for model, fv in (model_fair_values or {}).items():
+        if fv and current_price:
+            model_upside = ((fv / current_price) - 1) * 100
+            weight = (model_weights or {}).get(model, 0.33)
+            valuation_models[model] = {
+                'fair_value_per_share': fv,
+                'upside_downside_pct': model_upside,
+                'confidence': weight * 100,
+            }
+
+    # Build thesis from batch data
+    thesis_parts = []
+    thesis_parts.append(f"{symbol} in {sector}." if sector else f"{symbol}.")
+    if upside_pct is not None:
+        if upside_pct > 15:
+            thesis_parts.append(f"Analysis indicates significant undervaluation with {upside_pct:.1f}% upside to fair value.")
+        elif upside_pct > 5:
+            thesis_parts.append(f"Moderate upside of {upside_pct:.1f}% to fair value estimate.")
+        elif upside_pct > 0:
+            thesis_parts.append(f"Trading near fair value with {upside_pct:.1f}% potential upside.")
+        else:
+            thesis_parts.append(f"Currently trading at {abs(upside_pct):.1f}% premium to fair value.")
+    if market_cap:
+        thesis_parts.append(f"Market cap: ${market_cap/1e9:.1f}B.")
+
+    # Key catalysts/risks based on tier
+    if tier.upper() in ['BUY', 'STRONG_BUY']:
+        key_catalysts = [
+            f"Fair value estimate of ${fair_value:.2f} suggests upside potential",
+            "Valuation models show favorable risk/reward",
+        ]
+        key_risks = [
+            "Market volatility could impact near-term price action",
+            "Model assumptions may not reflect current market conditions",
+        ]
+    else:
+        key_catalysts = ["Potential rerating if fundamentals improve"]
+        key_risks = [
+            "Limited upside at current valuation levels",
+            "Market conditions may pressure valuations further",
+        ]
+
+    return {
+        'symbol': symbol,
+        'recommendation': recommendation,
+        'confidence': confidence,
+        'overall_score': overall_score,
+        'fundamental_score': min(fundamental_score, 100),
+        'technical_score': max(min(technical_score, 100), 10),
+        'current_price': current_price,
+        'target_price': fair_value,
+        'stop_loss': stop_loss,
+        'investment_thesis': ' '.join(thesis_parts),
+        'key_catalysts': key_catalysts,
+        'key_risks': key_risks,
+        'time_horizon': 'MEDIUM-TERM',
+        'position_size': 'MODERATE' if tier.upper() in ['BUY', 'STRONG_BUY'] else 'SMALL',
+        'valuation_models': valuation_models,
+        'score_breakdown': {
+            'value': min(50 + (upside_pct or 0) * 2, 100),
+            'growth': 60,  # Default without detailed data
+            'business_quality': 70,
+            'data_quality': 80,
+        },
+        # Market regime placeholder
+        'market_regime': {'regime': 'Normal'},
+        # Peer data placeholder
+        'peer_comparison': {'peers': [], 'metrics': {}},
+    }
 
 
 def main():

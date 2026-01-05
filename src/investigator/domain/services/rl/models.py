@@ -152,6 +152,9 @@ class ValuationContext:
     debt_to_equity: float = 0.0
     gross_margin: float = 0.0
     operating_margin: float = 0.0
+    net_margin: float = 0.0  # Net profit margin (net income / revenue)
+    margin_bin: int = 2  # 0=very_low(<2%), 1=low(2-5%), 2=medium(5-10%), 3=high(>10%)
+    is_low_margin_industry: bool = False  # True if industry is structurally low-margin
 
     # Data Quality
     data_quality_score: float = 50.0
@@ -238,6 +241,9 @@ class ValuationContext:
             "debt_to_equity": self.debt_to_equity,
             "gross_margin": self.gross_margin,
             "operating_margin": self.operating_margin,
+            "net_margin": self.net_margin,
+            "margin_bin": self.margin_bin,
+            "is_low_margin_industry": self.is_low_margin_industry,
             "data_quality_score": self.data_quality_score,
             "quarters_available": self.quarters_available,
             "technical_trend": self.technical_trend,
@@ -323,6 +329,9 @@ class ValuationContext:
             debt_to_equity=data.get("debt_to_equity", 0.0),
             gross_margin=data.get("gross_margin", 0.0),
             operating_margin=data.get("operating_margin", 0.0),
+            net_margin=data.get("net_margin", 0.0),
+            margin_bin=data.get("margin_bin", 2),
+            is_low_margin_industry=data.get("is_low_margin_industry", False),
             data_quality_score=data.get("data_quality_score", 50.0),
             quarters_available=data.get("quarters_available", 0),
             technical_trend=data.get("technical_trend", 0.0),

@@ -16,9 +16,23 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 import numpy as np
+
+# Check for MPS/PyTorch availability
+try:
+    import torch
+    HAS_TORCH = True
+    if torch.backends.mps.is_available():
+        MPS_DEVICE = torch.device("mps")
+        logger_init = logging.getLogger(__name__)
+        logger_init.info("MPS (Apple Metal) backend available")
+    else:
+        MPS_DEVICE = torch.device("cpu")
+except ImportError:
+    HAS_TORCH = False
+    MPS_DEVICE = None
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -153,10 +167,15 @@ def train_technical_policy(
 
     policy = TechnicalRLPolicy()
 
+    # Track weight changes across epochs for learning diagnostics
+    prev_mu_norm = np.linalg.norm(policy.mu)
+
     # Train for multiple epochs
     for epoch in range(epochs):
         np.random.shuffle(experiences)
         epoch_rewards = []
+        action_counts = {0: 0, 1: 0, 2: 0}  # skip, long, short
+        action_rewards = {0: [], 1: [], 2: []}
 
         for exp in experiences:
             context = create_context(exp)
@@ -174,9 +193,29 @@ def train_technical_policy(
             # Update policy
             policy.update(context, action, reward)
             epoch_rewards.append(reward)
+            action_counts[action] += 1
+            action_rewards[action].append(reward)
 
+        # Calculate learning diagnostics
         avg_reward = np.mean(epoch_rewards)
-        logger.info(f"Technical Epoch {epoch + 1}/{epochs}: avg_reward={avg_reward:.4f}")
+        current_mu_norm = np.linalg.norm(policy.mu)
+        weight_change = current_mu_norm - prev_mu_norm
+        prev_mu_norm = current_mu_norm
+
+        # Per-action reward means (model's actual learning signal)
+        action_avgs = {
+            a: np.mean(r) if r else 0.0
+            for a, r in action_rewards.items()
+        }
+
+        logger.info(
+            f"Technical Epoch {epoch + 1}/{epochs}: "
+            f"dataset_avg={avg_reward:.4f}, "
+            f"weight_delta={weight_change:.6f}, "
+            f"skip_avg={action_avgs[0]:.4f}, "
+            f"long_avg={action_avgs[1]:.4f}, "
+            f"short_avg={action_avgs[2]:.4f}"
+        )
 
     # Log action statistics
     stats = policy.get_action_stats()
@@ -187,12 +226,18 @@ def train_technical_policy(
     return policy
 
 
-def train_fundamental_policy(
+def train_fundamental_policy_batched_mps(
     experiences: List[Dict[str, Any]],
     epochs: int = 10,
+    batch_size: int = 512,
 ) -> FundamentalRLPolicy:
-    """Train the fundamental policy on model weights and holding periods."""
-    logger.info("Training Fundamental Policy...")
+    """Train fundamental policy using batched PyTorch with MPS acceleration."""
+    if not HAS_TORCH:
+        logger.warning("PyTorch not available, falling back to NumPy training")
+        return train_fundamental_policy_numpy(experiences, epochs)
+
+    logger.info(f"Training Fundamental Policy with MPS (batch_size={batch_size})...")
+    logger.info(f"Device: {MPS_DEVICE}")
 
     policy = FundamentalRLPolicy()
 
@@ -204,15 +249,160 @@ def train_fundamental_policy(
         "reward_365d": "12m",
     }
 
+    # Pre-extract all features and rewards to tensors
+    logger.info("Pre-extracting features to tensors...")
+    all_features = []
+    all_rewards = []
+    all_weights = []  # Store weight dicts for per-model updates
+    all_contexts = []  # Store contexts for holding period updates
+
+    for exp in experiences:
+        context = create_context(exp)
+        features = policy._extract_features(context)
+        reward = exp.get("reward_90d", 0) or 0
+        weights = exp.get("weights", {})
+
+        all_features.append(features)
+        all_rewards.append(reward)
+        all_weights.append(weights)
+        all_contexts.append((context, exp))  # Store for holding period updates
+
+    # Convert to tensors on MPS device
+    features_tensor = torch.tensor(np.array(all_features), dtype=torch.float32, device=MPS_DEVICE)
+    rewards_tensor = torch.tensor(all_rewards, dtype=torch.float32, device=MPS_DEVICE)
+
+    n_samples = len(experiences)
+    n_batches = (n_samples + batch_size - 1) // batch_size
+
+    logger.info(f"Training {n_samples} samples in {n_batches} batches")
+
+    # Track weight norms for learning diagnostics
+    prev_weight_mu_norm = np.linalg.norm(policy.weight_mu)
+
+    for epoch in range(epochs):
+        # Shuffle indices
+        indices = torch.randperm(n_samples, device=MPS_DEVICE)
+
+        epoch_rewards = []
+        model_updates = {m: 0 for m in ["dcf", "pe", "ps", "ev_ebitda", "pb", "ggm"]}
+
+        for batch_idx in range(n_batches):
+            start_idx = batch_idx * batch_size
+            end_idx = min(start_idx + batch_size, n_samples)
+            batch_indices = indices[start_idx:end_idx].cpu().numpy()
+
+            # Batched feature extraction (already on GPU)
+            batch_features = features_tensor[batch_indices]
+            batch_rewards = rewards_tensor[batch_indices]
+
+            # Batch outer products on MPS (main computation)
+            # outer_products: (batch_size, n_features, n_features)
+            outer_products = torch.einsum('bi,bj->bij', batch_features, batch_features)
+
+            # Sum outer products for batch update
+            batch_outer_sum = outer_products.sum(dim=0).cpu().numpy()
+            batch_feature_reward_sum = (batch_features * batch_rewards.unsqueeze(1)).sum(dim=0).cpu().numpy()
+
+            # Update policy parameters for each model based on weights used
+            for i, model in enumerate(["dcf", "pe", "ps", "ev_ebitda", "pb", "ggm"]):
+                # Calculate weight contribution for this model in batch
+                model_weight_sum = 0.0
+                for idx in batch_indices:
+                    weight = all_weights[idx].get(model, 0.0)
+                    if weight > 0:
+                        model_weight_sum += weight / 100.0
+                        model_updates[model] += 1
+
+                if model_weight_sum > 0:
+                    scale = model_weight_sum / len(batch_indices)
+                    # Bayesian update with scaled batch outer product
+                    policy.weight_Lambda[i] += batch_outer_sum * scale / policy.noise_variance
+                    policy.weight_Sigma[i] = np.linalg.inv(policy.weight_Lambda[i])
+                    policy.weight_mu[i] = np.dot(
+                        policy.weight_Sigma[i],
+                        np.dot(policy.weight_Lambda[i], policy.weight_mu[i]) +
+                        batch_feature_reward_sum * scale / policy.noise_variance
+                    )
+
+            # Update holding periods for each sample in batch
+            for idx in batch_indices:
+                context, exp = all_contexts[idx]
+                for reward_key, holding_period in reward_to_holding.items():
+                    reward = exp.get(reward_key)
+                    if reward is not None:
+                        policy.update_holding_period(context, holding_period, reward)
+
+            epoch_rewards.extend(batch_rewards.cpu().numpy().tolist())
+
+        # Calculate learning diagnostics
+        avg_reward = np.mean(epoch_rewards)
+        current_weight_mu_norm = np.linalg.norm(policy.weight_mu)
+        weight_delta = current_weight_mu_norm - prev_weight_mu_norm
+        prev_weight_mu_norm = current_weight_mu_norm
+
+        # Log with more informative metrics
+        top_models = sorted(model_updates.items(), key=lambda x: x[1], reverse=True)[:3]
+        top_models_str = ", ".join([f"{m}:{c}" for m, c in top_models])
+
+        logger.info(
+            f"Fundamental Epoch {epoch + 1}/{epochs}: "
+            f"dataset_avg={avg_reward:.4f}, "
+            f"weight_delta={weight_delta:.6f}, "
+            f"top_models=[{top_models_str}]"
+        )
+
+    policy._update_count = n_samples * epochs
+
+    # Log model statistics
+    stats = policy.get_model_stats()
+    logger.info("Fundamental Policy Model Stats:")
+    for model, data in stats.items():
+        logger.info(f"  {model}: count={data['count']}, avg_reward={data['avg_reward']:.4f}")
+
+    # Log holding period statistics
+    hp_stats = policy.get_holding_period_stats()
+    logger.info("Holding Period Stats:")
+    for period, data in hp_stats.get("period_stats", {}).items():
+        logger.info(f"  {period}: count={data['count']}, avg_reward={data['avg_reward']:.4f}")
+
+    return policy
+
+
+def train_fundamental_policy_numpy(
+    experiences: List[Dict[str, Any]],
+    epochs: int = 10,
+) -> FundamentalRLPolicy:
+    """Train fundamental policy using NumPy (fallback if no PyTorch)."""
+    logger.info("Training Fundamental Policy (NumPy)...")
+
+    policy = FundamentalRLPolicy()
+
+    # Map reward periods to holding periods
+    reward_to_holding = {
+        "reward_30d": "1m",
+        "reward_90d": "3m",
+        "reward_180d": "6m",
+        "reward_365d": "12m",
+    }
+
+    # Track weight changes
+    prev_weight_mu_norm = np.linalg.norm(policy.weight_mu)
+
     # Train for multiple epochs
     for epoch in range(epochs):
         np.random.shuffle(experiences)
         epoch_rewards = []
+        model_updates = {m: 0 for m in ["dcf", "pe", "ps", "ev_ebitda", "pb", "ggm"]}
 
         for exp in experiences:
             context = create_context(exp)
             weights = exp.get("weights", {})
             reward_90d = exp.get("reward_90d", 0) or 0
+
+            # Track which models were updated
+            for model, weight in weights.items():
+                if weight > 0:
+                    model_updates[model] = model_updates.get(model, 0) + 1
 
             # Update weights
             policy.update_weights(context, weights, reward_90d)
@@ -225,8 +415,21 @@ def train_fundamental_policy(
 
             epoch_rewards.append(reward_90d)
 
+        # Calculate learning diagnostics
         avg_reward = np.mean(epoch_rewards)
-        logger.info(f"Fundamental Epoch {epoch + 1}/{epochs}: avg_reward={avg_reward:.4f}")
+        current_weight_mu_norm = np.linalg.norm(policy.weight_mu)
+        weight_delta = current_weight_mu_norm - prev_weight_mu_norm
+        prev_weight_mu_norm = current_weight_mu_norm
+
+        top_models = sorted(model_updates.items(), key=lambda x: x[1], reverse=True)[:3]
+        top_models_str = ", ".join([f"{m}:{c}" for m, c in top_models])
+
+        logger.info(
+            f"Fundamental Epoch {epoch + 1}/{epochs}: "
+            f"dataset_avg={avg_reward:.4f}, "
+            f"weight_delta={weight_delta:.6f}, "
+            f"top_models=[{top_models_str}]"
+        )
 
     # Log model statistics
     stats = policy.get_model_stats()
@@ -246,6 +449,19 @@ def train_fundamental_policy(
             logger.info(f"  {sector}: {period}")
 
     return policy
+
+
+def train_fundamental_policy(
+    experiences: List[Dict[str, Any]],
+    epochs: int = 10,
+    use_mps: bool = True,
+    batch_size: int = 512,
+) -> FundamentalRLPolicy:
+    """Train fundamental policy with optional MPS acceleration."""
+    if use_mps and HAS_TORCH:
+        return train_fundamental_policy_batched_mps(experiences, epochs, batch_size)
+    else:
+        return train_fundamental_policy_numpy(experiences, epochs)
 
 
 def evaluate_dual_policy(
@@ -301,7 +517,24 @@ def main():
         default="data/rl_models",
         help="Output directory for models",
     )
+    parser.add_argument(
+        "--no-mps",
+        action="store_true",
+        help="Disable MPS (Apple Metal) acceleration",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=512,
+        help="Batch size for MPS training (default: 512)",
+    )
     args = parser.parse_args()
+
+    # Log MPS availability
+    if HAS_TORCH:
+        logger.info(f"PyTorch available, MPS device: {MPS_DEVICE}")
+    else:
+        logger.info("PyTorch not available, using NumPy")
 
     start_time = datetime.now()
     logger.info("=" * 70)
@@ -327,7 +560,12 @@ def main():
 
     # Train both policies
     technical_policy = train_technical_policy(train_exp, epochs=args.epochs)
-    fundamental_policy = train_fundamental_policy(train_exp, epochs=args.epochs)
+    fundamental_policy = train_fundamental_policy(
+        train_exp,
+        epochs=args.epochs,
+        use_mps=not args.no_mps,
+        batch_size=args.batch_size,
+    )
 
     # Create combined dual policy
     dual_policy = DualRLPolicy(

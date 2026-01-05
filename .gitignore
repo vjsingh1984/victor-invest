@@ -130,3 +130,11 @@ batch_results/
 
 # Trained RL models
 data/rl_models/
+
+# Audit logs (contain secret access events with user/session info)
+audit/
+*.jsonl
+
+# Generated analysis outputs
+batch_analysis_results*.jsonl
+recommendations*.json

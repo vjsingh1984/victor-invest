@@ -121,6 +121,7 @@ and investment recommendations based on current market regime.
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "curve",
         days: int = 365,
         maturity: str = "10y",

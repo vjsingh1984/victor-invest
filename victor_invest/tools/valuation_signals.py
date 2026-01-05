@@ -132,6 +132,7 @@ Signal Integration:
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "integrate",
         symbol: Optional[str] = None,
         base_fair_value: Optional[float] = None,

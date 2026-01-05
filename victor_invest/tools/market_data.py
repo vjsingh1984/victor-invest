@@ -120,6 +120,7 @@ Returns current market data, historical prices, and company metadata.
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         symbol: Optional[str] = None,
         action: str = "get_quote",
         days: int = 365,

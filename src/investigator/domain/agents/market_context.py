@@ -343,6 +343,9 @@ class ETFMarketContextAgent(InvestmentAgent):
             )
 
             # Compile comprehensive context
+            # Defensive check for macro_indicators
+            if macro_indicators is None:
+                macro_indicators = {}
             context_analysis = {
                 "symbol": symbol,
                 "sector": sector,
@@ -377,8 +380,9 @@ class ETFMarketContextAgent(InvestmentAgent):
             )
 
         except Exception as e:
+            import traceback
             processing_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"ETF market context analysis failed for {symbol}: {e}")
+            logger.error(f"ETF market context analysis failed for {symbol}: {e}\n{traceback.format_exc()}")
 
             return AgentResult(
                 task_id=task.task_id,
@@ -623,6 +627,14 @@ class ETFMarketContextAgent(InvestmentAgent):
         macro_indicators: Dict = None,
     ) -> Dict:
         """Generate LLM-powered market sentiment analysis with macro economic context"""
+
+        # Defensive checks for None values
+        if market_context is None:
+            market_context = {}
+        if sector_context is None:
+            sector_context = {}
+        if relative_performance is None:
+            relative_performance = {}
 
         # Prepare data for LLM analysis (including macro economic indicators)
         analysis_data = {
@@ -1091,7 +1103,7 @@ class ETFMarketContextAgent(InvestmentAgent):
                 )
 
             # Extract macro_summary which contains FRED data - apply judicious rounding
-            macro_summary = macro_indicators.get("macro_summary", {})
+            macro_summary = macro_indicators.get("macro_summary") or {}
 
             # GDP per capita (whole numbers sufficient)
             gdp_per_capita = macro_summary.get("GDP_PER_CAPITA")

@@ -125,6 +125,7 @@ Investment Signals:
 
     async def execute(
         self,
+        _exec_ctx: Dict[str, Any],
         action: str = "current",
         symbol: Optional[str] = None,
         periods: int = 12,
