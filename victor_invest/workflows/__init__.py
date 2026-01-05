@@ -219,6 +219,9 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
         from victor_invest.role_provider import register_investment_role_provider
         from victor_invest.vertical import InvestmentVertical
 
+        # Ensure handlers are registered before workflow execution
+        ensure_handlers_registered()
+
         workflow = self.get_workflow(workflow_name)
         if not workflow:
             raise ValueError(f"Unknown workflow: {workflow_name}")
@@ -273,15 +276,31 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
     # It executes compute-only YAML workflows without requiring a full orchestrator
 
 
-# Register Investment domain handlers when this module is loaded
-from victor_invest.handlers import register_handlers as _register_handlers
+# Lazy handler registration to prevent circular imports
+_handlers_registered = False
 
-_register_handlers()
+
+def ensure_handlers_registered() -> None:
+    """Register Investment domain handlers lazily on first use.
+
+    This lazy registration pattern prevents circular imports that can occur
+    when handlers.py imports from workflows or related modules during module
+    initialization. Handlers are registered once on first workflow execution.
+    """
+    global _handlers_registered
+    if _handlers_registered:
+        return
+    from victor_invest.handlers import register_handlers
+
+    register_handlers()
+    _handlers_registered = True
 
 
 __all__ = [
     # YAML-first workflow provider
     "InvestmentWorkflowProvider",
+    # Lazy handler registration
+    "ensure_handlers_registered",
     # Analysis state definitions
     "AnalysisMode",
     "AnalysisWorkflowState",
