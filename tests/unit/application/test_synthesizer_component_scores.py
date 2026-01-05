@@ -115,8 +115,8 @@ class TestExtractCashflowScore:
             "fundamental": {
                 "Q1": {
                     "content": "Strong operating cash flow with positive FCF. "
-                               "Working capital improved significantly. "
-                               "Cash position and liquidity are excellent."
+                    "Working capital improved significantly. "
+                    "Cash position and liquidity are excellent."
                 }
             }
         }
@@ -129,11 +129,7 @@ class TestExtractCashflowScore:
 
     def test_adjusts_down_for_no_cashflow_keywords(self, mock_synthesizer):
         """Should adjust score down when no cashflow keywords found."""
-        llm_responses = {
-            "fundamental": {
-                "Q1": {"content": "Revenue and expenses analysis."}
-            }
-        }
+        llm_responses = {"fundamental": {"Q1": {"content": "Revenue and expenses analysis."}}}
         ai_recommendation = {}
 
         result = mock_synthesizer._extract_cashflow_score(llm_responses, ai_recommendation)
@@ -145,13 +141,7 @@ class TestExtractCashflowScore:
         """Should handle dict content by converting to JSON string."""
         llm_responses = {
             "fundamental": {
-                "Q1": {
-                    "content": {
-                        "analysis": "cash flow analysis",
-                        "fcf": "positive",
-                        "liquidity": "strong"
-                    }
-                }
+                "Q1": {"content": {"analysis": "cash flow analysis", "fcf": "positive", "liquidity": "strong"}}
             }
         }
         ai_recommendation = {}
@@ -181,8 +171,8 @@ class TestExtractBalanceScore:
             "fundamental": {
                 "Q1": {
                     "content": "Asset base is strong. Liability management excellent. "
-                               "Equity position solid. Debt levels reasonable. "
-                               "Balance sheet shows good leverage and solvency."
+                    "Equity position solid. Debt levels reasonable. "
+                    "Balance sheet shows good leverage and solvency."
                 }
             }
         }
@@ -195,11 +185,7 @@ class TestExtractBalanceScore:
 
     def test_adjusts_down_for_no_balance_keywords(self, mock_synthesizer):
         """Should adjust score down when no balance keywords found."""
-        llm_responses = {
-            "fundamental": {
-                "Q1": {"content": "Revenue growth is strong."}
-            }
-        }
+        llm_responses = {"fundamental": {"Q1": {"content": "Revenue growth is strong."}}}
         ai_recommendation = {}
 
         result = mock_synthesizer._extract_balance_score(llm_responses, ai_recommendation)
@@ -213,13 +199,7 @@ class TestExtractGrowthScore:
 
     def test_returns_comprehensive_growth_score(self, mock_synthesizer):
         """Should return growth_prospects_score from comprehensive analysis."""
-        llm_responses = {
-            "fundamental": {
-                "comprehensive": {
-                    "content": {"growth_prospects_score": 8.5}
-                }
-            }
-        }
+        llm_responses = {"fundamental": {"comprehensive": {"content": {"growth_prospects_score": 8.5}}}}
         ai_recommendation = {}
 
         result = mock_synthesizer._extract_growth_score(llm_responses, ai_recommendation)
@@ -229,11 +209,7 @@ class TestExtractGrowthScore:
     def test_returns_ai_recommendation_growth_score(self, mock_synthesizer):
         """Should extract growth score from AI recommendation."""
         llm_responses = {"fundamental": {}}
-        ai_recommendation = {
-            "fundamental_assessment": {
-                "growth_prospects": {"score": 7.8}
-            }
-        }
+        ai_recommendation = {"fundamental_assessment": {"growth_prospects": {"score": 7.8}}}
 
         result = mock_synthesizer._extract_growth_score(llm_responses, ai_recommendation)
 
@@ -245,9 +221,9 @@ class TestExtractGrowthScore:
             "fundamental": {
                 "Q1": {
                     "content": "Revenue growth is accelerating. "
-                               "Strong expansion in market share. "
-                               "Momentum in key segments. "
-                               "Scaling operations effectively."
+                    "Strong expansion in market share. "
+                    "Momentum in key segments. "
+                    "Scaling operations effectively."
                 }
             }
         }
@@ -265,11 +241,7 @@ class TestExtractValueScore:
     def test_returns_ai_valuation_score(self, mock_synthesizer):
         """Should extract valuation score from AI recommendation."""
         llm_responses = {}
-        ai_recommendation = {
-            "fundamental_assessment": {
-                "valuation": {"score": 6.5}
-            }
-        }
+        ai_recommendation = {"fundamental_assessment": {"valuation": {"score": 6.5}}}
 
         result = mock_synthesizer._extract_value_score(llm_responses, ai_recommendation)
 
@@ -281,8 +253,8 @@ class TestExtractValueScore:
             "fundamental": {
                 "Q1": {
                     "content": "Stock appears undervalued at current discount. "
-                               "PE ratio attractive. Dividend yield strong. "
-                               "Good value opportunity here."
+                    "PE ratio attractive. Dividend yield strong. "
+                    "Good value opportunity here."
                 }
             }
         }
@@ -299,7 +271,7 @@ class TestExtractValueScore:
             "fundamental": {
                 "Q1": {
                     "content": "Stock appears overvalued and expensive. "
-                               "Trading at a premium. Overpriced relative to peers."
+                    "Trading at a premium. Overpriced relative to peers."
                 }
             }
         }
@@ -316,11 +288,7 @@ class TestExtractBusinessQualityScore:
 
     def test_returns_direct_business_quality_score(self, mock_synthesizer):
         """Should return business_quality_score from comprehensive analysis."""
-        llm_responses = {
-            "fundamental": {
-                "comprehensive": {"business_quality_score": 8.0}
-            }
-        }
+        llm_responses = {"fundamental": {"comprehensive": {"business_quality_score": 8.0}}}
         ai_recommendation = {}
 
         result = mock_synthesizer._extract_business_quality_score(llm_responses, ai_recommendation)
@@ -329,13 +297,7 @@ class TestExtractBusinessQualityScore:
 
     def test_returns_nested_content_score(self, mock_synthesizer):
         """Should extract from nested content dict."""
-        llm_responses = {
-            "fundamental": {
-                "comprehensive": {
-                    "content": {"business_quality_score": 7.5}
-                }
-            }
-        }
+        llm_responses = {"fundamental": {"comprehensive": {"content": {"business_quality_score": 7.5}}}}
         ai_recommendation = {}
 
         result = mock_synthesizer._extract_business_quality_score(llm_responses, ai_recommendation)
@@ -345,11 +307,7 @@ class TestExtractBusinessQualityScore:
     def test_returns_score_from_dict_format(self, mock_synthesizer):
         """Should handle score in dict format with 'score' key."""
         llm_responses = {
-            "fundamental": {
-                "comprehensive": {
-                    "business_quality_score": {"score": 6.8, "confidence": "high"}
-                }
-            }
+            "fundamental": {"comprehensive": {"business_quality_score": {"score": 6.8, "confidence": "high"}}}
         }
         ai_recommendation = {}
 
@@ -363,12 +321,12 @@ class TestExtractBusinessQualityScore:
             "fundamental": {
                 "Q1_2024": {
                     "content": "Recurring revenue growth. Strong competitive advantage. "
-                               "Market leadership position. Innovation in technology."
+                    "Market leadership position. Innovation in technology."
                 },
                 "Q2_2024": {
                     "content": "Margin expansion continues. Operating leverage improving. "
-                               "Cost control measures effective."
-                }
+                    "Cost control measures effective."
+                },
             }
         }
         ai_recommendation = {}
@@ -393,9 +351,7 @@ class TestAnalyzeQuarterlyBusinessQuality:
 
     def test_baseline_score_for_minimal_content(self, mock_synthesizer):
         """Should return base score for content with few indicators."""
-        result = mock_synthesizer._analyze_quarterly_business_quality(
-            "Some general text about the company.", "Q1_2024"
-        )
+        result = mock_synthesizer._analyze_quarterly_business_quality("Some general text about the company.", "Q1_2024")
 
         # Should return a score between 1 and 10
         assert 1.0 <= result <= 10.0

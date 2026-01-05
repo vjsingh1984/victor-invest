@@ -127,9 +127,7 @@ class RecommendationBuilder:
 
         # Use current price passed in, fallback to reasonable default if price is 0
         if current_price <= 0:
-            self.logger.warning(
-                f"No current price available for {symbol}, using placeholder for target calculation"
-            )
+            self.logger.warning(f"No current price available for {symbol}, using placeholder for target calculation")
             current_price = 100  # Fallback only as last resort
 
         # Extract overall score from different possible locations

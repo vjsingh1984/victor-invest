@@ -476,7 +476,7 @@ class ComponentScoreExtractor:
         # Calculate standard deviation
         mean_quality = sum(quality_indicators) / len(quality_indicators)
         variance = sum((x - mean_quality) ** 2 for x in quality_indicators) / len(quality_indicators)
-        std_dev = variance ** 0.5
+        std_dev = variance**0.5
 
         # Lower standard deviation = more consistent = higher bonus
         # Scale: 0-1 point bonus based on consistency

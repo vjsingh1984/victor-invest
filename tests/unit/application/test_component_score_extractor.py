@@ -24,15 +24,11 @@ class TestComponentScoreExtractorIncome:
     @pytest.fixture
     def extractor(self):
         """Create extractor with fundamental score calculator."""
-        return ComponentScoreExtractor(
-            fundamental_score_calculator=lambda _: 7.0
-        )
+        return ComponentScoreExtractor(fundamental_score_calculator=lambda _: 7.0)
 
     def test_returns_direct_ai_recommendation_score(self, extractor):
         """Should return income_statement_score from AI recommendation."""
-        result = extractor.extract_income_score(
-            {}, {"income_statement_score": 8.5}
-        )
+        result = extractor.extract_income_score({}, {"income_statement_score": 8.5})
         assert result == 8.5
 
     def test_extracts_from_profitability_margins(self, extractor):
@@ -57,9 +53,7 @@ class TestComponentScoreExtractorIncome:
 
     def test_fallback_to_fundamental_score(self, extractor):
         """Should fallback to fundamental * 0.9."""
-        result = extractor.extract_income_score(
-            {"fundamental": {"other": {}}}, {}
-        )
+        result = extractor.extract_income_score({"fundamental": {"other": {}}}, {})
         assert result == pytest.approx(6.3, rel=0.1)
 
     def test_returns_zero_when_base_is_zero(self):
@@ -83,7 +77,7 @@ class TestComponentScoreExtractorCashflow:
             "fundamental": {
                 "Q1": {
                     "content": "Strong operating cash flow with positive FCF. "
-                               "Working capital improved. Liquidity excellent."
+                    "Working capital improved. Liquidity excellent."
                 }
             }
         }
@@ -92,21 +86,13 @@ class TestComponentScoreExtractorCashflow:
 
     def test_adjusts_down_for_no_keywords(self, extractor):
         """Should adjust down when no keywords found."""
-        llm_responses = {
-            "fundamental": {
-                "Q1": {"content": "Revenue and expenses analysis."}
-            }
-        }
+        llm_responses = {"fundamental": {"Q1": {"content": "Revenue and expenses analysis."}}}
         result = extractor.extract_cashflow_score(llm_responses, {})
         assert result <= 7.0
 
     def test_handles_dict_content(self, extractor):
         """Should handle dict content by converting to JSON."""
-        llm_responses = {
-            "fundamental": {
-                "Q1": {"content": {"analysis": "cash flow", "fcf": "positive"}}
-            }
-        }
+        llm_responses = {"fundamental": {"Q1": {"content": {"analysis": "cash flow", "fcf": "positive"}}}}
         result = extractor.extract_cashflow_score(llm_responses, {})
         assert result >= 7.0
 
@@ -125,7 +111,7 @@ class TestComponentScoreExtractorBalance:
             "fundamental": {
                 "Q1": {
                     "content": "Asset base strong. Liability management good. "
-                               "Equity solid. Debt reasonable. Balance sheet healthy."
+                    "Equity solid. Debt reasonable. Balance sheet healthy."
                 }
             }
         }
@@ -143,11 +129,7 @@ class TestComponentScoreExtractorGrowth:
 
     def test_returns_comprehensive_growth_score(self, extractor):
         """Should return growth_prospects_score from comprehensive."""
-        llm_responses = {
-            "fundamental": {
-                "comprehensive": {"content": {"growth_prospects_score": 8.5}}
-            }
-        }
+        llm_responses = {"fundamental": {"comprehensive": {"content": {"growth_prospects_score": 8.5}}}}
         result = extractor.extract_growth_score(llm_responses, {})
         assert result == 8.5
 
@@ -162,8 +144,7 @@ class TestComponentScoreExtractorGrowth:
         llm_responses = {
             "fundamental": {
                 "Q1": {
-                    "content": "Revenue growth accelerating. Expansion in market share. "
-                               "Strong momentum in segments."
+                    "content": "Revenue growth accelerating. Expansion in market share. " "Strong momentum in segments."
                 }
             }
         }
@@ -191,7 +172,7 @@ class TestComponentScoreExtractorValue:
             "fundamental": {
                 "Q1": {
                     "content": "Stock appears undervalued at current discount. "
-                               "PE ratio attractive. Good value opportunity."
+                    "PE ratio attractive. Good value opportunity."
                 }
             }
         }
@@ -202,10 +183,7 @@ class TestComponentScoreExtractorValue:
         """Should adjust down for negative keywords."""
         llm_responses = {
             "fundamental": {
-                "Q1": {
-                    "content": "Stock appears overvalued and expensive. "
-                               "Trading at a premium. Overpriced."
-                }
+                "Q1": {"content": "Stock appears overvalued and expensive. " "Trading at a premium. Overpriced."}
             }
         }
         result = extractor.extract_value_score(llm_responses, {})
@@ -222,30 +200,20 @@ class TestComponentScoreExtractorBusinessQuality:
 
     def test_returns_direct_score(self, extractor):
         """Should return business_quality_score from comprehensive."""
-        llm_responses = {
-            "fundamental": {"comprehensive": {"business_quality_score": 8.0}}
-        }
+        llm_responses = {"fundamental": {"comprehensive": {"business_quality_score": 8.0}}}
         result = extractor.extract_business_quality_score(llm_responses, {})
         assert result == 8.0
 
     def test_returns_nested_content_score(self, extractor):
         """Should extract from nested content."""
-        llm_responses = {
-            "fundamental": {
-                "comprehensive": {"content": {"business_quality_score": 7.5}}
-            }
-        }
+        llm_responses = {"fundamental": {"comprehensive": {"content": {"business_quality_score": 7.5}}}}
         result = extractor.extract_business_quality_score(llm_responses, {})
         assert result == 7.5
 
     def test_returns_dict_format_score(self, extractor):
         """Should handle score in dict format."""
         llm_responses = {
-            "fundamental": {
-                "comprehensive": {
-                    "business_quality_score": {"score": 6.8, "confidence": "high"}
-                }
-            }
+            "fundamental": {"comprehensive": {"business_quality_score": {"score": 6.8, "confidence": "high"}}}
         }
         result = extractor.extract_business_quality_score(llm_responses, {})
         assert result == 6.8
@@ -254,12 +222,8 @@ class TestComponentScoreExtractorBusinessQuality:
         """Should calculate from quarterly analyses."""
         llm_responses = {
             "fundamental": {
-                "Q1_2024": {
-                    "content": "Recurring revenue growth. Competitive advantage."
-                },
-                "Q2_2024": {
-                    "content": "Margin expansion. Operating leverage improving."
-                }
+                "Q1_2024": {"content": "Recurring revenue growth. Competitive advantage."},
+                "Q2_2024": {"content": "Margin expansion. Operating leverage improving."},
             }
         }
         result = extractor.extract_business_quality_score(llm_responses, {})
@@ -281,9 +245,7 @@ class TestAnalyzeQuarterlyBusinessQuality:
 
     def test_baseline_score(self, extractor):
         """Should return score in valid range."""
-        result = extractor.analyze_quarterly_business_quality(
-            "Some general text.", "Q1_2024"
-        )
+        result = extractor.analyze_quarterly_business_quality("Some general text.", "Q1_2024")
         assert 1.0 <= result <= 10.0
 
     def test_quality_indicators_score(self, extractor):
