@@ -154,6 +154,14 @@ from investigator.domain.services.valuation.semiconductor_valuation import (  # 
     value_semiconductor,
 )
 
+# Valuation Registry for plugin-based sector handlers (SOLID: Open/Closed)
+from investigator.domain.services.valuation.valuation_registry import (
+    HandlerRegistration,
+    MatchType,
+    ValuationRegistry,
+    get_valuation_registry,
+)
+
 __all__ = [
     # Core valuation models
     "DCFValuation",
@@ -166,6 +174,11 @@ __all__ = [
     "DCFModelType",
     "create_dcf_model",
     "auto_select_dcf",
+    # Valuation Registry (SOLID: Open/Closed)
+    "ValuationRegistry",
+    "get_valuation_registry",
+    "HandlerRegistration",
+    "MatchType",
     # Insurance valuation
     "value_insurance_company",
     "calculate_insurance_specific_metrics",
