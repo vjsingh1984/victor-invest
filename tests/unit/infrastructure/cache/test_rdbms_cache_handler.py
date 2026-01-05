@@ -78,19 +78,23 @@ class FakeSecDao:
 def patch_database_manager(monkeypatch):
     import investigator.infrastructure.cache.rdbms_cache_handler as module
 
-    monkeypatch.setattr("utils.db.DatabaseManager", lambda *args, **kwargs: Mock())
-    monkeypatch.setattr("utils.db.get_quarterly_metrics_dao", lambda: None)
-    monkeypatch.setattr("utils.db.get_sec_companyfacts_dao", lambda: None)
-    monkeypatch.setattr("utils.db.get_sec_responses_dao", lambda: None)
-    monkeypatch.setattr("utils.db.get_sec_submissions_dao", lambda: None)
-    monkeypatch.setattr("utils.db.get_llm_responses_dao", lambda: None)
+    # Patch the canonical module path (not legacy utils.db)
+    db_module = "investigator.infrastructure.database.db"
+    monkeypatch.setattr(f"{db_module}.DatabaseManager", lambda *args, **kwargs: Mock())
+    monkeypatch.setattr(f"{db_module}.get_quarterly_metrics_dao", lambda: None)
+    monkeypatch.setattr(f"{db_module}.get_sec_companyfacts_dao", lambda: None)
+    monkeypatch.setattr(f"{db_module}.get_sec_responses_dao", lambda: None)
+    monkeypatch.setattr(f"{db_module}.get_sec_submissions_dao", lambda: None)
+    monkeypatch.setattr(f"{db_module}.get_llm_responses_dao", lambda: None)
     return module
 
 
 def test_llm_response_round_trip(patch_database_manager, monkeypatch):
     module = patch_database_manager
     dao = FakeLLMDao()
-    monkeypatch.setattr("utils.db.get_llm_responses_dao", lambda: dao)
+    monkeypatch.setattr(
+        "investigator.infrastructure.database.db.get_llm_responses_dao", lambda: dao
+    )
 
     handler = module.RdbmsCacheStorageHandler(CacheType.LLM_RESPONSE, priority=5)
 
@@ -119,7 +123,9 @@ def test_llm_response_round_trip(patch_database_manager, monkeypatch):
 def test_sec_response_save_and_fetch(patch_database_manager, monkeypatch):
     module = patch_database_manager
     dao = FakeSecDao()
-    monkeypatch.setattr("utils.db.get_sec_responses_dao", lambda: dao)
+    monkeypatch.setattr(
+        "investigator.infrastructure.database.db.get_sec_responses_dao", lambda: dao
+    )
 
     handler = module.RdbmsCacheStorageHandler(CacheType.SEC_RESPONSE, priority=5)
 
