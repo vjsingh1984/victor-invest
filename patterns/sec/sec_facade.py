@@ -8,31 +8,31 @@ SEC Data Facade Pattern
 Provides simplified interface for SEC data operations using design patterns
 """
 
-import logging
 import json
-from typing import Dict, List, Optional, Any
+import logging
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from patterns.sec.sec_strategies import (
-    ISECDataFetchStrategy,
-    CompanyFactsStrategy,
-    SubmissionsStrategy,
-    CachedDataStrategy,
-    HybridFetchStrategy,
-)
+from data.models import FinancialStatementData, QuarterlyData
+from investigator.config import get_config
 from investigator.infrastructure.cache import get_cache_manager
 from investigator.infrastructure.cache.cache_types import CacheType
-from patterns.sec.sec_adapters import (
-    SECToInternalAdapter,
-    InternalToLLMAdapter,
-    FilingContentAdapter,
-    CompanyFactsToDetailedAdapter,
-)
 from patterns.core.interfaces import DataSourceType, QuarterlyMetrics
-from data.models import QuarterlyData, FinancialStatementData
-from utils.ticker_cik_mapper import TickerCIKMapper
+from patterns.sec.sec_adapters import (
+    CompanyFactsToDetailedAdapter,
+    FilingContentAdapter,
+    InternalToLLMAdapter,
+    SECToInternalAdapter,
+)
+from patterns.sec.sec_strategies import (
+    CachedDataStrategy,
+    CompanyFactsStrategy,
+    HybridFetchStrategy,
+    ISECDataFetchStrategy,
+    SubmissionsStrategy,
+)
 from utils.api_client import SECAPIClient
-from investigator.config import get_config
+from utils.ticker_cik_mapper import TickerCIKMapper
 
 logger = logging.getLogger(__name__)
 
@@ -265,8 +265,8 @@ class FundamentalAnalysisFacadeV2:
         self.cache_manager = get_cache_manager()
 
         # Use existing aggregator and LLM facade with cache management
-        from utils.financial_data_aggregator import FinancialDataAggregator
         from patterns.llm.llm_facade import create_llm_facade
+        from utils.financial_data_aggregator import FinancialDataAggregator
 
         self.data_aggregator = FinancialDataAggregator(config)
         # Pass cache_manager to enable caching in LLM facade
@@ -690,9 +690,9 @@ Provide analysis in the following exact JSON format:
     def _calculate_and_cache_quarterly_metrics(self, quarterly_data: List, symbol: str) -> None:
         """Calculate comprehensive quarterly metrics and cache them to RDBMS"""
         try:
-            from utils.quarterly_metrics import QuarterlyMetricsCalculator
-            from investigator.infrastructure.cache.cache_types import CacheType
             from investigator.infrastructure.cache import get_cache_manager
+            from investigator.infrastructure.cache.cache_types import CacheType
+            from utils.quarterly_metrics import QuarterlyMetricsCalculator
 
             cache_manager = get_cache_manager()
             calculator = QuarterlyMetricsCalculator()
@@ -744,8 +744,8 @@ Provide analysis in the following exact JSON format:
                         metrics = metrics_df.iloc[0].to_dict()  # Get first row as dict
 
                         # Fix JSON serialization for Timestamp and numpy types
-                        import pandas as pd
                         import numpy as np
+                        import pandas as pd
 
                         for key, value in metrics.items():
                             if pd.isna(value):

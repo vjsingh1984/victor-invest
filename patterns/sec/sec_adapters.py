@@ -9,13 +9,13 @@ Converts between different data formats (SEC API, Internal, LLM)
 """
 
 import logging
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from data.models import QuarterlyData, FinancialStatementData, Filing
-from utils.json_utils import safe_json_dumps
+from data.models import Filing, FinancialStatementData, QuarterlyData
 from investigator.config import get_config
+from utils.json_utils import safe_json_dumps
 
 logger = logging.getLogger(__name__)
 

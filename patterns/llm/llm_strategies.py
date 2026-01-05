@@ -8,15 +8,16 @@ LLM Strategy Pattern Implementations
 Different strategies for LLM analysis, processing, and caching
 """
 
-import logging
-import json
 import hashlib
-from typing import Dict, List, Any
-from datetime import datetime
+import json
+import logging
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List
 
-from .llm_interfaces import ILLMStrategy, ILLMCacheStrategy, LLMRequest, LLMResponse, LLMTaskType, LLMPriority
-from utils.llm_response_processor import get_llm_response_processor
+from investigator.application.processors import get_llm_response_processor
+
+from .llm_interfaces import ILLMCacheStrategy, ILLMStrategy, LLMPriority, LLMRequest, LLMResponse, LLMTaskType
 
 logger = logging.getLogger(__name__)
 
