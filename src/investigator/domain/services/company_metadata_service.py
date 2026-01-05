@@ -17,7 +17,6 @@ from typing import Dict, Optional, Tuple
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-
 logger = logging.getLogger(__name__)
 
 

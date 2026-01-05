@@ -32,9 +32,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from investigator.domain.services.rl.models import (
-    ValuationContext,
-    GrowthStage,
     CompanySize,
+    GrowthStage,
+    ValuationContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -174,8 +174,7 @@ class ValuationContextExtractor:
         tech_ind = market_context.get("technical_indicators", {})
         rsi_14 = self._safe_get_float(tech_ind, "rsi_14", 50.0)
         macd_histogram = self._normalize_macd_histogram(
-            self._safe_get_float(tech_ind, "macd_histogram", 0.0),
-            current_price or 100.0
+            self._safe_get_float(tech_ind, "macd_histogram", 0.0), current_price or 100.0
         )
         obv_trend = self._safe_get_float(tech_ind, "obv_trend", 0.0)  # Already -1 to 1
         adx_14 = self._safe_get_float(tech_ind, "adx_14", 25.0)
@@ -661,28 +660,46 @@ class ValuationContextExtractor:
         # Low-margin industries (typically <5% net margin)
         low_margin_industries = [
             # Retail (1-3% margins)
-            "department", "specialty retail", "discount stores", "warehouse clubs",
-            "food chains", "grocery", "supermarket",
+            "department",
+            "specialty retail",
+            "discount stores",
+            "warehouse clubs",
+            "food chains",
+            "grocery",
+            "supermarket",
             "consumer electronics/video chains",
             # Hardware/Manufacturing (3-8% margins for most)
-            "computer manufacturing", "computer hardware",
+            "computer manufacturing",
+            "computer hardware",
             # Contract manufacturing / EMS (2-4% margins)
             "electrical products",  # FLEX, JBL - EMS companies
             "electronic components",
             # Airlines (2-5% margins, highly cyclical)
-            "air freight", "airlines", "airline",
+            "air freight",
+            "airlines",
+            "airline",
             # Food processing (3-5% margins)
-            "meat/poultry/fish", "packaged foods", "food processing",
-            "farm products", "farming/seeds",
+            "meat/poultry/fish",
+            "packaged foods",
+            "food processing",
+            "farm products",
+            "farming/seeds",
             # Healthcare services with thin margins
-            "hospital", "nursing", "medical/nursing services",
+            "hospital",
+            "nursing",
+            "medical/nursing services",
             # Insurance and managed care (process large premiums, thin margins)
-            "insurance", "insurers", "managed health care", "managed care",
+            "insurance",
+            "insurers",
+            "managed health care",
+            "managed care",
             "health care distribution",
             # Telecom/Cable (can have high capex eating into margins)
-            "cable", "pay television",
+            "cable",
+            "pay television",
             # Energy transmission
-            "oil/gas transmission", "gas distribution",
+            "oil/gas transmission",
+            "gas distribution",
             # Beverages (varies, but many are low margin)
             "beverages",
         ]

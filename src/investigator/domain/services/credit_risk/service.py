@@ -41,7 +41,6 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from investigator.domain.services.credit_risk.protocols import FinancialData
 from investigator.domain.services.credit_risk.altman_zscore import (
     AltmanZScoreCalculator,
     AltmanZScoreResult,
@@ -50,14 +49,15 @@ from investigator.domain.services.credit_risk.beneish_mscore import (
     BeneishMScoreCalculator,
     BeneishMScoreResult,
 )
+from investigator.domain.services.credit_risk.composite_distress import (
+    CompositeCreditRiskResult,
+    CompositeDistressCalculator,
+)
 from investigator.domain.services.credit_risk.piotroski_fscore import (
     PiotroskiFScoreCalculator,
     PiotroskiFScoreResult,
 )
-from investigator.domain.services.credit_risk.composite_distress import (
-    CompositeDistressCalculator,
-    CompositeCreditRiskResult,
-)
+from investigator.domain.services.credit_risk.protocols import FinancialData
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,7 @@ class CreditRiskAssessment:
 
     Contains all individual scores plus composite assessment.
     """
+
     symbol: str
     altman: Optional[AltmanZScoreResult] = None
     beneish: Optional[BeneishMScoreResult] = None
@@ -109,13 +110,15 @@ class CreditRiskAssessment:
         }
 
         if self.composite:
-            summary.update({
-                "distress_tier": self.composite.distress_tier.name if self.composite.distress_tier else None,
-                "distress_probability": self.composite.distress_probability,
-                "valuation_discount": self.composite.valuation_discount,
-                "risk_factors_count": len(self.composite.risk_factors),
-                "positive_factors_count": len(self.composite.positive_factors),
-            })
+            summary.update(
+                {
+                    "distress_tier": self.composite.distress_tier.name if self.composite.distress_tier else None,
+                    "distress_probability": self.composite.distress_probability,
+                    "valuation_discount": self.composite.valuation_discount,
+                    "risk_factors_count": len(self.composite.risk_factors),
+                    "positive_factors_count": len(self.composite.positive_factors),
+                }
+            )
 
         if self.altman:
             summary["altman_zone"] = self.altman.zone.value if self.altman.zone else None
@@ -284,19 +287,13 @@ class CreditRiskService:
         """
         try:
             # Lazy import to avoid circular dependencies
-            from investigator.infrastructure.sec.companyfacts_extractor import (
-                get_sec_companyfacts_extractor
-            )
+            from investigator.infrastructure.sec.companyfacts_extractor import get_sec_companyfacts_extractor
 
             loop = asyncio.get_event_loop()
             extractor = get_sec_companyfacts_extractor()
 
             # Get current period metrics
-            metrics = await loop.run_in_executor(
-                None,
-                extractor.extract_financial_metrics,
-                symbol
-            )
+            metrics = await loop.run_in_executor(None, extractor.extract_financial_metrics, symbol)
 
             if not metrics:
                 logger.warning(f"No SEC metrics found for {symbol}")
@@ -315,11 +312,7 @@ class CreditRiskService:
             logger.error(f"Error fetching financial data for {symbol}: {e}")
             return None
 
-    def _transform_sec_metrics(
-        self,
-        symbol: str,
-        metrics: Dict[str, Any]
-    ) -> FinancialData:
+    def _transform_sec_metrics(self, symbol: str, metrics: Dict[str, Any]) -> FinancialData:
         """Transform SEC extracted metrics to FinancialData format.
 
         Args:
@@ -363,17 +356,13 @@ class CreditRiskService:
             # Market Data
             market_cap=metrics.get("market_cap"),
             shares_outstanding=(
-                metrics.get("shares_outstanding") or
-                metrics.get("common_stock_shares_outstanding") or
-                metrics.get("weighted_average_shares_diluted")
+                metrics.get("shares_outstanding")
+                or metrics.get("common_stock_shares_outstanding")
+                or metrics.get("weighted_average_shares_diluted")
             ),
         )
 
-    def _transform_sec_data(
-        self,
-        symbol: str,
-        sec_data: Dict[str, Any]
-    ) -> FinancialData:
+    def _transform_sec_data(self, symbol: str, sec_data: Dict[str, Any]) -> FinancialData:
         """Transform raw SEC tool data to FinancialData format.
 
         Args:

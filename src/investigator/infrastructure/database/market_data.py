@@ -473,7 +473,12 @@ class DatabaseMarketDataFetcher:
             value = metadata.get(field)
             if isinstance(value, str):
                 upper = value.upper()
-                if "ETF" in upper or "EXCHANGE-TRADED FUND" in upper or "EXCHANGE TRADED FUND" in upper or "ETP" in upper:
+                if (
+                    "ETF" in upper
+                    or "EXCHANGE-TRADED FUND" in upper
+                    or "EXCHANGE TRADED FUND" in upper
+                    or "ETP" in upper
+                ):
                     return True
 
         name_fields = ["companyname", "security_name", "name", "description"]

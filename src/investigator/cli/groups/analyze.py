@@ -34,27 +34,20 @@ def analyze(ctx):
 @analyze.command("single")
 @click.argument("symbol")
 @click.option(
-    "--mode", "-m",
+    "--mode",
+    "-m",
     type=click.Choice(["quick", "standard", "comprehensive"]),
     default="comprehensive",
-    help="Analysis depth: quick (technical only), standard (tech+fund), comprehensive (full synthesis)"
+    help="Analysis depth: quick (technical only), standard (tech+fund), comprehensive (full synthesis)",
 )
+@click.option("--output", "-o", type=click.Path(), help="Output file path for results")
+@click.option("--format", "-f", type=click.Choice(["json", "yaml", "text"]), default="json", help="Output format")
 @click.option(
-    "--output", "-o",
-    type=click.Path(),
-    help="Output file path for results"
-)
-@click.option(
-    "--format", "-f",
-    type=click.Choice(["json", "yaml", "text"]),
-    default="json",
-    help="Output format"
-)
-@click.option(
-    "--detail", "-d",
+    "--detail",
+    "-d",
     type=click.Choice(["minimal", "standard", "verbose"]),
     default="standard",
-    help="Output detail level"
+    help="Output detail level",
 )
 @click.option("--report", is_flag=True, help="Generate PDF investment report")
 @click.option("--force-refresh", "--refresh", is_flag=True, help="Bypass cache and fetch fresh data")
@@ -74,11 +67,10 @@ def single(ctx, symbol, mode, output, format, detail, report, force_refresh):
     symbol = symbol.upper()
 
     async def run_analysis():
+        from investigator.application import AgentOrchestrator, AnalysisMode, OutputDetailLevel, format_analysis_output
         from investigator.config import get_config
         from investigator.infrastructure.cache import get_cache_manager
         from investigator.infrastructure.monitoring import MetricsCollector
-        from investigator.application import AgentOrchestrator, AnalysisMode
-        from investigator.application import OutputDetailLevel, format_analysis_output
 
         cfg = get_config()
         original_force_refresh = getattr(cfg.cache_control, "force_refresh", False)
@@ -153,6 +145,7 @@ def single(ctx, symbol, mode, output, format, detail, report, force_refresh):
                     try:
                         from investigator.application import InvestmentSynthesizer
                         from investigator.domain.models import InvestmentRecommendation
+
                         click.echo("\nGenerating PDF report...")
                         recommendation = _convert_to_recommendation(results, symbol)
                         synthesizer = InvestmentSynthesizer()
@@ -176,29 +169,22 @@ def single(ctx, symbol, mode, output, format, detail, report, force_refresh):
 @analyze.command("batch")
 @click.argument("symbols", nargs=-1, required=True)
 @click.option(
-    "--mode", "-m",
+    "--mode",
+    "-m",
     type=click.Choice(["quick", "standard", "comprehensive"]),
     default="standard",
-    help="Analysis mode for all symbols"
+    help="Analysis mode for all symbols",
 )
+@click.option("--output-dir", "-o", default="results", help="Output directory for results")
 @click.option(
-    "--output-dir", "-o",
-    default="results",
-    help="Output directory for results"
-)
-@click.option(
-    "--detail", "-d",
+    "--detail",
+    "-d",
     type=click.Choice(["minimal", "standard", "verbose"]),
     default="standard",
-    help="Output detail level"
+    help="Output detail level",
 )
 @click.option("--force-refresh", "--refresh", is_flag=True, help="Bypass cache")
-@click.option(
-    "--parallel", "-p",
-    default=3,
-    type=int,
-    help="Number of parallel analyses"
-)
+@click.option("--parallel", "-p", default=3, type=int, help="Number of parallel analyses")
 @click.pass_context
 def batch(ctx, symbols, mode, output_dir, detail, force_refresh, parallel):
     """Analyze multiple symbols in batch
@@ -213,11 +199,10 @@ def batch(ctx, symbols, mode, output_dir, detail, force_refresh, parallel):
     symbols = [s.upper() for s in symbols]
 
     async def run_batch():
+        from investigator.application import AgentOrchestrator, AnalysisMode, OutputDetailLevel, format_analysis_output
         from investigator.config import get_config
         from investigator.infrastructure.cache import get_cache_manager
         from investigator.infrastructure.monitoring import MetricsCollector
-        from investigator.application import AgentOrchestrator, AnalysisMode
-        from investigator.application import OutputDetailLevel, format_analysis_output
 
         cfg = get_config()
 
@@ -257,13 +242,17 @@ def batch(ctx, symbols, mode, output_dir, detail, force_refresh, parallel):
             # Save summary
             summary_file = Path(output_dir) / f"batch_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             with open(summary_file, "w") as f:
-                json.dump({
-                    "symbols": list(symbols),
-                    "mode": mode,
-                    "completed": len(results),
-                    "failed": len(symbols) - len(results),
-                    "timestamp": datetime.now().isoformat(),
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "symbols": list(symbols),
+                        "mode": mode,
+                        "completed": len(results),
+                        "failed": len(symbols) - len(results),
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                    f,
+                    indent=2,
+                )
 
             click.echo(f"\nCompleted {len(results)}/{len(symbols)} analyses")
             click.echo(f"Results saved to {output_dir}")
@@ -293,9 +282,9 @@ def compare(ctx, target, peers, output):
     peers = [p.upper() for p in peers]
 
     async def run_comparison():
+        from investigator.application import AgentOrchestrator
         from investigator.infrastructure.cache import get_cache_manager
         from investigator.infrastructure.monitoring import MetricsCollector
-        from investigator.application import AgentOrchestrator
 
         cache_manager = get_cache_manager()
         metrics_collector = MetricsCollector()
@@ -333,6 +322,7 @@ def compare(ctx, target, peers, output):
 
 
 # Helper functions
+
 
 def _print_executive_summary(summary: dict):
     """Print formatted executive summary"""
@@ -480,17 +470,14 @@ def _convert_to_recommendation(results: dict, symbol: str):
     # Extract technical data for current price
     technical_data = results.get("agents", {}).get("technical", {})
     current_price = (
-        technical_data.get("current_price") or
-        technical_data.get("analysis", {}).get("current_price") or
-        technical_data.get("price_data", {}).get("current_price")
+        technical_data.get("current_price")
+        or technical_data.get("analysis", {}).get("current_price")
+        or technical_data.get("price_data", {}).get("current_price")
     )
 
     # Map recommendation string to uppercase
     rec_string = recommendation_data.get("final_recommendation", "hold")
-    rec_map = {
-        "strong_buy": "STRONG BUY", "buy": "BUY", "hold": "HOLD",
-        "sell": "SELL", "strong_sell": "STRONG SELL"
-    }
+    rec_map = {"strong_buy": "STRONG BUY", "buy": "BUY", "hold": "HOLD", "sell": "SELL", "strong_sell": "STRONG SELL"}
     recommendation = rec_map.get(rec_string.lower().replace(" ", "_"), "HOLD") if rec_string else "HOLD"
 
     # Map conviction to confidence

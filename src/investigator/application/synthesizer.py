@@ -26,16 +26,19 @@ from investigator.config import get_config
 
 # Import from Clean Architecture
 from investigator.domain.models import InvestmentRecommendation
-from patterns.analysis.peer_comparison import get_peer_comparison_analyzer  # TODO: Move to investigator.domain.services
-from patterns.llm.llm_facade import create_llm_facade  # TODO: Move to investigator.infrastructure.llm
-from investigator.infrastructure.ui import ASCIIArt
 from investigator.infrastructure.cache import CacheManager, CacheType, get_cache_manager
-from investigator.infrastructure.database.db import DatabaseManager, get_llm_responses_dao  # TODO: Move to investigator.infrastructure.database
+from investigator.infrastructure.database.db import (  # TODO: Move to investigator.infrastructure.database
+    DatabaseManager,
+    get_llm_responses_dao,
+)
 from investigator.infrastructure.reporting import (
     PDFReportGenerator,
     ReportConfig,
     WeeklyReportGenerator,
 )
+from investigator.infrastructure.ui import ASCIIArt
+from patterns.analysis.peer_comparison import get_peer_comparison_analyzer  # TODO: Move to investigator.domain.services
+from patterns.llm.llm_facade import create_llm_facade  # TODO: Move to investigator.infrastructure.llm
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -309,10 +312,10 @@ class InvestmentSynthesizer:
             if quarterly_metrics and len(quarterly_metrics) >= 4 and dcf_valuation is None:
                 try:
                     symbol_logger.info("Calculating DCF (Discounted Cash Flow) valuation with unified terminal growth")
-                    from investigator.domain.services.valuation.dcf import DCFValuation
-                    from investigator.domain.services.terminal_growth_calculator import TerminalGrowthCalculator
-                    from investigator.domain.services.valuation_framework_planner import ValuationFrameworkPlanner
                     from investigator.domain.services.fcf_growth_calculator import FCFGrowthCalculator
+                    from investigator.domain.services.terminal_growth_calculator import TerminalGrowthCalculator
+                    from investigator.domain.services.valuation.dcf import DCFValuation
+                    from investigator.domain.services.valuation_framework_planner import ValuationFrameworkPlanner
 
                     # Step 1: Create DCF instance
                     dcf_analyzer = DCFValuation(
@@ -324,9 +327,9 @@ class InvestmentSynthesizer:
 
                     # Step 2: Calculate Rule of 40 to get metrics for terminal growth
                     rule_of_40_result = dcf_analyzer._calculate_rule_of_40()
-                    rule_of_40_score = rule_of_40_result.get('score', 0)
-                    revenue_growth_pct = rule_of_40_result.get('revenue_growth_pct', 0)
-                    profit_margin_pct = rule_of_40_result.get('profit_margin_pct', 0)
+                    rule_of_40_score = rule_of_40_result.get("score", 0)
+                    revenue_growth_pct = rule_of_40_result.get("revenue_growth_pct", 0)
+                    profit_margin_pct = rule_of_40_result.get("profit_margin_pct", 0)
 
                     # Step 3: Calculate FCF margin
                     fcf_calc = FCFGrowthCalculator(symbol)
@@ -337,37 +340,34 @@ class InvestmentSynthesizer:
                     # Get market cap from latest quarterly metrics
                     market_cap_billions = 0.0
                     if quarterly_metrics:
-                        latest_market_cap = quarterly_metrics[-1].get('market_cap', 0)
+                        latest_market_cap = quarterly_metrics[-1].get("market_cap", 0)
                         market_cap_billions = latest_market_cap / 1e9 if latest_market_cap > 0 else 0.0
 
                     # Step 5: Create ValuationFrameworkPlanner
                     planner = ValuationFrameworkPlanner(
                         symbol=symbol,
                         sector=sector,
-                        industry='',  # Not critical for classification
-                        market_cap_billions=market_cap_billions
+                        industry="",  # Not critical for classification
+                        market_cap_billions=market_cap_billions,
                     )
 
                     # Step 6: Classify company stage
                     company_stage = planner.classify_company_stage(
-                        revenue_growth_pct=revenue_growth_pct,
-                        fcf_margin_pct=fcf_margin_pct
+                        revenue_growth_pct=revenue_growth_pct, fcf_margin_pct=fcf_margin_pct
                     )
 
                     # Step 7: Create TerminalGrowthCalculator
                     terminal_calc = TerminalGrowthCalculator(
-                        symbol=symbol,
-                        sector=sector,
-                        base_terminal_growth=0.035  # 3.5% base for tech
+                        symbol=symbol, sector=sector, base_terminal_growth=0.035  # 3.5% base for tech
                     )
 
                     # Step 8: Calculate unified terminal growth
                     terminal_result = terminal_calc.calculate_terminal_growth(
                         rule_of_40_score=rule_of_40_score,
                         revenue_growth_pct=revenue_growth_pct,
-                        fcf_margin_pct=fcf_margin_pct
+                        fcf_margin_pct=fcf_margin_pct,
                     )
-                    terminal_growth_rate = terminal_result['terminal_growth_rate']
+                    terminal_growth_rate = terminal_result["terminal_growth_rate"]
 
                     symbol_logger.info(
                         f"Unified Terminal Growth: {terminal_growth_rate*100:.2f}% "
@@ -377,9 +377,7 @@ class InvestmentSynthesizer:
                     )
 
                     # Step 9: Calculate DCF with unified terminal growth rate
-                    dcf_valuation = dcf_analyzer.calculate_dcf_valuation(
-                        terminal_growth_rate=terminal_growth_rate
-                    )
+                    dcf_valuation = dcf_analyzer.calculate_dcf_valuation(terminal_growth_rate=terminal_growth_rate)
 
                     if dcf_valuation:
                         fair_value = dcf_valuation.get("fair_value_per_share", 0)
@@ -4793,7 +4791,9 @@ Your responses must be precise, quantitative, and suitable for institutional inv
 
             model_info = {
                 "model": metadata["model"],
-                "temperature": self.config.ollama.temperatures.get_temperature('balanced'),  # Synthesis uses balanced temperature (0.1)
+                "temperature": self.config.ollama.temperatures.get_temperature(
+                    "balanced"
+                ),  # Synthesis uses balanced temperature (0.1)
                 "top_p": 0.9,
                 "num_ctx": 32768,
                 "num_predict": 4096,

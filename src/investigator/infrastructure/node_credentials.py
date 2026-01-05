@@ -25,9 +25,9 @@ Usage in workflow nodes:
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
-from enum import Enum
 from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 
 from investigator.infrastructure.credentials import (
     DatabaseCredentials,
@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 class CredentialType(Enum):
     """Types of credentials that can be required by nodes."""
+
     DATABASE = "database"
     API_KEY = "api_key"
     AWS = "aws"
@@ -49,6 +50,7 @@ class CredentialType(Enum):
 @dataclass
 class CredentialRequirement:
     """Specification for a required credential."""
+
     type: CredentialType
     name: str  # e.g., "sec", "stock", "anthropic"
     required: bool = True  # If False, node can proceed without it
@@ -58,6 +60,7 @@ class CredentialRequirement:
 @dataclass
 class CredentialAuditEntry:
     """Audit log entry for credential access."""
+
     timestamp: datetime
     node_id: str
     credential_type: str
@@ -83,7 +86,7 @@ class CredentialAuditLogger:
         access_granted: bool,
         source: str,
         duration_ms: float = 0.0,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ) -> None:
         """Log a credential access attempt."""
         entry = CredentialAuditEntry(
@@ -101,7 +104,7 @@ class CredentialAuditLogger:
 
         # Rotate if too many entries
         if len(cls._entries) > cls._max_entries:
-            cls._entries = cls._entries[-cls._max_entries:]
+            cls._entries = cls._entries[-cls._max_entries :]
 
         # Log to standard logger
         if access_granted:
@@ -164,12 +167,14 @@ class CredentialAuditLogger:
 
         # Pattern 1: Excessive access frequency
         if len(recent_entries) > 100:
-            violations.append({
-                "pattern": "excessive_frequency",
-                "severity": "high",
-                "message": f"Excessive credential access: {len(recent_entries)} accesses in last minute",
-                "count": len(recent_entries),
-            })
+            violations.append(
+                {
+                    "pattern": "excessive_frequency",
+                    "severity": "high",
+                    "message": f"Excessive credential access: {len(recent_entries)} accesses in last minute",
+                    "count": len(recent_entries),
+                }
+            )
 
         # Pattern 2: High failure rate per credential
         cred_stats: Dict[str, Dict[str, int]] = {}
@@ -185,28 +190,29 @@ class CredentialAuditLogger:
         for cred_key, stats in cred_stats.items():
             total = stats["success"] + stats["failure"]
             if total >= 5 and stats["failure"] / total > 0.5:
-                violations.append({
-                    "pattern": "high_failure_rate",
-                    "severity": "medium",
-                    "message": f"High failure rate for {cred_key}: {stats['failure']}/{total} failed",
-                    "credential": cred_key,
-                    "failure_rate": stats["failure"] / total,
-                })
+                violations.append(
+                    {
+                        "pattern": "high_failure_rate",
+                        "severity": "medium",
+                        "message": f"High failure rate for {cred_key}: {stats['failure']}/{total} failed",
+                        "credential": cred_key,
+                        "failure_rate": stats["failure"] / total,
+                    }
+                )
 
         # Pattern 3: Off-hours access (6am-10pm considered normal)
         current_hour = now.hour
         if current_hour < 6 or current_hour >= 22:
-            off_hours_entries = [
-                e for e in recent_entries
-                if e.timestamp.hour < 6 or e.timestamp.hour >= 22
-            ]
+            off_hours_entries = [e for e in recent_entries if e.timestamp.hour < 6 or e.timestamp.hour >= 22]
             if off_hours_entries:
-                violations.append({
-                    "pattern": "off_hours_access",
-                    "severity": "low",
-                    "message": f"Credential access outside normal hours: {len(off_hours_entries)} accesses",
-                    "count": len(off_hours_entries),
-                })
+                violations.append(
+                    {
+                        "pattern": "off_hours_access",
+                        "severity": "low",
+                        "message": f"Credential access outside normal hours: {len(off_hours_entries)} accesses",
+                        "count": len(off_hours_entries),
+                    }
+                )
 
         # Pattern 4: Unusual node accessing sensitive credentials
         # Track which nodes typically access which credentials
@@ -221,26 +227,25 @@ class CredentialAuditLogger:
         for entry in recent_entries:
             cred_key = f"{entry.credential_type}:{entry.credential_name}"
             # Get all nodes that have accessed this credential
-            nodes_for_cred = [
-                n for n, creds in node_cred_access.items()
-                if cred_key in creds
-            ]
+            nodes_for_cred = [n for n, creds in node_cred_access.items() if cred_key in creds]
             # If this is a new node accessing an established credential
             if len(nodes_for_cred) > 3:  # Established credential
                 # Check if this node has only recently started accessing it
                 node_history = [
-                    e for e in cls._entries
-                    if e.node_id == entry.node_id
-                    and f"{e.credential_type}:{e.credential_name}" == cred_key
+                    e
+                    for e in cls._entries
+                    if e.node_id == entry.node_id and f"{e.credential_type}:{e.credential_name}" == cred_key
                 ]
                 if len(node_history) <= 2:  # New accessor
-                    violations.append({
-                        "pattern": "new_accessor",
-                        "severity": "low",
-                        "message": f"Node '{entry.node_id}' newly accessing {cred_key}",
-                        "node_id": entry.node_id,
-                        "credential": cred_key,
-                    })
+                    violations.append(
+                        {
+                            "pattern": "new_accessor",
+                            "severity": "low",
+                            "message": f"Node '{entry.node_id}' newly accessing {cred_key}",
+                            "node_id": entry.node_id,
+                            "credential": cred_key,
+                        }
+                    )
 
         return violations
 
@@ -308,6 +313,7 @@ class NodeCredentialContext:
         # Try to get Victor framework credential manager
         try:
             from victor.workflows.services.credentials import get_credential_manager
+
             self._victor_cred_mgr = get_credential_manager()
         except ImportError:
             pass
@@ -329,18 +335,22 @@ class NodeCredentialContext:
                     parts = cred_spec.split(":")
                     if len(parts) == 2:
                         cred_type = CredentialType(parts[0])
-                        requirements.append(CredentialRequirement(
-                            type=cred_type,
-                            name=parts[1],
-                        ))
+                        requirements.append(
+                            CredentialRequirement(
+                                type=cred_type,
+                                name=parts[1],
+                            )
+                        )
                 elif isinstance(cred_spec, dict):
                     # Full format: {"type": "database", "name": "sec", "required": true}
-                    requirements.append(CredentialRequirement(
-                        type=CredentialType(cred_spec["type"]),
-                        name=cred_spec["name"],
-                        required=cred_spec.get("required", True),
-                        scopes=cred_spec.get("scopes", []),
-                    ))
+                    requirements.append(
+                        CredentialRequirement(
+                            type=CredentialType(cred_spec["type"]),
+                            name=cred_spec["name"],
+                            required=cred_spec.get("required", True),
+                            scopes=cred_spec.get("scopes", []),
+                        )
+                    )
 
         return cls(
             node_id=getattr(node, "id", "unknown"),
@@ -481,16 +491,12 @@ class NodeCredentialContext:
             if req.type == CredentialType.DATABASE:
                 creds = self.get_database(req.name)
                 if req.required and not creds:
-                    errors.append(
-                        f"Required database credential '{req.name}' not available"
-                    )
+                    errors.append(f"Required database credential '{req.name}' not available")
 
             elif req.type == CredentialType.API_KEY:
                 key = self.get_api_key(req.name)
                 if req.required and not key:
-                    errors.append(
-                        f"Required API key '{req.name}' not available"
-                    )
+                    errors.append(f"Required API key '{req.name}' not available")
 
         return errors
 
@@ -568,9 +574,7 @@ def inject_credentials_middleware(handler_func):
         # Validate requirements
         errors = cred_ctx.validate_requirements()
         if errors:
-            logger.warning(
-                f"Node {node.id} credential validation warnings: {errors}"
-            )
+            logger.warning(f"Node {node.id} credential validation warnings: {errors}")
 
         # Check if handler accepts cred_ctx
         sig = inspect.signature(handler_func)

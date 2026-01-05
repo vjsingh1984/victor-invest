@@ -9,9 +9,9 @@ Handles SEC submission data parsing, filtering, and processing with support for 
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

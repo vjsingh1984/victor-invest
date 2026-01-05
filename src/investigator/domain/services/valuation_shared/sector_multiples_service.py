@@ -166,9 +166,7 @@ class SectorMultiplesService:
             if industry in self.INDUSTRY_PE_OVERRIDES:
                 return self.INDUSTRY_PE_OVERRIDES[industry]
             # Try from config
-            industry_override = self._config.get(
-                f"pe_multiples.industry_overrides.{industry}"
-            )
+            industry_override = self._config.get(f"pe_multiples.industry_overrides.{industry}")
             if industry_override is not None:
                 return float(industry_override)
 
@@ -218,11 +216,7 @@ class SectorMultiplesService:
         normalized = self.normalize_sector(sector)
         return self._config.get_sector_ev_ebitda_multiple(normalized)
 
-    def get_multiples(
-        self,
-        sector: str,
-        industry: Optional[str] = None
-    ) -> Dict[str, float]:
+    def get_multiples(self, sector: str, industry: Optional[str] = None) -> Dict[str, float]:
         """
         Get all multiples for a sector.
 
@@ -240,12 +234,7 @@ class SectorMultiplesService:
             "ev_ebitda": self.get_ev_ebitda(sector, industry),
         }
 
-    def get_multiple(
-        self,
-        multiple_type: str,
-        sector: str,
-        industry: Optional[str] = None
-    ) -> float:
+    def get_multiple(self, multiple_type: str, sector: str, industry: Optional[str] = None) -> float:
         """
         Get a specific multiple type for a sector.
 
@@ -271,10 +260,7 @@ class SectorMultiplesService:
         elif type_lower in ("ev_ebitda", "evebitda", "ev/ebitda"):
             return self.get_ev_ebitda(sector, industry)
         else:
-            raise ValueError(
-                f"Unknown multiple type: {multiple_type}. "
-                f"Use one of: pe, ps, pb, ev_ebitda"
-            )
+            raise ValueError(f"Unknown multiple type: {multiple_type}. " f"Use one of: pe, ps, pb, ev_ebitda")
 
 
 # Convenience functions for backward compatibility

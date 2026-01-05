@@ -27,9 +27,9 @@ Usage:
 
 import json
 import logging
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class WeightAdjustment:
     """Single weight adjustment record."""
+
     model: str
     source: str  # e.g., 'market_context', 'data_quality', 'sector'
     multiplier: float
@@ -46,6 +47,7 @@ class WeightAdjustment:
 @dataclass
 class AuditStep:
     """A single step in the weight audit trail."""
+
     step_number: int
     step_name: str
     timestamp: str
@@ -62,10 +64,10 @@ class AuditStep:
             after = self.weights_after.get(model, 0)
             if abs(after - before) > 0.01:
                 changes[model] = {
-                    'before': round(before, 2),
-                    'after': round(after, 2),
-                    'delta': round(after - before, 2),
-                    'delta_pct': round((after - before) / before * 100, 1) if before > 0 else 0
+                    "before": round(before, 2),
+                    "after": round(after, 2),
+                    "delta": round(after - before, 2),
+                    "delta_pct": round((after - before) / before * 100, 1) if before > 0 else 0,
                 }
         return changes
 
@@ -73,6 +75,7 @@ class AuditStep:
 @dataclass
 class AuditSummary:
     """Summary of the full audit trail."""
+
     symbol: str
     total_steps: int
     initial_weights: Dict[str, float]
@@ -136,7 +139,7 @@ class WeightAuditTrail:
         weights_before: Dict[str, float],
         weights_after: Dict[str, float],
         adjustments: List[WeightAdjustment],
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Capture a snapshot of weights at a step.
@@ -156,7 +159,7 @@ class WeightAuditTrail:
             weights_before=weights_before.copy(),
             weights_after=weights_after.copy(),
             adjustments=adjustments,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         self.steps.append(step)
@@ -164,14 +167,10 @@ class WeightAuditTrail:
         # Log step summary
         changes = step.get_changes()
         if changes:
-            logger.debug(
-                f"[{self.symbol}] Step {step_number} ({step_name}): "
-                f"{len(changes)} models changed"
-            )
+            logger.debug(f"[{self.symbol}] Step {step_number} ({step_name}): " f"{len(changes)} models changed")
             for model, change in changes.items():
                 logger.debug(
-                    f"  {model}: {change['before']:.1f}% → {change['after']:.1f}% "
-                    f"({change['delta']:+.1f}%)"
+                    f"  {model}: {change['before']:.1f}% → {change['after']:.1f}% " f"({change['delta']:+.1f}%)"
                 )
 
     def mark_bounds_applied(self) -> None:
@@ -192,7 +191,7 @@ class WeightAuditTrail:
                 initial_weights={},
                 final_weights={},
                 total_adjustments=0,
-                bounds_applied=self.bounds_applied
+                bounds_applied=self.bounds_applied,
             )
 
         # Get initial and final weights
@@ -209,13 +208,9 @@ class WeightAuditTrail:
         for step in self.steps:
             changes = step.get_changes()
             for model, change in changes.items():
-                if abs(change['delta']) > max_delta:
-                    max_delta = abs(change['delta'])
-                    largest_change = {
-                        'model': model,
-                        'step': step.step_name,
-                        **change
-                    }
+                if abs(change["delta"]) > max_delta:
+                    max_delta = abs(change["delta"])
+                    largest_change = {"model": model, "step": step.step_name, **change}
 
         # Collect warnings
         warnings = []
@@ -226,8 +221,7 @@ class WeightAuditTrail:
                 change_pct = (final - initial) / initial * 100
                 if abs(change_pct) > 50:
                     warnings.append(
-                        f"{model}: Weight changed by {change_pct:+.0f}% "
-                        f"({initial:.1f}% → {final:.1f}%)"
+                        f"{model}: Weight changed by {change_pct:+.0f}% " f"({initial:.1f}% → {final:.1f}%)"
                     )
 
         return AuditSummary(
@@ -238,22 +232,16 @@ class WeightAuditTrail:
             total_adjustments=total_adjustments,
             bounds_applied=self.bounds_applied,
             largest_change=largest_change,
-            warnings=warnings
+            warnings=warnings,
         )
 
     def log_summary(self) -> None:
         """Log a human-readable summary of the audit trail."""
         summary = self.get_summary()
 
-        logger.info(
-            f"╔══════════════════════════════════════════════════════════╗"
-        )
-        logger.info(
-            f"║ WEIGHT AUDIT TRAIL: {self.symbol:^38} ║"
-        )
-        logger.info(
-            f"╠══════════════════════════════════════════════════════════╣"
-        )
+        logger.info(f"╔══════════════════════════════════════════════════════════╗")
+        logger.info(f"║ WEIGHT AUDIT TRAIL: {self.symbol:^38} ║")
+        logger.info(f"╠══════════════════════════════════════════════════════════╣")
 
         # Steps overview
         logger.info(
@@ -273,17 +261,13 @@ class WeightAuditTrail:
         for model, weight in summary.final_weights.items():
             initial = summary.initial_weights.get(model, 0)
             delta = weight - initial
-            logger.info(
-                f"║   {model:12}: {weight:6.1f}% ({delta:+5.1f}%)                     ║"
-            )
+            logger.info(f"║   {model:12}: {weight:6.1f}% ({delta:+5.1f}%)                     ║")
 
         # Largest change
         if summary.largest_change:
             lc = summary.largest_change
             logger.info(f"╠══════════════════════════════════════════════════════════╣")
-            logger.info(
-                f"║ LARGEST CHANGE: {lc['model']} in {lc['step'][:20]:20}       ║"
-            )
+            logger.info(f"║ LARGEST CHANGE: {lc['model']} in {lc['step'][:20]:20}       ║")
             logger.info(
                 f"║   {lc['before']:.1f}% → {lc['after']:.1f}% ({lc['delta']:+.1f}%)                            ║"
             )
@@ -295,9 +279,7 @@ class WeightAuditTrail:
             for warning in summary.warnings[:3]:  # Limit to 3
                 logger.info(f"║   ⚠️  {warning[:50]:50} ║")
 
-        logger.info(
-            f"╚══════════════════════════════════════════════════════════╝"
-        )
+        logger.info(f"╚══════════════════════════════════════════════════════════╝")
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -309,38 +291,38 @@ class WeightAuditTrail:
         summary = self.get_summary()
 
         return {
-            'symbol': self.symbol,
-            'started_at': self.started_at,
-            'summary': {
-                'total_steps': summary.total_steps,
-                'total_adjustments': summary.total_adjustments,
-                'bounds_applied': summary.bounds_applied,
-                'initial_weights': summary.initial_weights,
-                'final_weights': summary.final_weights,
-                'largest_change': summary.largest_change,
-                'warnings': summary.warnings,
+            "symbol": self.symbol,
+            "started_at": self.started_at,
+            "summary": {
+                "total_steps": summary.total_steps,
+                "total_adjustments": summary.total_adjustments,
+                "bounds_applied": summary.bounds_applied,
+                "initial_weights": summary.initial_weights,
+                "final_weights": summary.final_weights,
+                "largest_change": summary.largest_change,
+                "warnings": summary.warnings,
             },
-            'steps': [
+            "steps": [
                 {
-                    'step_number': step.step_number,
-                    'step_name': step.step_name,
-                    'timestamp': step.timestamp,
-                    'weights_before': step.weights_before,
-                    'weights_after': step.weights_after,
-                    'changes': step.get_changes(),
-                    'adjustments': [
+                    "step_number": step.step_number,
+                    "step_name": step.step_name,
+                    "timestamp": step.timestamp,
+                    "weights_before": step.weights_before,
+                    "weights_after": step.weights_after,
+                    "changes": step.get_changes(),
+                    "adjustments": [
                         {
-                            'model': adj.model,
-                            'source': adj.source,
-                            'multiplier': adj.multiplier,
-                            'reason': adj.reason,
+                            "model": adj.model,
+                            "source": adj.source,
+                            "multiplier": adj.multiplier,
+                            "reason": adj.reason,
                         }
                         for adj in step.adjustments
                     ],
-                    'metadata': step.metadata,
+                    "metadata": step.metadata,
                 }
                 for step in self.steps
-            ]
+            ],
         }
 
     def to_json(self, indent: int = 2) -> str:

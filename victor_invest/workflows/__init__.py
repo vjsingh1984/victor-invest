@@ -57,7 +57,7 @@ workflow handler registry. YAML workflows reference handlers by path.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from victor.framework.workflows import BaseYAMLWorkflowProvider
 
@@ -72,14 +72,14 @@ from victor_invest.workflows.graphs import (
     run_analysis,
     run_yaml_analysis,
 )
-from victor_invest.workflows.state import AnalysisMode, AnalysisWorkflowState
 from victor_invest.workflows.rl_backtest import (
     RLBacktestWorkflowState,
     build_rl_backtest_graph,
+    generate_lookback_list,
     run_rl_backtest,
     run_rl_backtest_batch,
-    generate_lookback_list,
 )
+from victor_invest.workflows.state import AnalysisMode, AnalysisWorkflowState
 
 
 class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
@@ -212,11 +212,12 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
                 synthesis = result.context.get("synthesis")
                 print(f"Recommendation: {synthesis.get('recommendation')}")
         """
-        from victor.framework import Agent
         from victor.core.verticals import VerticalRegistry
+        from victor.framework import Agent
         from victor.workflows.executor import WorkflowExecutor
-        from victor_invest.vertical import InvestmentVertical
+
         from victor_invest.role_provider import register_investment_role_provider
+        from victor_invest.vertical import InvestmentVertical
 
         workflow = self.get_workflow(workflow_name)
         if not workflow:
@@ -226,6 +227,7 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
         if model is None and provider == "ollama":
             try:
                 from investigator.config import get_config
+
                 config = get_config()
                 model = config.ollama.models.get("synthesis", "gpt-oss:20b")
             except Exception:

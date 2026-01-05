@@ -25,7 +25,6 @@ from investigator.domain.models.analysis import (
 # Import CacheType for cache operations
 from investigator.infrastructure.cache.cache_types import CacheType
 
-
 # ========================================================================================
 # Helper Functions
 # ========================================================================================

@@ -37,9 +37,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from scipy import linalg
 
-from investigator.domain.services.rl.models import ValuationContext
-from investigator.domain.services.rl.policy.base import RLPolicy, VALUATION_MODELS
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
+from investigator.domain.services.rl.models import ValuationContext
+from investigator.domain.services.rl.policy.base import VALUATION_MODELS, RLPolicy
 
 logger = logging.getLogger(__name__)
 

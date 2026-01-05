@@ -20,10 +20,10 @@ Author: Claude Code (Victor-Core Migration)
 Date: 2025-12-29
 """
 
-from typing import Dict, Tuple, Optional, List
+import logging
 from dataclasses import dataclass, field
 from datetime import date
-import logging
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

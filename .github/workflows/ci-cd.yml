@@ -40,11 +40,9 @@ jobs:
 
       - name: Run Black formatter check
         run: black --check src/ victor_invest/ tests/ --exclude='/(\.eggs|\.git|\.venv|build|dist|archive)/'
-        continue-on-error: true
 
       - name: Run isort import checker
         run: isort --check-only src/ victor_invest/ tests/
-        continue-on-error: true
 
       - name: Run Flake8 linter
         run: flake8 src/ victor_invest/ --count --select=E9,F63,F7,F82 --show-source --statistics

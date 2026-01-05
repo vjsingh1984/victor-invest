@@ -38,8 +38,8 @@ Example:
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from .valuation_config_service import ValuationConfigService
 from .sector_multiples_service import SectorMultiplesService
+from .valuation_config_service import ValuationConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -382,11 +382,13 @@ class FairValueService:
                     min_fv = current_price * min_downside_multiple
                     fair_value = max(min_fv, min(fair_value, max_fv))
                     if fair_value != original_fv:
-                        models_capped.append({
-                            "model": model,
-                            "original": original_fv,
-                            "capped": fair_value,
-                        })
+                        models_capped.append(
+                            {
+                                "model": model,
+                                "original": original_fv,
+                                "capped": fair_value,
+                            }
+                        )
                         logger.debug(
                             f"Capped {model} fair value: ${original_fv:.2f} → ${fair_value:.2f} "
                             f"(price: ${current_price:.2f}, max: {max_upside_multiple}x)"
@@ -397,12 +399,14 @@ class FairValueService:
 
                 weighted_sum += fair_value * w
                 total_weight += w
-                models_used.append({
-                    "model": model,
-                    "fair_value": fair_value,
-                    "weight": w,
-                    "contribution": fair_value * w,
-                })
+                models_used.append(
+                    {
+                        "model": model,
+                        "fair_value": fair_value,
+                        "weight": w,
+                        "contribution": fair_value * w,
+                    }
+                )
 
         if total_weight > 0:
             blended = weighted_sum / total_weight

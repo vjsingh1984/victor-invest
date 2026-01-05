@@ -52,20 +52,22 @@ SKEW_URL = "https://cdn.cboe.com/api/global/delayed_quotes/charts/historical/_SK
 
 class VolatilityRegime(Enum):
     """Classification of volatility regime."""
-    VERY_LOW = "very_low"        # VIX < 12
-    LOW = "low"                  # 12-15
-    NORMAL = "normal"            # 15-20
-    ELEVATED = "elevated"        # 20-25
-    HIGH = "high"                # 25-35
-    EXTREME = "extreme"          # > 35
+
+    VERY_LOW = "very_low"  # VIX < 12
+    LOW = "low"  # 12-15
+    NORMAL = "normal"  # 15-20
+    ELEVATED = "elevated"  # 20-25
+    HIGH = "high"  # 25-35
+    EXTREME = "extreme"  # > 35
 
 
 class TermStructure(Enum):
     """VIX term structure shape."""
-    STEEP_CONTANGO = "steep_contango"      # > 10% upward slope
-    CONTANGO = "contango"                  # Normal upward slope
-    FLAT = "flat"                          # Near flat
-    BACKWARDATION = "backwardation"        # Inverted, fear signal
+
+    STEEP_CONTANGO = "steep_contango"  # > 10% upward slope
+    CONTANGO = "contango"  # Normal upward slope
+    FLAT = "flat"  # Near flat
+    BACKWARDATION = "backwardation"  # Inverted, fear signal
     STEEP_BACKWARDATION = "steep_backwardation"  # Severe stress
 
 
@@ -84,6 +86,7 @@ class VIXData:
         change_pct: Percentage change
         regime: Classified volatility regime
     """
+
     date: date
     vix_spot: float
     vix_open: Optional[float] = None
@@ -130,6 +133,7 @@ class VIXTermStructure:
         structure: Classified term structure shape
         contango_ratio: Front month / Spot ratio
     """
+
     date: date
     spot: float
     front_month: Optional[float] = None
@@ -201,6 +205,7 @@ class SKEWData:
         change: Daily change
         percentile_90d: 90-day percentile rank
     """
+
     date: date
     skew: float
     previous: Optional[float] = None
@@ -232,6 +237,7 @@ class PutCallRatio:
         volume_puts: Put volume
         volume_calls: Call volume
     """
+
     date: date
     total_ratio: float
     equity_ratio: Optional[float] = None
@@ -273,6 +279,7 @@ class CBOEClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()

@@ -24,9 +24,9 @@ Usage:
     result = sanitizer.scan(data)
 """
 
+import hashlib
 import logging
 import re
-import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 class CredentialPattern(Enum):
     """Types of credential patterns to detect."""
+
     API_KEY = "api_key"
     PASSWORD = "password"
     SECRET = "secret"
@@ -52,6 +53,7 @@ class CredentialPattern(Enum):
 @dataclass
 class CredentialFinding:
     """A detected credential in output."""
+
     pattern_type: CredentialPattern
     location: str  # Where found (field path, line number, etc.)
     matched_text: str  # The redacted version of what matched
@@ -73,6 +75,7 @@ class CredentialFinding:
 @dataclass
 class ScanResult:
     """Result of credential scan."""
+
     has_credentials: bool
     findings: List[CredentialFinding]
     scanned_at: datetime
@@ -96,11 +99,11 @@ CREDENTIAL_PATTERNS: Dict[CredentialPattern, List[Tuple[Pattern, float, str]]] =
         (re.compile(r'["\']?api[_-]?key["\']?\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})["\']?', re.I), 0.9, "high"),
         (re.compile(r'["\']?apikey["\']?\s*[=:]\s*["\']?([a-zA-Z0-9_\-]{20,})["\']?', re.I), 0.9, "high"),
         # Anthropic API key
-        (re.compile(r'sk-ant-[a-zA-Z0-9_\-]{40,}', re.I), 0.95, "high"),
+        (re.compile(r"sk-ant-[a-zA-Z0-9_\-]{40,}", re.I), 0.95, "high"),
         # OpenAI API key
-        (re.compile(r'sk-[a-zA-Z0-9]{48,}'), 0.95, "high"),
+        (re.compile(r"sk-[a-zA-Z0-9]{48,}"), 0.95, "high"),
         # Generic sk- pattern
-        (re.compile(r'sk-[a-zA-Z0-9_\-]{20,}'), 0.8, "high"),
+        (re.compile(r"sk-[a-zA-Z0-9_\-]{20,}"), 0.8, "high"),
     ],
     CredentialPattern.PASSWORD: [
         (re.compile(r'["\']?password["\']?\s*[=:]\s*["\']?([^\s"\']{8,})["\']?', re.I), 0.85, "high"),
@@ -118,31 +121,37 @@ CREDENTIAL_PATTERNS: Dict[CredentialPattern, List[Tuple[Pattern, float, str]]] =
     ],
     CredentialPattern.CONNECTION_STRING: [
         # PostgreSQL connection string
-        (re.compile(r'postgresql://[^:]+:([^@]+)@[^\s]+', re.I), 0.95, "high"),
+        (re.compile(r"postgresql://[^:]+:([^@]+)@[^\s]+", re.I), 0.95, "high"),
         # MySQL connection string
-        (re.compile(r'mysql://[^:]+:([^@]+)@[^\s]+', re.I), 0.95, "high"),
+        (re.compile(r"mysql://[^:]+:([^@]+)@[^\s]+", re.I), 0.95, "high"),
         # MongoDB connection string
-        (re.compile(r'mongodb(\+srv)?://[^:]+:([^@]+)@[^\s]+', re.I), 0.95, "high"),
+        (re.compile(r"mongodb(\+srv)?://[^:]+:([^@]+)@[^\s]+", re.I), 0.95, "high"),
         # Redis connection string
-        (re.compile(r'redis://[^:]+:([^@]+)@[^\s]+', re.I), 0.95, "high"),
+        (re.compile(r"redis://[^:]+:([^@]+)@[^\s]+", re.I), 0.95, "high"),
     ],
     CredentialPattern.PRIVATE_KEY: [
-        (re.compile(r'-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----', re.I), 0.99, "high"),
-        (re.compile(r'-----BEGIN PGP PRIVATE KEY BLOCK-----', re.I), 0.99, "high"),
+        (re.compile(r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", re.I), 0.99, "high"),
+        (re.compile(r"-----BEGIN PGP PRIVATE KEY BLOCK-----", re.I), 0.99, "high"),
     ],
     CredentialPattern.AWS_KEY: [
         # AWS Access Key ID
-        (re.compile(r'AKIA[0-9A-Z]{16}'), 0.95, "high"),
+        (re.compile(r"AKIA[0-9A-Z]{16}"), 0.95, "high"),
         # AWS Secret Access Key
-        (re.compile(r'["\']?aws[_-]?secret[_-]?access[_-]?key["\']?\s*[=:]\s*["\']?([a-zA-Z0-9/+=]{40})["\']?', re.I), 0.95, "high"),
+        (
+            re.compile(
+                r'["\']?aws[_-]?secret[_-]?access[_-]?key["\']?\s*[=:]\s*["\']?([a-zA-Z0-9/+=]{40})["\']?', re.I
+            ),
+            0.95,
+            "high",
+        ),
     ],
     CredentialPattern.BEARER_TOKEN: [
-        (re.compile(r'Bearer\s+([a-zA-Z0-9_\-\.]{20,})', re.I), 0.9, "high"),
-        (re.compile(r'Authorization:\s*Bearer\s+([a-zA-Z0-9_\-\.]{20,})', re.I), 0.95, "high"),
+        (re.compile(r"Bearer\s+([a-zA-Z0-9_\-\.]{20,})", re.I), 0.9, "high"),
+        (re.compile(r"Authorization:\s*Bearer\s+([a-zA-Z0-9_\-\.]{20,})", re.I), 0.95, "high"),
     ],
     CredentialPattern.BASIC_AUTH: [
-        (re.compile(r'Basic\s+([a-zA-Z0-9+/=]{20,})', re.I), 0.85, "high"),
-        (re.compile(r'Authorization:\s*Basic\s+([a-zA-Z0-9+/=]{20,})', re.I), 0.9, "high"),
+        (re.compile(r"Basic\s+([a-zA-Z0-9+/=]{20,})", re.I), 0.85, "high"),
+        (re.compile(r"Authorization:\s*Basic\s+([a-zA-Z0-9+/=]{20,})", re.I), 0.9, "high"),
     ],
 }
 
@@ -251,6 +260,7 @@ def redact_credentials(text: str) -> str:
 
     for pattern_type, patterns in CREDENTIAL_PATTERNS.items():
         for regex, confidence, severity in patterns:
+
             def redactor(match):
                 if match.groups():
                     # Redact only the captured group
@@ -320,9 +330,7 @@ class CredentialSanitizer:
                 self._alert_callback(result)
 
             if self._strict_mode:
-                raise CredentialLeakageError(
-                    f"Credential leakage detected: {result.summary}"
-                )
+                raise CredentialLeakageError(f"Credential leakage detected: {result.summary}")
 
         return result
 
@@ -357,14 +365,16 @@ class CredentialSanitizer:
                 # Check if key name suggests sensitive data
                 if any(s in key.lower() for s in ["password", "secret", "token", "key", "credential"]):
                     if isinstance(value, str) and len(value) >= 8:
-                        findings.append(CredentialFinding(
-                            pattern_type=CredentialPattern.PASSWORD,
-                            location=new_path,
-                            matched_text=_redact_value(str(value)),
-                            confidence=0.8,
-                            severity="high",
-                            context=f"{key}=***",
-                        ))
+                        findings.append(
+                            CredentialFinding(
+                                pattern_type=CredentialPattern.PASSWORD,
+                                location=new_path,
+                                matched_text=_redact_value(str(value)),
+                                confidence=0.8,
+                                severity="high",
+                                context=f"{key}=***",
+                            )
+                        )
                         redacted[key] = _redact_value(str(value))
                         continue
 
@@ -372,10 +382,7 @@ class CredentialSanitizer:
             return redacted
 
         elif isinstance(data, list):
-            return [
-                self._scan_recursive(item, f"{path}[{i}]", findings)
-                for i, item in enumerate(data)
-            ]
+            return [self._scan_recursive(item, f"{path}[{i}]", findings) for i, item in enumerate(data)]
 
         else:
             # For other types, convert to string and check
@@ -413,9 +420,7 @@ class CredentialSanitizer:
 
         for scan in self._scan_history:
             for finding in scan.findings:
-                by_pattern[finding.pattern_type.value] = by_pattern.get(
-                    finding.pattern_type.value, 0
-                ) + 1
+                by_pattern[finding.pattern_type.value] = by_pattern.get(finding.pattern_type.value, 0) + 1
                 by_severity[finding.severity] += 1
 
         return {
@@ -430,6 +435,7 @@ class CredentialSanitizer:
 
 class CredentialLeakageError(Exception):
     """Raised when credential leakage is detected in strict mode."""
+
     pass
 
 
@@ -439,6 +445,7 @@ def create_output_sanitizer() -> CredentialSanitizer:
     Returns:
         Configured CredentialSanitizer
     """
+
     def alert_handler(result: ScanResult):
         logger.error(
             f"[SECURITY_ALERT] Potential credential leakage detected!\n"

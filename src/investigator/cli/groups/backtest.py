@@ -5,7 +5,7 @@ RL Backtest and training commands for InvestiGator CLI
 import asyncio
 import json
 import sys
-from datetime import datetime, date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -30,49 +30,14 @@ def backtest(ctx):
 
 
 @backtest.command("run")
-@click.option(
-    "--symbols", "-s",
-    help="Comma-separated list of symbols (default: all in rl_decisions)"
-)
-@click.option(
-    "--lookback", "-l",
-    default=365,
-    type=int,
-    help="Lookback period in days"
-)
-@click.option(
-    "--start-date",
-    callback=validate_date,
-    help="Start date (YYYY-MM-DD)"
-)
-@click.option(
-    "--end-date",
-    callback=validate_date,
-    help="End date (YYYY-MM-DD)"
-)
-@click.option(
-    "--parallel", "-p",
-    default=5,
-    type=int,
-    help="Number of parallel workers"
-)
-@click.option(
-    "--min-confidence",
-    default=0.6,
-    type=float,
-    help="Minimum confidence threshold (0.0-1.0)"
-)
-@click.option(
-    "--holding-days",
-    default=30,
-    type=int,
-    help="Holding period in days"
-)
-@click.option(
-    "--output", "-o",
-    type=click.Path(),
-    help="Output file for results"
-)
+@click.option("--symbols", "-s", help="Comma-separated list of symbols (default: all in rl_decisions)")
+@click.option("--lookback", "-l", default=365, type=int, help="Lookback period in days")
+@click.option("--start-date", callback=validate_date, help="Start date (YYYY-MM-DD)")
+@click.option("--end-date", callback=validate_date, help="End date (YYYY-MM-DD)")
+@click.option("--parallel", "-p", default=5, type=int, help="Number of parallel workers")
+@click.option("--min-confidence", default=0.6, type=float, help="Minimum confidence threshold (0.0-1.0)")
+@click.option("--holding-days", default=30, type=int, help="Holding period in days")
+@click.option("--output", "-o", type=click.Path(), help="Output file for results")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 @click.pass_context
 def run_backtest(ctx, symbols, lookback, start_date, end_date, parallel, min_confidence, holding_days, output, verbose):
@@ -101,6 +66,7 @@ def run_backtest(ctx, symbols, lookback, start_date, end_date, parallel, min_con
     try:
         # Import the backtest runner
         import sys
+
         sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent))
         from scripts.rl_backtest import RLBacktester
 
@@ -141,46 +107,23 @@ def run_backtest(ctx, symbols, lookback, start_date, end_date, parallel, min_con
         click.echo(f"Backtest failed: {e}", err=True)
         if verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
 
 
 @backtest.command("train")
-@click.option(
-    "--epochs", "-e",
-    default=100,
-    type=int,
-    help="Number of training epochs"
-)
-@click.option(
-    "--batch-size", "-b",
-    default=32,
-    type=int,
-    help="Training batch size"
-)
-@click.option(
-    "--learning-rate", "-lr",
-    default=0.001,
-    type=float,
-    help="Learning rate"
-)
-@click.option(
-    "--min-samples",
-    default=100,
-    type=int,
-    help="Minimum samples required for training"
-)
+@click.option("--epochs", "-e", default=100, type=int, help="Number of training epochs")
+@click.option("--batch-size", "-b", default=32, type=int, help="Training batch size")
+@click.option("--learning-rate", "-lr", default=0.001, type=float, help="Learning rate")
+@click.option("--min-samples", default=100, type=int, help="Minimum samples required for training")
 @click.option(
     "--policy",
     type=click.Choice(["contextual_bandit", "hybrid", "fundamental", "technical"]),
     default="hybrid",
-    help="Policy type to train"
+    help="Policy type to train",
 )
-@click.option(
-    "--output-dir", "-o",
-    default="models",
-    help="Output directory for trained model"
-)
+@click.option("--output-dir", "-o", default="models", help="Output directory for trained model")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
 @click.pass_context
 def train(ctx, epochs, batch_size, learning_rate, min_samples, policy, output_dir, verbose):
@@ -200,6 +143,7 @@ def train(ctx, epochs, batch_size, learning_rate, min_samples, policy, output_di
 
     try:
         import sys
+
         sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent))
         from scripts.rl_train import RLTrainer
 
@@ -235,6 +179,7 @@ def train(ctx, epochs, batch_size, learning_rate, min_samples, policy, output_di
         click.echo(f"Training failed: {e}", err=True)
         if verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
 
@@ -251,8 +196,9 @@ def status(ctx, detailed):
     click.echo("=" * 60)
 
     try:
-        from investigator.infrastructure.database.db import get_engine
         from sqlalchemy import text
+
+        from investigator.infrastructure.database.db import get_engine
 
         engine = get_engine()
 
@@ -262,20 +208,22 @@ def status(ctx, detailed):
             total_decisions = result.scalar()
 
             # Count outcomes
-            result = conn.execute(text(
-                "SELECT COUNT(*) FROM rl_decisions WHERE actual_return IS NOT NULL"
-            ))
+            result = conn.execute(text("SELECT COUNT(*) FROM rl_decisions WHERE actual_return IS NOT NULL"))
             with_outcomes = result.scalar()
 
             # Recent accuracy
-            result = conn.execute(text("""
+            result = conn.execute(
+                text(
+                    """
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN correct THEN 1 ELSE 0 END) as correct
                 FROM rl_decisions
                 WHERE actual_return IS NOT NULL
                 AND decision_timestamp > NOW() - INTERVAL '30 days'
-            """))
+            """
+                )
+            )
             row = result.fetchone()
             recent_total = row[0] if row else 0
             recent_correct = row[1] if row else 0
@@ -294,7 +242,9 @@ def status(ctx, detailed):
         if detailed:
             click.echo("\nDetailed breakdown by action:")
             with engine.connect() as conn:
-                result = conn.execute(text("""
+                result = conn.execute(
+                    text(
+                        """
                     SELECT
                         action,
                         COUNT(*) as count,
@@ -303,10 +253,11 @@ def status(ctx, detailed):
                     FROM rl_decisions
                     WHERE actual_return IS NOT NULL
                     GROUP BY action
-                """))
+                """
+                    )
+                )
                 for row in result:
-                    click.echo(f"  {row[0]}: {row[1]} decisions, "
-                              f"conf={row[2]:.2f}, ret={row[3]:.2%}")
+                    click.echo(f"  {row[0]}: {row[1]} decisions, " f"conf={row[2]:.2f}, ret={row[3]:.2%}")
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -326,6 +277,7 @@ def update_outcomes(ctx, days, force):
 
     try:
         import sys
+
         sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent))
         from scripts.rl_outcome_updater import update_outcomes
 
@@ -346,12 +298,7 @@ def update_outcomes(ctx, days, force):
 
 
 @backtest.command("analyze")
-@click.option(
-    "--period",
-    type=click.Choice(["7d", "30d", "90d", "365d", "all"]),
-    default="30d",
-    help="Analysis period"
-)
+@click.option("--period", type=click.Choice(["7d", "30d", "90d", "365d", "all"]), default="30d", help="Analysis period")
 @click.option("--output", "-o", type=click.Path(), help="Output file")
 @click.pass_context
 def analyze_results(ctx, period, output):
@@ -361,16 +308,11 @@ def analyze_results(ctx, period, output):
     """
     click.echo(f"Analyzing results for period: {period}")
 
-    period_days = {
-        "7d": 7,
-        "30d": 30,
-        "90d": 90,
-        "365d": 365,
-        "all": 9999
-    }
+    period_days = {"7d": 7, "30d": 30, "90d": 90, "365d": 365, "all": 9999}
 
     try:
         import sys
+
         sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent))
         from scripts.analyze_backtest import analyze_backtest_results
 

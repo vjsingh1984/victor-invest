@@ -35,11 +35,13 @@ logger = logging.getLogger(__name__)
 # DEFENSE CONTRACTOR CLASSIFICATION
 # ====================
 
+
 class DefenseContractorType(Enum):
     """Classification of defense contractor types."""
+
     PRIME_CONTRACTOR = "prime_contractor"  # Large primes (LMT, RTX, NOC, GD, BA)
-    TIER_1_SUPPLIER = "tier_1_supplier"    # Major systems integrators
-    TIER_2_SUPPLIER = "tier_2_supplier"    # Component/subsystem suppliers
+    TIER_1_SUPPLIER = "tier_1_supplier"  # Major systems integrators
+    TIER_2_SUPPLIER = "tier_2_supplier"  # Component/subsystem suppliers
     GOVERNMENT_SERVICES = "government_services"  # IT/services (SAIC, LDOS, BAH)
     AEROSPACE_DEFENSE = "aerospace_defense"  # Mixed commercial/defense
     UNKNOWN = "unknown"
@@ -60,33 +62,31 @@ DEFENSE_INDUSTRIES = [
 # Known defense contractor symbols for explicit mapping
 KNOWN_DEFENSE_CONTRACTORS: Dict[str, DefenseContractorType] = {
     # Prime Contractors
-    "LMT": DefenseContractorType.PRIME_CONTRACTOR,   # Lockheed Martin
-    "RTX": DefenseContractorType.PRIME_CONTRACTOR,   # Raytheon Technologies
-    "NOC": DefenseContractorType.PRIME_CONTRACTOR,   # Northrop Grumman
-    "GD": DefenseContractorType.PRIME_CONTRACTOR,    # General Dynamics
-    "BA": DefenseContractorType.AEROSPACE_DEFENSE,   # Boeing (mixed commercial)
-    "LHX": DefenseContractorType.PRIME_CONTRACTOR,   # L3Harris Technologies
-
+    "LMT": DefenseContractorType.PRIME_CONTRACTOR,  # Lockheed Martin
+    "RTX": DefenseContractorType.PRIME_CONTRACTOR,  # Raytheon Technologies
+    "NOC": DefenseContractorType.PRIME_CONTRACTOR,  # Northrop Grumman
+    "GD": DefenseContractorType.PRIME_CONTRACTOR,  # General Dynamics
+    "BA": DefenseContractorType.AEROSPACE_DEFENSE,  # Boeing (mixed commercial)
+    "LHX": DefenseContractorType.PRIME_CONTRACTOR,  # L3Harris Technologies
     # Government Services / IT
     "SAIC": DefenseContractorType.GOVERNMENT_SERVICES,  # Science Applications
     "LDOS": DefenseContractorType.GOVERNMENT_SERVICES,  # Leidos
-    "BAH": DefenseContractorType.GOVERNMENT_SERVICES,   # Booz Allen Hamilton
+    "BAH": DefenseContractorType.GOVERNMENT_SERVICES,  # Booz Allen Hamilton
     "CACI": DefenseContractorType.GOVERNMENT_SERVICES,  # CACI International
     "MANT": DefenseContractorType.GOVERNMENT_SERVICES,  # ManTech International
-    "PSN": DefenseContractorType.GOVERNMENT_SERVICES,   # Parsons Corporation
-    "KBR": DefenseContractorType.GOVERNMENT_SERVICES,   # KBR Inc
-
+    "PSN": DefenseContractorType.GOVERNMENT_SERVICES,  # Parsons Corporation
+    "KBR": DefenseContractorType.GOVERNMENT_SERVICES,  # KBR Inc
     # Tier 1/2 Suppliers
-    "HII": DefenseContractorType.TIER_1_SUPPLIER,    # Huntington Ingalls
-    "TXT": DefenseContractorType.TIER_1_SUPPLIER,    # Textron
-    "TDG": DefenseContractorType.TIER_1_SUPPLIER,    # TransDigm
-    "HEI": DefenseContractorType.TIER_1_SUPPLIER,    # Heico
+    "HII": DefenseContractorType.TIER_1_SUPPLIER,  # Huntington Ingalls
+    "TXT": DefenseContractorType.TIER_1_SUPPLIER,  # Textron
+    "TDG": DefenseContractorType.TIER_1_SUPPLIER,  # TransDigm
+    "HEI": DefenseContractorType.TIER_1_SUPPLIER,  # Heico
     "MOG.A": DefenseContractorType.TIER_2_SUPPLIER,  # Moog Inc
-    "CW": DefenseContractorType.TIER_2_SUPPLIER,     # Curtiss-Wright
-    "DCO": DefenseContractorType.TIER_2_SUPPLIER,    # Ducommun
-    "KTOS": DefenseContractorType.TIER_2_SUPPLIER,   # Kratos Defense
-    "MRCY": DefenseContractorType.TIER_2_SUPPLIER,   # Mercury Systems
-    "AXON": DefenseContractorType.TIER_2_SUPPLIER,   # Axon Enterprise
+    "CW": DefenseContractorType.TIER_2_SUPPLIER,  # Curtiss-Wright
+    "DCO": DefenseContractorType.TIER_2_SUPPLIER,  # Ducommun
+    "KTOS": DefenseContractorType.TIER_2_SUPPLIER,  # Kratos Defense
+    "MRCY": DefenseContractorType.TIER_2_SUPPLIER,  # Mercury Systems
+    "AXON": DefenseContractorType.TIER_2_SUPPLIER,  # Axon Enterprise
 }
 
 
@@ -98,14 +98,14 @@ DEFENSE_CONTRACTOR_TIER = {
     "name": "defense_contractor",
     "description": "Specialized tier for defense contractors with backlog-driven valuation",
     "weights": {
-        "ev_ebitda": 35,        # Primary multiple for defense (stable margins)
-        "pe": 30,               # P/E important for mature defense contractors
-        "dcf": 25,              # DCF with conservative growth assumptions
-        "backlog_value": 10,    # NEW: Value backlog at discount
+        "ev_ebitda": 35,  # Primary multiple for defense (stable margins)
+        "pe": 30,  # P/E important for mature defense contractors
+        "dcf": 25,  # DCF with conservative growth assumptions
+        "backlog_value": 10,  # NEW: Value backlog at discount
     },
     "parameters": {
-        "terminal_growth": 0.025,   # Defense spending grows slowly but steadily
-        "terminal_margin": 0.10,    # 10% operating margin typical for defense
+        "terminal_growth": 0.025,  # Defense spending grows slowly but steadily
+        "terminal_margin": 0.10,  # 10% operating margin typical for defense
         "discount_rate_adjustment": -0.005,  # Slightly lower risk premium (gov't customer)
         "backlog_discount_rate": 0.10,  # Discount rate for backlog valuation
     },
@@ -117,9 +117,11 @@ DEFENSE_CONTRACTOR_TIER = {
 # BACKLOG EXTRACTION (P2-B1)
 # ====================
 
+
 @dataclass
 class BacklogMetrics:
     """Container for defense contractor backlog metrics."""
+
     total_backlog: Optional[float] = None
     funded_backlog: Optional[float] = None
     unfunded_backlog: Optional[float] = None
@@ -161,16 +163,16 @@ def extract_backlog_metrics_from_xbrl(
 
     # Define backlog-related canonical names to extract
     backlog_canonical_names = [
-        'order_backlog',
-        'funded_backlog',
-        'unfunded_backlog',
-        'contract_liability',
-        'deferred_revenue_backlog',
-        'unbilled_contracts_receivable',
-        'contract_assets',
+        "order_backlog",
+        "funded_backlog",
+        "unfunded_backlog",
+        "contract_liability",
+        "deferred_revenue_backlog",
+        "unbilled_contracts_receivable",
+        "contract_assets",
     ]
 
-    us_gaap = xbrl_data.get('facts', {}).get('us-gaap', {})
+    us_gaap = xbrl_data.get("facts", {}).get("us-gaap", {})
     if not us_gaap:
         logger.warning(f"{symbol} - No us-gaap data available for backlog extraction")
         return metrics
@@ -183,38 +185,37 @@ def extract_backlog_metrics_from_xbrl(
         for alias in aliases:
             if alias in us_gaap:
                 concept = us_gaap[alias]
-                units = concept.get('units', {})
-                usd_data = units.get('USD', [])
+                units = concept.get("units", {})
+                usd_data = units.get("USD", [])
 
                 if usd_data:
                     # Get the latest annual value (10-K preferred, then 10-Q)
                     sorted_data = sorted(
-                        [d for d in usd_data if d.get('form') in ['10-K', '10-Q', '20-F']],
+                        [d for d in usd_data if d.get("form") in ["10-K", "10-Q", "20-F"]],
                         key=lambda x: (
-                            x.get('fy', 0),
-                            {'FY': 5, 'Q4': 4, 'Q3': 3, 'Q2': 2, 'Q1': 1}.get(x.get('fp', ''), 0)
+                            x.get("fy", 0),
+                            {"FY": 5, "Q4": 4, "Q3": 3, "Q2": 2, "Q1": 1}.get(x.get("fp", ""), 0),
                         ),
-                        reverse=True
+                        reverse=True,
                     )
 
                     if sorted_data:
-                        value = sorted_data[0].get('val')
+                        value = sorted_data[0].get("val")
                         if value is not None:
                             extracted_values[canonical_name] = float(value)
                             logger.debug(
-                                f"{symbol} - Extracted {canonical_name} from {alias}: "
-                                f"${float(value)/1e9:.2f}B"
+                                f"{symbol} - Extracted {canonical_name} from {alias}: " f"${float(value)/1e9:.2f}B"
                             )
                             break  # Found value, move to next canonical name
 
     # Map extracted values to BacklogMetrics fields
-    metrics.total_backlog = extracted_values.get('order_backlog')
-    metrics.funded_backlog = extracted_values.get('funded_backlog')
-    metrics.unfunded_backlog = extracted_values.get('unfunded_backlog')
-    metrics.contract_liability = extracted_values.get('contract_liability')
-    metrics.deferred_revenue = extracted_values.get('deferred_revenue_backlog')
-    metrics.unbilled_receivables = extracted_values.get('unbilled_contracts_receivable')
-    metrics.contract_assets = extracted_values.get('contract_assets')
+    metrics.total_backlog = extracted_values.get("order_backlog")
+    metrics.funded_backlog = extracted_values.get("funded_backlog")
+    metrics.unfunded_backlog = extracted_values.get("unfunded_backlog")
+    metrics.contract_liability = extracted_values.get("contract_liability")
+    metrics.deferred_revenue = extracted_values.get("deferred_revenue_backlog")
+    metrics.unbilled_receivables = extracted_values.get("unbilled_contracts_receivable")
+    metrics.contract_assets = extracted_values.get("contract_assets")
 
     # If no direct backlog available, estimate from contract liability + deferred revenue
     if metrics.total_backlog is None:
@@ -255,6 +256,7 @@ def extract_backlog_metrics_from_xbrl(
 # ====================
 # BACKLOG PREMIUM CALCULATION (P2-B3)
 # ====================
+
 
 def calculate_backlog_premium(backlog: float, annual_revenue: float) -> float:
     """
@@ -298,10 +300,7 @@ def calculate_backlog_premium(backlog: float, annual_revenue: float) -> float:
         premium = 1.0  # No adjustment
         quality = "average"
 
-    logger.info(
-        f"Backlog premium calculated: {premium:.2f}x "
-        f"(ratio={backlog_ratio:.2f}x, quality={quality})"
-    )
+    logger.info(f"Backlog premium calculated: {premium:.2f}x " f"(ratio={backlog_ratio:.2f}x, quality={quality})")
 
     return premium
 
@@ -364,6 +363,7 @@ def calculate_backlog_value(
 # CONTRACT MIX ADJUSTMENT (P2-B4)
 # ====================
 
+
 def calculate_contract_mix_adjustment(cost_plus_pct: float) -> float:
     """
     Adjust valuation based on contract type mix.
@@ -396,10 +396,7 @@ def calculate_contract_mix_adjustment(cost_plus_pct: float) -> float:
         adjustment = 1.0
         mix_type = "balanced"
 
-    logger.info(
-        f"Contract mix adjustment: {adjustment:.2f}x "
-        f"(cost-plus={cost_plus_pct:.0%}, mix={mix_type})"
-    )
+    logger.info(f"Contract mix adjustment: {adjustment:.2f}x " f"(cost-plus={cost_plus_pct:.0%}, mix={mix_type})")
 
     return adjustment
 
@@ -408,9 +405,11 @@ def calculate_contract_mix_adjustment(cost_plus_pct: float) -> float:
 # DEFENSE CONTRACTOR CLASSIFICATION
 # ====================
 
+
 @dataclass
 class DefenseContractorClassification:
     """Result from defense contractor classification."""
+
     is_defense_contractor: bool
     contractor_type: DefenseContractorType
     confidence: str  # "high", "medium", "low"
@@ -444,9 +443,7 @@ def classify_defense_contractor(
     # Priority 1: Check known defense contractor mappings
     if symbol_upper in KNOWN_DEFENSE_CONTRACTORS:
         contractor_type = KNOWN_DEFENSE_CONTRACTORS[symbol_upper]
-        logger.info(
-            f"{symbol} - Defense contractor detected via symbol mapping: {contractor_type.value}"
-        )
+        logger.info(f"{symbol} - Defense contractor detected via symbol mapping: {contractor_type.value}")
         return DefenseContractorClassification(
             is_defense_contractor=True,
             contractor_type=contractor_type,
@@ -461,9 +458,7 @@ def classify_defense_contractor(
 
         for defense_industry in DEFENSE_INDUSTRIES:
             if defense_industry.lower() in industry_lower or industry_lower in defense_industry.lower():
-                logger.info(
-                    f"{symbol} - Defense contractor detected via industry match: '{industry}'"
-                )
+                logger.info(f"{symbol} - Defense contractor detected via industry match: '{industry}'")
                 return DefenseContractorClassification(
                     is_defense_contractor=True,
                     contractor_type=DefenseContractorType.UNKNOWN,
@@ -476,9 +471,7 @@ def classify_defense_contractor(
         defense_keywords = ["defense", "military", "government", "aerospace"]
         for keyword in defense_keywords:
             if keyword in industry_lower:
-                logger.info(
-                    f"{symbol} - Possible defense contractor (keyword '{keyword}' in industry)"
-                )
+                logger.info(f"{symbol} - Possible defense contractor (keyword '{keyword}' in industry)")
                 return DefenseContractorClassification(
                     is_defense_contractor=True,
                     contractor_type=DefenseContractorType.UNKNOWN,
@@ -501,9 +494,11 @@ def classify_defense_contractor(
 # DEFENSE CONTRACTOR VALUATION
 # ====================
 
+
 @dataclass
 class DefenseValuationResult:
     """Result from defense contractor valuation."""
+
     fair_value: float
     base_fair_value: float  # Before backlog adjustments
     backlog_premium: float
@@ -555,9 +550,7 @@ def value_defense_contractor(
     contractor_type = classification.contractor_type
 
     if not classification.is_defense_contractor:
-        logger.warning(
-            f"{symbol} - Not classified as defense contractor, returning base valuation"
-        )
+        logger.warning(f"{symbol} - Not classified as defense contractor, returning base valuation")
         return DefenseValuationResult(
             fair_value=base_fair_value,
             base_fair_value=base_fair_value,
@@ -573,12 +566,7 @@ def value_defense_contractor(
         )
 
     # Get annual revenue
-    annual_revenue = (
-        financials.get('total_revenue') or
-        financials.get('revenue') or
-        financials.get('revenues') or
-        0
-    )
+    annual_revenue = financials.get("total_revenue") or financials.get("revenue") or financials.get("revenues") or 0
 
     # Extract backlog metrics
     backlog_metrics = None
@@ -587,9 +575,7 @@ def value_defense_contractor(
     backlog_value = None
 
     if xbrl_data:
-        backlog_metrics = extract_backlog_metrics_from_xbrl(
-            symbol, xbrl_data, annual_revenue
-        )
+        backlog_metrics = extract_backlog_metrics_from_xbrl(symbol, xbrl_data, annual_revenue)
         total_backlog = backlog_metrics.total_backlog
         backlog_ratio = backlog_metrics.backlog_ratio
 
@@ -597,9 +583,7 @@ def value_defense_contractor(
         if total_backlog and annual_revenue > 0:
             operating_margin = DEFENSE_CONTRACTOR_TIER["parameters"]["terminal_margin"]
             discount_rate = DEFENSE_CONTRACTOR_TIER["parameters"]["backlog_discount_rate"]
-            backlog_value = calculate_backlog_value(
-                total_backlog, annual_revenue, operating_margin, discount_rate
-            )
+            backlog_value = calculate_backlog_value(total_backlog, annual_revenue, operating_margin, discount_rate)
     else:
         warnings.append("No XBRL data provided - backlog metrics not available")
 
@@ -630,12 +614,14 @@ def value_defense_contractor(
         confidence = "low"
 
     # Build details
-    details.update({
-        "classification": classification.__dict__,
-        "backlog_metrics": backlog_metrics.__dict__ if backlog_metrics else None,
-        "tier_weights": DEFENSE_CONTRACTOR_TIER["weights"],
-        "tier_parameters": DEFENSE_CONTRACTOR_TIER["parameters"],
-    })
+    details.update(
+        {
+            "classification": classification.__dict__,
+            "backlog_metrics": backlog_metrics.__dict__ if backlog_metrics else None,
+            "tier_weights": DEFENSE_CONTRACTOR_TIER["weights"],
+            "tier_parameters": DEFENSE_CONTRACTOR_TIER["parameters"],
+        }
+    )
 
     logger.info(
         f"{symbol} - Defense contractor valuation: "

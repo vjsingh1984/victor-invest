@@ -60,9 +60,9 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from dateutil.relativedelta import relativedelta
 from typing import Any, Dict, List, Optional
 
+from dateutil.relativedelta import relativedelta
 from victor.framework.graph import END, StateGraph
 
 from victor_invest.tools import RLBacktestTool, ValuationTool
@@ -380,11 +380,13 @@ async def record_predictions(state_input) -> dict:
 
         for months_back, reward_info in state.reward_data.items():
             if "error" in reward_info:
-                state.add_prediction({
-                    "lookback_months": months_back,
-                    "status": "skipped",
-                    "error": reward_info["error"],
-                })
+                state.add_prediction(
+                    {
+                        "lookback_months": months_back,
+                        "status": "skipped",
+                        "error": reward_info["error"],
+                    }
+                )
                 continue
 
             val_result = state.valuation_results.get(months_back, {})
@@ -421,21 +423,25 @@ async def record_predictions(state_input) -> dict:
             )
 
             if result.success:
-                state.add_prediction({
-                    "lookback_months": months_back,
-                    "analysis_date": reward_info["analysis_date"],
-                    "price": price,
-                    "fair_value": blended_fair_value,
-                    "record_ids": result.data.get("record_ids", []),
-                    "status": "recorded",
-                })
+                state.add_prediction(
+                    {
+                        "lookback_months": months_back,
+                        "analysis_date": reward_info["analysis_date"],
+                        "price": price,
+                        "fair_value": blended_fair_value,
+                        "record_ids": result.data.get("record_ids", []),
+                        "status": "recorded",
+                    }
+                )
             else:
-                state.add_prediction({
-                    "lookback_months": months_back,
-                    "analysis_date": reward_info["analysis_date"],
-                    "status": "failed",
-                    "error": result.error,
-                })
+                state.add_prediction(
+                    {
+                        "lookback_months": months_back,
+                        "analysis_date": reward_info["analysis_date"],
+                        "status": "failed",
+                        "error": result.error,
+                    }
+                )
 
         state.mark_step_completed("record_predictions")
 
@@ -473,10 +479,7 @@ async def finalize_backtest(state_input) -> dict:
     }
 
     state.mark_step_completed("finalize_backtest")
-    logger.info(
-        f"Backtest complete for {state.symbol}: "
-        f"{successful} recorded, {failed} failed, {skipped} skipped"
-    )
+    logger.info(f"Backtest complete for {state.symbol}: " f"{successful} recorded, {failed} failed, {skipped} skipped")
 
     return _state_to_dict(state)
 
@@ -581,7 +584,7 @@ async def run_rl_backtest(
     if use_yaml_workflow:
         # Use InvestmentWorkflowProvider (BaseYAMLWorkflowProvider pattern)
         try:
-            from victor.workflows.executor import WorkflowExecutor, WorkflowContext
+            from victor.workflows.executor import WorkflowContext, WorkflowExecutor
 
             # Import here to avoid circular imports
             from victor_invest.workflows import InvestmentWorkflowProvider
@@ -591,12 +594,14 @@ async def run_rl_backtest(
 
             if workflow:
                 # Create execution context
-                context = WorkflowContext({
-                    "symbol": symbol,
-                    "max_lookback_months": max_lookback_months,
-                    "interval": interval,
-                    "lookback_dates": lookback_months_list,
-                })
+                context = WorkflowContext(
+                    {
+                        "symbol": symbol,
+                        "max_lookback_months": max_lookback_months,
+                        "interval": interval,
+                        "lookback_dates": lookback_months_list,
+                    }
+                )
 
                 # Execute via YAML workflow with shared handlers
                 executor = WorkflowExecutor(orchestrator=None)
@@ -623,7 +628,7 @@ async def run_rl_backtest(
     result = await compiled.invoke(state.to_dict())
 
     # Convert result back to state
-    if hasattr(result, 'state'):
+    if hasattr(result, "state"):
         result_data = result.state
     elif isinstance(result, dict):
         result_data = result
@@ -652,9 +657,9 @@ def _convert_yaml_result_to_state(
     )
 
     # Extract from workflow result context
-    if hasattr(workflow_result, 'context'):
+    if hasattr(workflow_result, "context"):
         ctx = workflow_result.context
-        if hasattr(ctx, 'get'):
+        if hasattr(ctx, "get"):
             state.predictions = ctx.get("predictions", [])
             state.metadata = ctx.get("metadata", {})
             if ctx.get("backtest_results"):

@@ -13,11 +13,11 @@ import pandas as pd
 from sqlalchemy import text
 
 from investigator.domain.agents.base import AgentResult, AgentTask, AnalysisType, InvestmentAgent, TaskStatus
-from investigator.infrastructure.external.fred import (
+from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Uses singleton pattern
+from investigator.infrastructure.external.fred import (  # TODO: Move to infrastructure
     MacroIndicatorsFetcher,
     format_indicator_for_display,
-)  # TODO: Move to infrastructure
-from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Uses singleton pattern
+)
 
 logger = logging.getLogger(__name__)
 
@@ -381,6 +381,7 @@ class ETFMarketContextAgent(InvestmentAgent):
 
         except Exception as e:
             import traceback
+
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error(f"ETF market context analysis failed for {symbol}: {e}\n{traceback.format_exc()}")
 

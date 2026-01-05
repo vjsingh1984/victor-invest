@@ -30,9 +30,9 @@ Example:
 """
 
 from investigator.infrastructure.external.nyfed.markets_data import (
+    GSCPIData,
     NYFedDataClient,
     RecessionProbability,
-    GSCPIData,
     get_nyfed_client,
 )
 

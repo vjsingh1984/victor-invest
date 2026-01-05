@@ -17,22 +17,22 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from .result import (
+    ExtractionAttempt,
+    ExtractionAudit,
+    ExtractionConfidence,
+    ExtractionResult,
+    MatchMethod,
+)
 from .strategies import (
-    PeriodMatchStrategy,
-    ByPeriodEndMatcher,
-    ByDateRangeMatcher,
-    ByFrameFieldMatcher,
     ByAdshFyFpMatcher,
     ByAdshOnlyMatcher,
+    ByDateRangeMatcher,
+    ByFrameFieldMatcher,
+    ByPeriodEndMatcher,
     MatchContext,
     MatchResult,
-)
-from .result import (
-    ExtractionResult,
-    ExtractionAudit,
-    ExtractionAttempt,
-    MatchMethod,
-    ExtractionConfidence,
+    PeriodMatchStrategy,
 )
 
 logger = logging.getLogger(__name__)
@@ -107,16 +107,17 @@ class MetricExtractionOrchestrator:
         # Initialize canonical mapper
         if canonical_mapper is None:
             from investigator.infrastructure.sec.canonical_mapper import get_canonical_mapper
+
             self.canonical_mapper = get_canonical_mapper()
         else:
             self.canonical_mapper = canonical_mapper
 
         # Statistics
         self.stats = {
-            'extractions': 0,
-            'successes': 0,
-            'by_strategy': {},
-            'by_tag_position': {},
+            "extractions": 0,
+            "successes": 0,
+            "by_strategy": {},
+            "by_tag_position": {},
         }
 
     def extract(
@@ -147,17 +148,21 @@ class MetricExtractionOrchestrator:
             ExtractionResult with value, metadata, and audit trail
         """
         start_time = time.time()
-        self.stats['extractions'] += 1
+        self.stats["extractions"] += 1
 
         # Create audit trail
-        audit = ExtractionAudit(
-            canonical_key=canonical_key,
-            target_period_end=target_period_end,
-            target_fiscal_year=target_fiscal_year,
-            target_fiscal_period=target_fiscal_period,
-            target_adsh=target_adsh,
-            started_at=datetime.now().isoformat(),
-        ) if self.enable_audit else None
+        audit = (
+            ExtractionAudit(
+                canonical_key=canonical_key,
+                target_period_end=target_period_end,
+                target_fiscal_year=target_fiscal_year,
+                target_fiscal_period=target_fiscal_period,
+                target_adsh=target_adsh,
+                started_at=datetime.now().isoformat(),
+            )
+            if self.enable_audit
+            else None
+        )
 
         # Create match context
         context = MatchContext(
@@ -170,20 +175,14 @@ class MetricExtractionOrchestrator:
         )
 
         # Get tag fallback chain for this canonical key
-        fallback_tags = self.canonical_mapper.get_tags(
-            canonical_key,
-            sector=self.sector,
-            industry=self.industry
-        )
+        fallback_tags = self.canonical_mapper.get_tags(canonical_key, sector=self.sector, industry=self.industry)
 
         if not fallback_tags:
             logger.warning(f"No XBRL tags found for canonical key '{canonical_key}'")
             if audit:
                 audit.completed_at = datetime.now().isoformat()
             return ExtractionResult.not_found(
-                canonical_key,
-                audit=audit,
-                reason=f"No XBRL tags configured for '{canonical_key}'"
+                canonical_key, audit=audit, reason=f"No XBRL tags configured for '{canonical_key}'"
             )
 
         # Try each matcher strategy
@@ -195,73 +194,72 @@ class MetricExtractionOrchestrator:
                 # Get entries for this tag
                 if tag_name not in us_gaap:
                     if audit:
-                        audit.add_attempt(ExtractionAttempt(
-                            strategy_name=matcher.name,
-                            tag_name=tag_name,
-                            matched=False,
-                            entries_found=0,
-                            reason=f"Tag '{tag_name}' not in us_gaap",
-                            duration_ms=(time.time() - attempt_start) * 1000
-                        ))
+                        audit.add_attempt(
+                            ExtractionAttempt(
+                                strategy_name=matcher.name,
+                                tag_name=tag_name,
+                                matched=False,
+                                entries_found=0,
+                                reason=f"Tag '{tag_name}' not in us_gaap",
+                                duration_ms=(time.time() - attempt_start) * 1000,
+                            )
+                        )
                     continue
 
                 tag_data = us_gaap[tag_name]
-                units = tag_data.get('units', {})
+                units = tag_data.get("units", {})
 
                 # Get expected unit (usually USD)
                 mapping = self.canonical_mapper.mappings.get(canonical_key, {})
-                expected_unit = mapping.get('unit', 'USD')
+                expected_unit = mapping.get("unit", "USD")
                 entries = units.get(expected_unit, [])
 
                 if not entries:
                     if audit:
-                        audit.add_attempt(ExtractionAttempt(
-                            strategy_name=matcher.name,
-                            tag_name=tag_name,
-                            matched=False,
-                            entries_found=0,
-                            reason=f"No {expected_unit} entries for tag",
-                            duration_ms=(time.time() - attempt_start) * 1000
-                        ))
+                        audit.add_attempt(
+                            ExtractionAttempt(
+                                strategy_name=matcher.name,
+                                tag_name=tag_name,
+                                matched=False,
+                                entries_found=0,
+                                reason=f"No {expected_unit} entries for tag",
+                                duration_ms=(time.time() - attempt_start) * 1000,
+                            )
+                        )
                     continue
 
                 # Try this matcher with this tag
                 match_result = matcher.match(entries, context)
 
                 if audit:
-                    audit.add_attempt(ExtractionAttempt(
-                        strategy_name=matcher.name,
-                        tag_name=tag_name,
-                        matched=match_result.matched,
-                        entries_found=len(match_result.entries),
-                        selected_entry=match_result.entries[0] if match_result.entries else None,
-                        reason=match_result.reason,
-                        duration_ms=(time.time() - attempt_start) * 1000
-                    ))
+                    audit.add_attempt(
+                        ExtractionAttempt(
+                            strategy_name=matcher.name,
+                            tag_name=tag_name,
+                            matched=match_result.matched,
+                            entries_found=len(match_result.entries),
+                            selected_entry=match_result.entries[0] if match_result.entries else None,
+                            reason=match_result.reason,
+                            duration_ms=(time.time() - attempt_start) * 1000,
+                        )
+                    )
 
                 if match_result.matched and match_result.entries:
                     # Select best entry (prefer individual quarter over YTD)
-                    best_entry = self._select_best_entry(
-                        match_result.entries,
-                        target_fiscal_period
-                    )
+                    best_entry = self._select_best_entry(match_result.entries, target_fiscal_period)
 
-                    if best_entry and best_entry.get('val') is not None:
-                        value = best_entry['val']
+                    if best_entry and best_entry.get("val") is not None:
+                        value = best_entry["val"]
 
                         # Determine confidence based on strategy and tag position
-                        confidence = self._determine_confidence(
-                            matcher,
-                            tag_position,
-                            len(fallback_tags)
-                        )
+                        confidence = self._determine_confidence(matcher, tag_position, len(fallback_tags))
 
                         # Update statistics
-                        self.stats['successes'] += 1
-                        self.stats['by_strategy'][matcher.name] = \
-                            self.stats['by_strategy'].get(matcher.name, 0) + 1
-                        self.stats['by_tag_position'][tag_position] = \
-                            self.stats['by_tag_position'].get(tag_position, 0) + 1
+                        self.stats["successes"] += 1
+                        self.stats["by_strategy"][matcher.name] = self.stats["by_strategy"].get(matcher.name, 0) + 1
+                        self.stats["by_tag_position"][tag_position] = (
+                            self.stats["by_tag_position"].get(tag_position, 0) + 1
+                        )
 
                         if audit:
                             audit.completed_at = datetime.now().isoformat()
@@ -278,7 +276,7 @@ class MetricExtractionOrchestrator:
                             entry=best_entry,
                             match_method=match_result.method,
                             confidence=confidence,
-                            audit=audit
+                            audit=audit,
                         )
 
         # All strategies exhausted - try derived value calculation
@@ -300,16 +298,10 @@ class MetricExtractionOrchestrator:
         )
 
         return ExtractionResult.not_found(
-            canonical_key,
-            audit=audit,
-            reason=f"Exhausted {len(self.matchers)} matchers × {len(fallback_tags)} tags"
+            canonical_key, audit=audit, reason=f"Exhausted {len(self.matchers)} matchers × {len(fallback_tags)} tags"
         )
 
-    def _select_best_entry(
-        self,
-        entries: List[Dict],
-        target_fiscal_period: Optional[str]
-    ) -> Optional[Dict]:
+    def _select_best_entry(self, entries: List[Dict], target_fiscal_period: Optional[str]) -> Optional[Dict]:
         """
         Select best entry from matched entries.
 
@@ -331,19 +323,19 @@ class MetricExtractionOrchestrator:
         unknown = []
 
         for entry in entries:
-            if entry.get('val') is None:
+            if entry.get("val") is None:
                 continue
 
-            start = entry.get('start')
-            end = entry.get('end')
+            start = entry.get("start")
+            end = entry.get("end")
 
             if not start or not end:
                 unknown.append(entry)
                 continue
 
             try:
-                start_date = datetime.strptime(start, '%Y-%m-%d')
-                end_date = datetime.strptime(end, '%Y-%m-%d')
+                start_date = datetime.strptime(start, "%Y-%m-%d")
+                end_date = datetime.strptime(end, "%Y-%m-%d")
                 days = (end_date - start_date).days
 
                 if days < 120:
@@ -356,10 +348,10 @@ class MetricExtractionOrchestrator:
                 unknown.append(entry)
 
         # Select based on target fiscal period
-        if target_fiscal_period == 'FY':
+        if target_fiscal_period == "FY":
             # For FY, prefer annual entries
             if annual:
-                annual.sort(key=lambda x: x[0].get('filed', ''), reverse=True)
+                annual.sort(key=lambda x: x[0].get("filed", ""), reverse=True)
                 return annual[0][0]
             if ytd:
                 ytd.sort(key=lambda x: x[1], reverse=True)  # Prefer longer duration
@@ -367,25 +359,22 @@ class MetricExtractionOrchestrator:
         else:
             # For quarters, prefer individual quarter entries
             if individual:
-                individual.sort(key=lambda x: x[0].get('filed', ''), reverse=True)
+                individual.sort(key=lambda x: x[0].get("filed", ""), reverse=True)
                 return individual[0][0]
             if ytd:
                 # For YTD, we'd need to normalize - just return the entry
-                ytd.sort(key=lambda x: x[0].get('filed', ''), reverse=True)
+                ytd.sort(key=lambda x: x[0].get("filed", ""), reverse=True)
                 return ytd[0][0]
 
         # Fallback to any entry with value
         if unknown:
-            unknown.sort(key=lambda x: x.get('filed', ''), reverse=True)
+            unknown.sort(key=lambda x: x.get("filed", ""), reverse=True)
             return unknown[0]
 
         return entries[0] if entries else None
 
     def _determine_confidence(
-        self,
-        matcher: PeriodMatchStrategy,
-        tag_position: int,
-        total_tags: int
+        self, matcher: PeriodMatchStrategy, tag_position: int, total_tags: int
     ) -> ExtractionConfidence:
         """
         Determine extraction confidence based on how value was obtained.
@@ -402,8 +391,8 @@ class MetricExtractionOrchestrator:
         - Deep fallback tags (position > 2)
         """
         # Strategy-based confidence
-        high_confidence_matchers = ['ByPeriodEndMatcher']
-        medium_confidence_matchers = ['ByDateRangeMatcher', 'ByFrameFieldMatcher', 'ByAdshOnlyMatcher']
+        high_confidence_matchers = ["ByPeriodEndMatcher"]
+        medium_confidence_matchers = ["ByDateRangeMatcher", "ByFrameFieldMatcher", "ByAdshOnlyMatcher"]
         # ByAdshFyFpMatcher is low confidence
 
         if matcher.name in high_confidence_matchers:
@@ -422,11 +411,7 @@ class MetricExtractionOrchestrator:
             return ExtractionConfidence.LOW
 
     def _try_derived_value(
-        self,
-        canonical_key: str,
-        us_gaap: Dict,
-        context: MatchContext,
-        audit: Optional[ExtractionAudit]
+        self, canonical_key: str, us_gaap: Dict, context: MatchContext, audit: Optional[ExtractionAudit]
     ) -> Optional[ExtractionResult]:
         """
         Try to calculate derived value from other metrics.
@@ -434,17 +419,17 @@ class MetricExtractionOrchestrator:
         Example: free_cash_flow = operating_cash_flow - capital_expenditures
         """
         mapping = self.canonical_mapper.mappings.get(canonical_key, {})
-        derived_config = mapping.get('derived', {})
+        derived_config = mapping.get("derived", {})
 
-        if not derived_config.get('enabled', False):
+        if not derived_config.get("enabled", False):
             return None
 
-        formula = derived_config.get('formula')
+        formula = derived_config.get("formula")
         if not formula:
             return None
 
         # Get required fields
-        required_fields = derived_config.get('required_fields', [])
+        required_fields = derived_config.get("required_fields", [])
         if not required_fields:
             return None
 
@@ -472,16 +457,8 @@ class MetricExtractionOrchestrator:
             # Simple formula evaluation (supports +, -, *, /)
             value = self._evaluate_formula(formula, components)
             if value is not None:
-                logger.debug(
-                    f"✓ Derived {canonical_key} = {value:,.0f} "
-                    f"from formula '{formula}'"
-                )
-                return ExtractionResult.derived(
-                    value=value,
-                    formula=formula,
-                    components=components,
-                    audit=audit
-                )
+                logger.debug(f"✓ Derived {canonical_key} = {value:,.0f} " f"from formula '{formula}'")
+                return ExtractionResult.derived(value=value, formula=formula, components=components, audit=audit)
         except Exception as e:
             logger.warning(f"Failed to evaluate formula '{formula}': {e}")
 
@@ -499,7 +476,7 @@ class MetricExtractionOrchestrator:
             expr = expr.replace(name, str(value))
 
         # Only allow safe characters
-        allowed = set('0123456789.+-*/()')
+        allowed = set("0123456789.+-*/()")
         if not all(c in allowed or c.isspace() for c in expr):
             logger.warning(f"Formula contains unsafe characters: {formula}")
             return None
@@ -512,11 +489,5 @@ class MetricExtractionOrchestrator:
 
     def get_stats(self) -> Dict:
         """Get extraction statistics."""
-        success_rate = (
-            self.stats['successes'] / self.stats['extractions'] * 100
-            if self.stats['extractions'] > 0 else 0
-        )
-        return {
-            **self.stats,
-            'success_rate': f"{success_rate:.1f}%"
-        }
+        success_rate = self.stats["successes"] / self.stats["extractions"] * 100 if self.stats["extractions"] > 0 else 0
+        return {**self.stats, "success_rate": f"{success_rate:.1f}%"}

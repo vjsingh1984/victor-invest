@@ -15,9 +15,9 @@ import pandas as pd
 
 from investigator.domain.agents.base import InvestmentAgent
 from investigator.domain.models.analysis import AgentResult, AgentTask, TaskStatus
+from investigator.domain.services.toon_formatter import TOONFormatter, to_toon_array
 from investigator.infrastructure.cache import CacheManager
 from investigator.infrastructure.cache.cache_types import CacheType
-from investigator.domain.services.toon_formatter import to_toon_array, TOONFormatter
 from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Uses singleton pattern
 from investigator.infrastructure.indicators import TechnicalIndicatorCalculator as TechnicalIndicators
 

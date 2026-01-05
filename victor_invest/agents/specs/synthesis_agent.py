@@ -19,15 +19,14 @@ streams into actionable investment recommendations.
 """
 
 from victor.agents.spec import (
-    AgentSpec,
     AgentCapabilities,
     AgentConstraints,
+    AgentSpec,
     ModelPreference,
     OutputFormat,
 )
 
 from victor_invest.prompts.investment_prompts import SYNTHESIS_PROMPT
-
 
 SYNTHESIS_AGENT_SPEC = AgentSpec(
     name="synthesis_analyst",

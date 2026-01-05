@@ -21,9 +21,9 @@ from investigator.domain.services.industry_datasets.base import (
     ValuationAdjustment,
 )
 from investigator.domain.services.industry_datasets.registry import (
-    get_registry,
     get_dataset_for_industry,
     get_dataset_for_symbol,
+    get_registry,
 )
 
 logger = logging.getLogger(__name__)

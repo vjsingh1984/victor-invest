@@ -32,10 +32,10 @@ import os
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
-from investigator.domain.services.rl.models import ValuationContext
-from investigator.domain.services.rl.policy.technical_policy import TechnicalRLPolicy
-from investigator.domain.services.rl.policy.fundamental_policy import FundamentalRLPolicy
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
+from investigator.domain.services.rl.models import ValuationContext
+from investigator.domain.services.rl.policy.fundamental_policy import FundamentalRLPolicy
+from investigator.domain.services.rl.policy.technical_policy import TechnicalRLPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +72,7 @@ class DualRLPolicy:
 
         # Initialize or use provided policies
         self.technical = technical_policy or TechnicalRLPolicy()
-        self.fundamental = fundamental_policy or FundamentalRLPolicy(
-            base_weighting_service=base_weighting_service
-        )
+        self.fundamental = fundamental_policy or FundamentalRLPolicy(base_weighting_service=base_weighting_service)
 
         # Try to load existing policies
         self._load_policies()

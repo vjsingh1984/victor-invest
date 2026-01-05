@@ -36,8 +36,10 @@ logger = logging.getLogger(__name__)
 # INSURANCE TYPE CLASSIFICATION AND TARGET RATIOS
 # ====================
 
+
 class InsuranceType(Enum):
     """Classification of insurance company types for valuation purposes."""
+
     PROPERTY_CASUALTY = "property_casualty"
     LIFE = "life"
     HEALTH = "health"
@@ -51,19 +53,19 @@ class InsuranceType(Enum):
 # Combined Ratio > 1.0 indicates underwriting loss (must rely on investment income)
 TARGET_COMBINED_RATIOS: Dict[InsuranceType, float] = {
     InsuranceType.PROPERTY_CASUALTY: 0.95,  # P&C typically targets 95%
-    InsuranceType.LIFE: 0.85,               # Life insurance has lower target
-    InsuranceType.HEALTH: 0.88,             # Health insurance target
-    InsuranceType.REINSURANCE: 0.92,        # Reinsurance slightly lower
-    InsuranceType.MULTI_LINE: 0.93,         # Multi-line average
-    InsuranceType.UNKNOWN: 0.95,            # Conservative default
+    InsuranceType.LIFE: 0.85,  # Life insurance has lower target
+    InsuranceType.HEALTH: 0.88,  # Health insurance target
+    InsuranceType.REINSURANCE: 0.92,  # Reinsurance slightly lower
+    InsuranceType.MULTI_LINE: 0.93,  # Multi-line average
+    InsuranceType.UNKNOWN: 0.95,  # Conservative default
 }
 
 # Combined ratio thresholds for valuation quality assessment
 COMBINED_RATIO_THRESHOLDS = {
-    'excellent': 0.90,    # < 90% = excellent underwriting
-    'good': 0.95,         # < 95% = good underwriting
-    'acceptable': 1.00,   # < 100% = acceptable (underwriting profit)
-    'weak': 1.05,         # < 105% = weak (small underwriting loss)
+    "excellent": 0.90,  # < 90% = excellent underwriting
+    "good": 0.95,  # < 95% = good underwriting
+    "acceptable": 1.00,  # < 100% = acceptable (underwriting profit)
+    "weak": 1.05,  # < 105% = weak (small underwriting loss)
     # >= 105% = poor (significant underwriting loss)
 }
 
@@ -71,6 +73,7 @@ COMBINED_RATIO_THRESHOLDS = {
 # ====================
 # COMBINED RATIO CALCULATION (P1-B3)
 # ====================
+
 
 def calculate_combined_ratio(metrics: Dict) -> Optional[float]:
     """
@@ -103,8 +106,8 @@ def calculate_combined_ratio(metrics: Dict) -> Optional[float]:
         >>> ratio = calculate_combined_ratio(metrics)
         >>> print(f"Combined Ratio: {ratio:.1%}")  # 95.0%
     """
-    premiums = metrics.get('premiums_earned')
-    claims = metrics.get('claims_incurred')
+    premiums = metrics.get("premiums_earned")
+    claims = metrics.get("claims_incurred")
 
     # Premiums and claims are required
     if not premiums or premiums <= 0:
@@ -116,8 +119,8 @@ def calculate_combined_ratio(metrics: Dict) -> Optional[float]:
         return None
 
     # Optional expense components (default to 0 if not available)
-    acquisition_costs = metrics.get('policy_acquisition_costs', 0) or 0
-    operating_expenses = metrics.get('insurance_operating_expenses', 0) or 0
+    acquisition_costs = metrics.get("policy_acquisition_costs", 0) or 0
+    operating_expenses = metrics.get("insurance_operating_expenses", 0) or 0
 
     # Calculate combined ratio
     total_costs = claims + acquisition_costs + operating_expenses
@@ -144,8 +147,8 @@ def calculate_loss_ratio(metrics: Dict) -> Optional[float]:
     Returns:
         Loss ratio as decimal or None if calculation not possible
     """
-    premiums = metrics.get('premiums_earned')
-    claims = metrics.get('claims_incurred')
+    premiums = metrics.get("premiums_earned")
+    claims = metrics.get("claims_incurred")
 
     if not premiums or premiums <= 0 or claims is None:
         return None
@@ -166,13 +169,13 @@ def calculate_expense_ratio(metrics: Dict) -> Optional[float]:
     Returns:
         Expense ratio as decimal or None if calculation not possible
     """
-    premiums = metrics.get('premiums_earned')
+    premiums = metrics.get("premiums_earned")
 
     if not premiums or premiums <= 0:
         return None
 
-    acquisition_costs = metrics.get('policy_acquisition_costs', 0) or 0
-    operating_expenses = metrics.get('insurance_operating_expenses', 0) or 0
+    acquisition_costs = metrics.get("policy_acquisition_costs", 0) or 0
+    operating_expenses = metrics.get("insurance_operating_expenses", 0) or 0
 
     total_expenses = acquisition_costs + operating_expenses
     if total_expenses == 0:
@@ -182,8 +185,7 @@ def calculate_expense_ratio(metrics: Dict) -> Optional[float]:
 
 
 def assess_combined_ratio_quality(
-    combined_ratio: Optional[float],
-    insurance_type: InsuranceType = InsuranceType.UNKNOWN
+    combined_ratio: Optional[float], insurance_type: InsuranceType = InsuranceType.UNKNOWN
 ) -> Tuple[str, str]:
     """
     Assess the quality of underwriting based on combined ratio.
@@ -200,23 +202,19 @@ def assess_combined_ratio_quality(
 
     target = TARGET_COMBINED_RATIOS.get(insurance_type, 0.95)
 
-    if combined_ratio < COMBINED_RATIO_THRESHOLDS['excellent']:
+    if combined_ratio < COMBINED_RATIO_THRESHOLDS["excellent"]:
         return ("excellent", f"Excellent underwriting ({combined_ratio:.1%} vs {target:.0%} target)")
-    elif combined_ratio < COMBINED_RATIO_THRESHOLDS['good']:
+    elif combined_ratio < COMBINED_RATIO_THRESHOLDS["good"]:
         return ("good", f"Good underwriting ({combined_ratio:.1%} vs {target:.0%} target)")
-    elif combined_ratio < COMBINED_RATIO_THRESHOLDS['acceptable']:
+    elif combined_ratio < COMBINED_RATIO_THRESHOLDS["acceptable"]:
         return ("acceptable", f"Acceptable underwriting ({combined_ratio:.1%} vs {target:.0%} target)")
-    elif combined_ratio < COMBINED_RATIO_THRESHOLDS['weak']:
+    elif combined_ratio < COMBINED_RATIO_THRESHOLDS["weak"]:
         return ("weak", f"Weak underwriting ({combined_ratio:.1%} - slight loss)")
     else:
         return ("poor", f"Poor underwriting ({combined_ratio:.1%} - significant loss)")
 
 
-def extract_insurance_metrics_from_xbrl(
-    symbol: str,
-    xbrl_data: Dict,
-    database_url: Optional[str] = None
-) -> Dict:
+def extract_insurance_metrics_from_xbrl(symbol: str, xbrl_data: Dict, database_url: Optional[str] = None) -> Dict:
     """
     Extract insurance-specific metrics from XBRL data using insurance tag aliases.
 
@@ -245,16 +243,16 @@ def extract_insurance_metrics_from_xbrl(
 
     # Define insurance metrics to extract
     insurance_metrics = [
-        'premiums_earned',
-        'claims_incurred',
-        'policy_acquisition_costs',
-        'insurance_operating_expenses',
-        'loss_reserves',
-        'reinsurance_recoverables',
-        'insurance_investment_income',
+        "premiums_earned",
+        "claims_incurred",
+        "policy_acquisition_costs",
+        "insurance_operating_expenses",
+        "loss_reserves",
+        "reinsurance_recoverables",
+        "insurance_investment_income",
     ]
 
-    us_gaap = xbrl_data.get('facts', {}).get('us-gaap', {})
+    us_gaap = xbrl_data.get("facts", {}).get("us-gaap", {})
     if not us_gaap:
         logger.warning(f"{symbol} - No us-gaap data available for insurance metric extraction")
         return metrics
@@ -266,24 +264,26 @@ def extract_insurance_metrics_from_xbrl(
         for alias in aliases:
             if alias in us_gaap:
                 concept = us_gaap[alias]
-                units = concept.get('units', {})
-                usd_data = units.get('USD', [])
+                units = concept.get("units", {})
+                usd_data = units.get("USD", [])
 
                 if usd_data:
                     # Get the latest value (sorted by fiscal year/period)
                     sorted_data = sorted(
-                        [d for d in usd_data if d.get('form') in ['10-Q', '10-K', '20-F']],
-                        key=lambda x: (x.get('fy', 0), {'FY': 5, 'Q4': 4, 'Q3': 3, 'Q2': 2, 'Q1': 1}.get(x.get('fp', ''), 0)),
-                        reverse=True
+                        [d for d in usd_data if d.get("form") in ["10-Q", "10-K", "20-F"]],
+                        key=lambda x: (
+                            x.get("fy", 0),
+                            {"FY": 5, "Q4": 4, "Q3": 3, "Q2": 2, "Q1": 1}.get(x.get("fp", ""), 0),
+                        ),
+                        reverse=True,
                     )
 
                     if sorted_data:
-                        value = sorted_data[0].get('val')
+                        value = sorted_data[0].get("val")
                         if value is not None:
                             metrics[metric_name] = float(value)
                             logger.debug(
-                                f"{symbol} - Extracted {metric_name} from {alias}: "
-                                f"${float(value)/1e9:.2f}B"
+                                f"{symbol} - Extracted {metric_name} from {alias}: " f"${float(value)/1e9:.2f}B"
                             )
                             break  # Found value, move to next metric
 
@@ -306,7 +306,7 @@ def value_insurance_company(
     current_price: float,
     database_url: Optional[str] = None,
     xbrl_data: Optional[Dict] = None,
-    insurance_type: InsuranceType = InsuranceType.UNKNOWN
+    insurance_type: InsuranceType = InsuranceType.UNKNOWN,
 ) -> Dict:
     """
     Value insurance company using Price-to-Book (P/BV) methodology
@@ -325,9 +325,9 @@ def value_insurance_company(
     warnings = []
 
     # Extract required metrics (from latest quarter)
-    stockholders_equity = financials.get('stockholders_equity', 0)
-    shares_outstanding = financials.get('shares_outstanding', 0)
-    total_revenue = financials.get('total_revenue', 0) or financials.get('revenue', 0)
+    stockholders_equity = financials.get("stockholders_equity", 0)
+    shares_outstanding = financials.get("shares_outstanding", 0)
+    total_revenue = financials.get("total_revenue", 0) or financials.get("revenue", 0)
 
     # If stockholders_equity or shares_outstanding is missing, try to fetch from database
     if not stockholders_equity or not shares_outstanding:
@@ -362,7 +362,7 @@ def value_insurance_company(
         roe = (net_income / avg_equity) * 100
         logger.info(f"{symbol} - Using TTM metrics: NI=${net_income/1e9:.2f}B, Avg Equity=${avg_equity/1e9:.2f}B")
     else:
-        net_income = financials.get('net_income', 0)
+        net_income = financials.get("net_income", 0)
         if not net_income:
             raise ValueError(f"{symbol} - No net income data available")
         roe = (net_income / stockholders_equity) * 100
@@ -445,33 +445,29 @@ def value_insurance_company(
         )
 
     return {
-        'fair_value': fair_value,
-        'book_value_per_share': book_value_per_share,
-        'target_pb_ratio': target_pb,
-        'current_pb_ratio': current_pb,
-        'roe': roe,
-        'net_margin': net_margin,
+        "fair_value": fair_value,
+        "book_value_per_share": book_value_per_share,
+        "target_pb_ratio": target_pb,
+        "current_pb_ratio": current_pb,
+        "roe": roe,
+        "net_margin": net_margin,
         # P1-B Enhanced: Actual insurance metrics
-        'combined_ratio': combined_ratio,
-        'loss_ratio': loss_ratio,
-        'expense_ratio': expense_ratio,
-        'underwriting_quality': underwriting_quality,
-        'underwriting_description': underwriting_description,
-        'insurance_type': insurance_type.value if insurance_type else None,
-        'target_combined_ratio': TARGET_COMBINED_RATIOS.get(insurance_type),
+        "combined_ratio": combined_ratio,
+        "loss_ratio": loss_ratio,
+        "expense_ratio": expense_ratio,
+        "underwriting_quality": underwriting_quality,
+        "underwriting_description": underwriting_description,
+        "insurance_type": insurance_type.value if insurance_type else None,
+        "target_combined_ratio": TARGET_COMBINED_RATIOS.get(insurance_type),
         # Raw insurance metrics for transparency
-        'insurance_metrics': insurance_metrics,
-        'confidence': confidence,
-        'warnings': warnings,
+        "insurance_metrics": insurance_metrics,
+        "confidence": confidence,
+        "warnings": warnings,
     }
 
 
 def _determine_target_pb_from_combined_ratio(
-    symbol: str,
-    roe: float,
-    combined_ratio: float,
-    insurance_type: InsuranceType,
-    warnings: List[str]
+    symbol: str, roe: float, combined_ratio: float, insurance_type: InsuranceType, warnings: List[str]
 ) -> Tuple[float, str]:
     """
     Determine target P/BV ratio based on ROE and actual combined ratio.
@@ -520,25 +516,19 @@ def _determine_target_pb_from_combined_ratio(
     elif roe >= 10 and combined_ratio <= 1.00:
         target_pb = 1.15
         confidence = "high"
-        logger.info(
-            f"{symbol} - Good insurer (ROE={roe:.1f}%, CR={combined_ratio:.1%}) -> P/BV={target_pb:.2f}x"
-        )
+        logger.info(f"{symbol} - Good insurer (ROE={roe:.1f}%, CR={combined_ratio:.1%}) -> P/BV={target_pb:.2f}x")
 
     # Average: ROE > 8% AND combined ratio acceptable (< 100%)
     elif roe >= 8 and combined_ratio < 1.00:
         target_pb = 1.00
         confidence = "medium"
-        logger.info(
-            f"{symbol} - Average insurer (ROE={roe:.1f}%, CR={combined_ratio:.1%}) -> P/BV={target_pb:.2f}x"
-        )
+        logger.info(f"{symbol} - Average insurer (ROE={roe:.1f}%, CR={combined_ratio:.1%}) -> P/BV={target_pb:.2f}x")
 
     # Below Average: Underwriting loss but manageable
     elif combined_ratio >= 1.00 and combined_ratio < 1.05:
         target_pb = 0.85
         confidence = "medium"
-        warnings.append(
-            f"Underwriting loss (CR={combined_ratio:.1%}), relies on investment income"
-        )
+        warnings.append(f"Underwriting loss (CR={combined_ratio:.1%}), relies on investment income")
         logger.info(
             f"{symbol} - Below-average insurer (ROE={roe:.1f}%, CR={combined_ratio:.1%}) -> P/BV={target_pb:.2f}x"
         )
@@ -547,12 +537,8 @@ def _determine_target_pb_from_combined_ratio(
     else:
         target_pb = 0.70
         confidence = "low"
-        warnings.append(
-            f"Significant underwriting loss (CR={combined_ratio:.1%}) - distressed valuation"
-        )
-        logger.warning(
-            f"{symbol} - Weak insurer (ROE={roe:.1f}%, CR={combined_ratio:.1%}) -> P/BV={target_pb:.2f}x"
-        )
+        warnings.append(f"Significant underwriting loss (CR={combined_ratio:.1%}) - distressed valuation")
+        logger.warning(f"{symbol} - Weak insurer (ROE={roe:.1f}%, CR={combined_ratio:.1%}) -> P/BV={target_pb:.2f}x")
 
     return target_pb, confidence
 
@@ -574,6 +560,7 @@ def _fetch_from_database(
     if not database_url:
         try:
             from investigator.config import get_config
+
             config = get_config()
             database_url = (
                 f"postgresql://{config.database.username}:{config.database.password}"
@@ -585,11 +572,13 @@ def _fetch_from_database(
 
     try:
         from sqlalchemy import create_engine, text
+
         engine = create_engine(database_url)
 
         with engine.connect() as conn:
             # Query latest quarter with balance sheet data
-            query = text("""
+            query = text(
+                """
                 SELECT
                     stockholders_equity,
                     shares_outstanding,
@@ -602,9 +591,10 @@ def _fetch_from_database(
                   AND stockholders_equity IS NOT NULL
                 ORDER BY period_end_date DESC
                 LIMIT 1
-            """)
+            """
+            )
 
-            result = conn.execute(query, {'symbol': symbol}).fetchone()
+            result = conn.execute(query, {"symbol": symbol}).fetchone()
 
             if result:
                 logger.info(
@@ -628,9 +618,7 @@ def _fetch_from_database(
 
 
 def _calculate_ttm_metrics(
-    symbol: str,
-    database_url: Optional[str],
-    warnings: List[str]
+    symbol: str, database_url: Optional[str], warnings: List[str]
 ) -> Tuple[Optional[float], Optional[float]]:
     """
     Calculate TTM (Trailing Twelve Months) net income and average equity
@@ -647,6 +635,7 @@ def _calculate_ttm_metrics(
         # Try to get from config
         try:
             from investigator.config import get_config
+
             config = get_config()
             database_url = (
                 f"postgresql://{config.database.username}:{config.database.password}"
@@ -658,11 +647,13 @@ def _calculate_ttm_metrics(
 
     try:
         from sqlalchemy import create_engine, text
+
         engine = create_engine(database_url)
 
         with engine.connect() as conn:
             # Query last 4 quarters sorted by period_end_date DESC
-            query = text("""
+            query = text(
+                """
                 SELECT
                     net_income,
                     stockholders_equity,
@@ -676,9 +667,10 @@ def _calculate_ttm_metrics(
                   AND stockholders_equity IS NOT NULL
                 ORDER BY period_end_date DESC
                 LIMIT 4
-            """)
+            """
+            )
 
-            results = conn.execute(query, {'symbol': symbol}).fetchall()
+            results = conn.execute(query, {"symbol": symbol}).fetchall()
 
             if len(results) < 4:
                 logger.warning(
@@ -708,12 +700,7 @@ def _calculate_ttm_metrics(
         return None, None
 
 
-def _determine_target_pb(
-    symbol: str,
-    roe: float,
-    net_margin: float,
-    warnings: List[str]
-) -> Tuple[float, str]:
+def _determine_target_pb(symbol: str, roe: float, net_margin: float, warnings: List[str]) -> Tuple[float, str]:
     """
     Determine target P/BV ratio based on ROE and underwriting quality
 
@@ -735,19 +722,25 @@ def _determine_target_pb(
     if roe >= 15 and net_margin >= 10:
         target_pb = 1.50
         confidence = "high"
-        logger.info(f"{symbol} - Excellent insurer profile (ROE={roe:.1f}%, Margin={net_margin:.1f}%) → P/BV={target_pb:.2f}x")
+        logger.info(
+            f"{symbol} - Excellent insurer profile (ROE={roe:.1f}%, Margin={net_margin:.1f}%) → P/BV={target_pb:.2f}x"
+        )
 
     # Good insurers: ROE > 12%, Margin > 8%
     elif roe >= 12 and net_margin >= 8:
         target_pb = 1.20
         confidence = "high"
-        logger.info(f"{symbol} - Good insurer profile (ROE={roe:.1f}%, Margin={net_margin:.1f}%) → P/BV={target_pb:.2f}x")
+        logger.info(
+            f"{symbol} - Good insurer profile (ROE={roe:.1f}%, Margin={net_margin:.1f}%) → P/BV={target_pb:.2f}x"
+        )
 
     # Average insurers: ROE > 10%, Margin > 5%
     elif roe >= 10 and net_margin >= 5:
         target_pb = 1.00
         confidence = "medium"
-        logger.info(f"{symbol} - Average insurer profile (ROE={roe:.1f}%, Margin={net_margin:.1f}%) → P/BV={target_pb:.2f}x")
+        logger.info(
+            f"{symbol} - Average insurer profile (ROE={roe:.1f}%, Margin={net_margin:.1f}%) → P/BV={target_pb:.2f}x"
+        )
 
     # Below-average insurers: ROE > 8%, Margin > 3%
     elif roe >= 8 and net_margin >= 3:
@@ -766,11 +759,7 @@ def _determine_target_pb(
     return target_pb, confidence
 
 
-def calculate_insurance_specific_metrics(
-    symbol: str,
-    financials: Dict,
-    xbrl_data: Optional[Dict] = None
-) -> Dict:
+def calculate_insurance_specific_metrics(symbol: str, financials: Dict, xbrl_data: Optional[Dict] = None) -> Dict:
     """
     Calculate insurance-specific metrics from XBRL data or financial metrics.
 
@@ -806,20 +795,20 @@ def calculate_insurance_specific_metrics(
         metrics.update(insurance_metrics)
 
         # Calculate ratios
-        metrics['combined_ratio'] = calculate_combined_ratio(insurance_metrics)
-        metrics['loss_ratio'] = calculate_loss_ratio(insurance_metrics)
-        metrics['expense_ratio'] = calculate_expense_ratio(insurance_metrics)
+        metrics["combined_ratio"] = calculate_combined_ratio(insurance_metrics)
+        metrics["loss_ratio"] = calculate_loss_ratio(insurance_metrics)
+        metrics["expense_ratio"] = calculate_expense_ratio(insurance_metrics)
 
         # Calculate insurance float (unearned premiums + loss reserves)
-        loss_reserves = insurance_metrics.get('loss_reserves', 0) or 0
+        loss_reserves = insurance_metrics.get("loss_reserves", 0) or 0
         # Note: Unearned premiums might be in loss_reserves or need separate extraction
-        metrics['float'] = loss_reserves
+        metrics["float"] = loss_reserves
 
         # Assess underwriting quality
-        if metrics['combined_ratio'] is not None:
-            quality, description = assess_combined_ratio_quality(metrics['combined_ratio'])
-            metrics['underwriting_quality'] = quality
-            metrics['underwriting_description'] = description
+        if metrics["combined_ratio"] is not None:
+            quality, description = assess_combined_ratio_quality(metrics["combined_ratio"])
+            metrics["underwriting_quality"] = quality
+            metrics["underwriting_description"] = description
 
         logger.info(
             f"{symbol} - Insurance metrics calculated: "
@@ -828,18 +817,18 @@ def calculate_insurance_specific_metrics(
         )
     else:
         # Fallback: Use financials dict with placeholders
-        metrics['premiums_earned'] = financials.get('total_revenue') or financials.get('premiums_earned')
-        metrics['claims_incurred'] = financials.get('claims_incurred')
-        metrics['policy_acquisition_costs'] = financials.get('policy_acquisition_costs')
-        metrics['insurance_operating_expenses'] = financials.get('insurance_operating_expenses')
+        metrics["premiums_earned"] = financials.get("total_revenue") or financials.get("premiums_earned")
+        metrics["claims_incurred"] = financials.get("claims_incurred")
+        metrics["policy_acquisition_costs"] = financials.get("policy_acquisition_costs")
+        metrics["insurance_operating_expenses"] = financials.get("insurance_operating_expenses")
 
         # Try to calculate combined ratio if we have the data
-        metrics['combined_ratio'] = calculate_combined_ratio(metrics)
-        metrics['loss_ratio'] = calculate_loss_ratio(metrics)
-        metrics['expense_ratio'] = calculate_expense_ratio(metrics)
-        metrics['float'] = None  # Cannot calculate without XBRL data
+        metrics["combined_ratio"] = calculate_combined_ratio(metrics)
+        metrics["loss_ratio"] = calculate_loss_ratio(metrics)
+        metrics["expense_ratio"] = calculate_expense_ratio(metrics)
+        metrics["float"] = None  # Cannot calculate without XBRL data
 
-        if metrics['combined_ratio'] is None:
+        if metrics["combined_ratio"] is None:
             logger.debug(f"{symbol} - Combined ratio not available from financials dict")
 
     return metrics

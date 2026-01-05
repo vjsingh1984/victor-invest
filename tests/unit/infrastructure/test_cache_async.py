@@ -6,10 +6,11 @@ concurrent agent execution even during slow disk/DB operations.
 """
 
 import asyncio
-import pytest
 import time
 from pathlib import Path
 from typing import Dict
+
+import pytest
 
 from investigator.infrastructure.cache.cache_manager import CacheManager
 from investigator.infrastructure.cache.cache_types import CacheType
@@ -18,6 +19,7 @@ from investigator.infrastructure.cache.cache_types import CacheType
 @pytest.fixture
 def cache_manager(tmp_path):
     """Create cache manager with temporary directory"""
+
     # Mock config for testing
     class MockCacheControl:
         use_cache = True
@@ -66,7 +68,7 @@ async def test_async_cache_concurrent_writes(cache_manager):
         cache_manager.set_async(
             CacheType.LLM_RESPONSE,
             {"symbol": f"TEST{i}", "llm_type": "test"},
-            {"response": {"data": f"value_{i}" * 1000}}  # Proper structure with response key
+            {"response": {"data": f"value_{i}" * 1000}},  # Proper structure with response key
         )
         for i in range(10)
     ]
@@ -93,18 +95,14 @@ async def test_async_cache_concurrent_reads(cache_manager):
         await cache_manager.set_async(
             CacheType.LLM_RESPONSE,
             {"symbol": f"TEST{i}", "llm_type": "test"},
-            {"response": {"data": f"cached_value_{i}", "analysis": "test"}}
+            {"response": {"data": f"cached_value_{i}", "analysis": "test"}},
         )
 
     start = time.time()
 
     # Concurrent cache reads
     tasks = [
-        cache_manager.get_async(
-            CacheType.LLM_RESPONSE,
-            {"symbol": f"TEST{i}", "llm_type": "test"}
-        )
-        for i in range(10)
+        cache_manager.get_async(CacheType.LLM_RESPONSE, {"symbol": f"TEST{i}", "llm_type": "test"}) for i in range(10)
     ]
 
     results = await asyncio.gather(*tasks)
@@ -131,7 +129,7 @@ async def test_async_cache_mixed_operations(cache_manager):
         await cache_manager.set_async(
             CacheType.LLM_RESPONSE,
             {"symbol": f"EXISTING{i}", "llm_type": "test"},
-            {"response": {"data": f"existing_{i}", "analysis": "test"}}
+            {"response": {"data": f"existing_{i}", "analysis": "test"}},
         )
 
     start = time.time()
@@ -141,12 +139,7 @@ async def test_async_cache_mixed_operations(cache_manager):
 
     # 5 reads of existing data
     for i in range(5):
-        tasks.append(
-            cache_manager.get_async(
-                CacheType.LLM_RESPONSE,
-                {"symbol": f"EXISTING{i}", "llm_type": "test"}
-            )
-        )
+        tasks.append(cache_manager.get_async(CacheType.LLM_RESPONSE, {"symbol": f"EXISTING{i}", "llm_type": "test"}))
 
     # 5 writes of new data with proper structure
     for i in range(5):
@@ -154,7 +147,7 @@ async def test_async_cache_mixed_operations(cache_manager):
             cache_manager.set_async(
                 CacheType.LLM_RESPONSE,
                 {"symbol": f"NEW{i}", "llm_type": "test"},
-                {"response": {"data": f"new_value_{i}", "analysis": "test"}}
+                {"response": {"data": f"new_value_{i}", "analysis": "test"}},
             )
         )
 
@@ -199,14 +192,11 @@ async def test_async_cache_doesnt_block_event_loop(cache_manager):
             await cache_manager.set_async(
                 CacheType.LLM_RESPONSE,
                 {"symbol": f"HEAVY{i}", "llm_type": "test"},
-                {"response": {"data": "x" * 10000, "analysis": "heavy"}}  # Large payload with proper structure
+                {"response": {"data": "x" * 10000, "analysis": "heavy"}},  # Large payload with proper structure
             )
 
     # Run both concurrently - heartbeat should not be starved
-    await asyncio.gather(
-        heartbeat_monitor(),
-        cache_operations()
-    )
+    await asyncio.gather(heartbeat_monitor(), cache_operations())
 
     # Verify event loop was not blocked
     assert not event_loop_blocked, "Event loop was blocked during cache I/O"
@@ -221,7 +211,7 @@ async def test_cache_shutdown_cleanup(cache_manager):
     await cache_manager.set_async(
         CacheType.LLM_RESPONSE,
         {"symbol": "TEST", "llm_type": "test"},
-        {"response": {"data": "test_value", "analysis": "test"}}
+        {"response": {"data": "test_value", "analysis": "test"}},
     )
 
     # Shutdown should complete without errors
@@ -243,15 +233,12 @@ async def test_backward_compatibility_sync_methods(cache_manager):
     success = cache_manager.set(
         CacheType.LLM_RESPONSE,
         {"symbol": "SYNC_TEST", "llm_type": "test"},
-        {"response": {"data": "sync_value", "analysis": "test"}}
+        {"response": {"data": "sync_value", "analysis": "test"}},
     )
     assert success, "Sync write should succeed"
 
     # Sync read
-    result = cache_manager.get(
-        CacheType.LLM_RESPONSE,
-        {"symbol": "SYNC_TEST", "llm_type": "test"}
-    )
+    result = cache_manager.get(CacheType.LLM_RESPONSE, {"symbol": "SYNC_TEST", "llm_type": "test"})
     assert result is not None, "Sync read should return data"
     assert result["response"]["data"] == "sync_value"
 
@@ -263,7 +250,7 @@ def test_cache_manager_initialization():
     manager = CacheManager()
 
     # Verify executor is created
-    assert hasattr(manager, '_executor'), "Cache manager should have executor"
+    assert hasattr(manager, "_executor"), "Cache manager should have executor"
     assert manager._executor is not None, "Executor should be initialized"
     assert manager._executor._max_workers == 4, "Should have 4 worker threads"
 

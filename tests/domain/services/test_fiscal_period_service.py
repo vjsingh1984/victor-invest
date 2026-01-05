@@ -14,10 +14,11 @@ Date: 2025-11-12
 """
 
 import pytest
+
 from investigator.domain.services.fiscal_period_service import (
-    FiscalPeriodService,
     FiscalPeriod,
-    get_fiscal_period_service
+    FiscalPeriodService,
+    get_fiscal_period_service,
 )
 
 
@@ -28,7 +29,6 @@ class TestFiscalPeriodService:
     def service(self):
         """Create a fresh FiscalPeriodService instance for each test"""
         return FiscalPeriodService()
-
 
     # =============================================================================
     # normalize_period() Tests
@@ -211,25 +211,13 @@ class TestFiscalPeriodService:
     def test_detect_fiscal_year_end_calendar_year(self, service):
         """Test detection of calendar year end (12-31)"""
         company_facts = {
-            'facts': {
-                'us-gaap': {
-                    'Revenues': {
-                        'units': {
-                            'USD': [
-                                {
-                                    'end': '2024-12-31',
-                                    'val': 1000000,
-                                    'fy': 2024,
-                                    'fp': 'FY',
-                                    'form': '10-K'
-                                },
-                                {
-                                    'end': '2023-12-31',
-                                    'val': 900000,
-                                    'fy': 2023,
-                                    'fp': 'FY',
-                                    'form': '10-K'
-                                }
+            "facts": {
+                "us-gaap": {
+                    "Revenues": {
+                        "units": {
+                            "USD": [
+                                {"end": "2024-12-31", "val": 1000000, "fy": 2024, "fp": "FY", "form": "10-K"},
+                                {"end": "2023-12-31", "val": 900000, "fy": 2023, "fp": "FY", "form": "10-K"},
                             ]
                         }
                     }
@@ -243,25 +231,13 @@ class TestFiscalPeriodService:
     def test_detect_fiscal_year_end_june(self, service):
         """Test detection of June fiscal year end (06-30)"""
         company_facts = {
-            'facts': {
-                'us-gaap': {
-                    'Revenues': {
-                        'units': {
-                            'USD': [
-                                {
-                                    'end': '2024-06-30',
-                                    'val': 1000000,
-                                    'fy': 2024,
-                                    'fp': 'FY',
-                                    'form': '10-K'
-                                },
-                                {
-                                    'end': '2023-06-30',
-                                    'val': 900000,
-                                    'fy': 2023,
-                                    'fp': 'FY',
-                                    'form': '10-K'
-                                }
+            "facts": {
+                "us-gaap": {
+                    "Revenues": {
+                        "units": {
+                            "USD": [
+                                {"end": "2024-06-30", "val": 1000000, "fy": 2024, "fp": "FY", "form": "10-K"},
+                                {"end": "2023-06-30", "val": 900000, "fy": 2023, "fp": "FY", "form": "10-K"},
                             ]
                         }
                     }
@@ -275,19 +251,11 @@ class TestFiscalPeriodService:
     def test_detect_fiscal_year_end_september(self, service):
         """Test detection of September fiscal year end (09-30)"""
         company_facts = {
-            'facts': {
-                'us-gaap': {
-                    'Revenues': {
-                        'units': {
-                            'USD': [
-                                {
-                                    'end': '2024-09-30',
-                                    'val': 1000000,
-                                    'fy': 2024,
-                                    'fp': 'FY',
-                                    'form': '10-K'
-                                }
-                            ]
+            "facts": {
+                "us-gaap": {
+                    "Revenues": {
+                        "units": {
+                            "USD": [{"end": "2024-09-30", "val": 1000000, "fy": 2024, "fp": "FY", "form": "10-K"}]
                         }
                     }
                 }
@@ -300,17 +268,17 @@ class TestFiscalPeriodService:
     def test_detect_fiscal_year_end_most_common(self, service):
         """Test that most common fiscal year end is returned"""
         company_facts = {
-            'facts': {
-                'us-gaap': {
-                    'Revenues': {
-                        'units': {
-                            'USD': [
+            "facts": {
+                "us-gaap": {
+                    "Revenues": {
+                        "units": {
+                            "USD": [
                                 # Three 12-31 endings
-                                {'end': '2024-12-31', 'fy': 2024, 'fp': 'FY', 'form': '10-K'},
-                                {'end': '2023-12-31', 'fy': 2023, 'fp': 'FY', 'form': '10-K'},
-                                {'end': '2022-12-31', 'fy': 2022, 'fp': 'FY', 'form': '10-K'},
+                                {"end": "2024-12-31", "fy": 2024, "fp": "FY", "form": "10-K"},
+                                {"end": "2023-12-31", "fy": 2023, "fp": "FY", "form": "10-K"},
+                                {"end": "2022-12-31", "fy": 2022, "fp": "FY", "form": "10-K"},
                                 # One 06-30 ending (outlier)
-                                {'end': '2021-06-30', 'fy': 2021, 'fp': 'FY', 'form': '10-K'},
+                                {"end": "2021-06-30", "fy": 2021, "fp": "FY", "form": "10-K"},
                             ]
                         }
                     }
@@ -324,16 +292,16 @@ class TestFiscalPeriodService:
     def test_detect_fiscal_year_end_ignores_quarterly(self, service):
         """Test that quarterly filings (10-Q) are ignored"""
         company_facts = {
-            'facts': {
-                'us-gaap': {
-                    'Revenues': {
-                        'units': {
-                            'USD': [
+            "facts": {
+                "us-gaap": {
+                    "Revenues": {
+                        "units": {
+                            "USD": [
                                 # FY filings (10-K) - should be used
-                                {'end': '2024-12-31', 'fy': 2024, 'fp': 'FY', 'form': '10-K'},
+                                {"end": "2024-12-31", "fy": 2024, "fp": "FY", "form": "10-K"},
                                 # Quarterly filings (10-Q) - should be ignored
-                                {'end': '2024-09-30', 'fy': 2024, 'fp': 'Q3', 'form': '10-Q'},
-                                {'end': '2024-06-30', 'fy': 2024, 'fp': 'Q2', 'form': '10-Q'},
+                                {"end": "2024-09-30", "fy": 2024, "fp": "Q3", "form": "10-Q"},
+                                {"end": "2024-06-30", "fy": 2024, "fp": "Q2", "form": "10-Q"},
                             ]
                         }
                     }
@@ -355,13 +323,13 @@ class TestFiscalPeriodService:
     def test_detect_fiscal_year_end_no_fy_data(self, service):
         """Test that absence of FY data raises ValueError"""
         company_facts = {
-            'facts': {
-                'us-gaap': {
-                    'Revenues': {
-                        'units': {
-                            'USD': [
+            "facts": {
+                "us-gaap": {
+                    "Revenues": {
+                        "units": {
+                            "USD": [
                                 # Only quarterly data, no 10-K
-                                {'end': '2024-09-30', 'fy': 2024, 'fp': 'Q3', 'form': '10-Q'}
+                                {"end": "2024-09-30", "fy": 2024, "fp": "Q3", "form": "10-Q"}
                             ]
                         }
                     }
@@ -426,79 +394,41 @@ class TestFiscalPeriodService:
     def test_validate_q4_computation_valid_inputs(self, service):
         """Test validation passes for valid Q4 computation inputs"""
         # All individual quarters (qtrs=1) and FY=4
-        result = service.validate_q4_computation_inputs(
-            fy_qtrs=4,
-            q1_qtrs=1,
-            q2_qtrs=1,
-            q3_qtrs=1
-        )
+        result = service.validate_q4_computation_inputs(fy_qtrs=4, q1_qtrs=1, q2_qtrs=1, q3_qtrs=1)
         assert result is True
 
     def test_validate_q4_computation_ytd_data(self, service):
         """Test validation fails when quarters are YTD (qtrs>=2)"""
         # Q2 is YTD (qtrs=2)
-        result = service.validate_q4_computation_inputs(
-            fy_qtrs=4,
-            q1_qtrs=1,
-            q2_qtrs=2,  # YTD
-            q3_qtrs=1
-        )
+        result = service.validate_q4_computation_inputs(fy_qtrs=4, q1_qtrs=1, q2_qtrs=2, q3_qtrs=1)  # YTD
         assert result is False
 
         # Q3 is YTD (qtrs=3)
-        result = service.validate_q4_computation_inputs(
-            fy_qtrs=4,
-            q1_qtrs=1,
-            q2_qtrs=1,
-            q3_qtrs=3  # YTD
-        )
+        result = service.validate_q4_computation_inputs(fy_qtrs=4, q1_qtrs=1, q2_qtrs=1, q3_qtrs=3)  # YTD
         assert result is False
 
     def test_validate_q4_computation_invalid_fy(self, service):
         """Test validation fails when FY qtrs != 4"""
-        result = service.validate_q4_computation_inputs(
-            fy_qtrs=3,  # Should be 4
-            q1_qtrs=1,
-            q2_qtrs=1,
-            q3_qtrs=1
-        )
+        result = service.validate_q4_computation_inputs(fy_qtrs=3, q1_qtrs=1, q2_qtrs=1, q3_qtrs=1)  # Should be 4
         assert result is False
 
     def test_validate_q4_computation_invalid_types(self, service):
         """Test validation raises TypeError for non-int inputs"""
         with pytest.raises(TypeError, match="fy_qtrs must be int"):
             service.validate_q4_computation_inputs(
-                fy_qtrs="4",  # String instead of int
-                q1_qtrs=1,
-                q2_qtrs=1,
-                q3_qtrs=1
+                fy_qtrs="4", q1_qtrs=1, q2_qtrs=1, q3_qtrs=1  # String instead of int
             )
 
         with pytest.raises(TypeError, match="q1_qtrs must be int"):
-            service.validate_q4_computation_inputs(
-                fy_qtrs=4,
-                q1_qtrs=1.5,  # Float instead of int
-                q2_qtrs=1,
-                q3_qtrs=1
-            )
+            service.validate_q4_computation_inputs(fy_qtrs=4, q1_qtrs=1.5, q2_qtrs=1, q3_qtrs=1)  # Float instead of int
 
     def test_validate_q4_computation_out_of_range(self, service):
         """Test validation raises ValueError for qtrs outside 1-4"""
         with pytest.raises(ValueError, match="fy_qtrs must be 1-4"):
-            service.validate_q4_computation_inputs(
-                fy_qtrs=5,  # Out of range
-                q1_qtrs=1,
-                q2_qtrs=1,
-                q3_qtrs=1
-            )
+            service.validate_q4_computation_inputs(fy_qtrs=5, q1_qtrs=1, q2_qtrs=1, q3_qtrs=1)  # Out of range
 
         with pytest.raises(ValueError, match="q3_qtrs must be 1-4"):
-            service.validate_q4_computation_inputs(
-                fy_qtrs=4,
-                q1_qtrs=1,
-                q2_qtrs=1,
-                q3_qtrs=0  # Out of range
-            )
+            service.validate_q4_computation_inputs(fy_qtrs=4, q1_qtrs=1, q2_qtrs=1, q3_qtrs=0)  # Out of range
 
     # =============================================================================
     # Singleton Tests
@@ -511,7 +441,6 @@ class TestFiscalPeriodService:
 
         assert service1 is service2  # Same instance
         assert isinstance(service1, FiscalPeriodService)
-
 
     # =============================================================================
     # Integration Tests

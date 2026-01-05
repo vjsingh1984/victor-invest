@@ -5,14 +5,11 @@ Provides data from all 12 Federal Reserve districts with standardized interfaces
 Each district source follows the same pattern for consistency.
 """
 
+import logging
 from datetime import date
 from typing import Any, Dict, List, Optional
-import logging
 
-from ..base import (
-    MacroDataSource, DataResult, SourceMetadata,
-    DataCategory, DataFrequency, DataQuality
-)
+from ..base import DataCategory, DataFrequency, DataQuality, DataResult, MacroDataSource, SourceMetadata
 from ..registry import register_source
 
 logger = logging.getLogger(__name__)
@@ -50,8 +47,9 @@ class FedDistrictSource(MacroDataSource):
     def _fetch_impl(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
         """Fetch district-specific indicators"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             target_date = as_of_date or date.today()
@@ -59,7 +57,8 @@ class FedDistrictSource(MacroDataSource):
             data = {}
             with engine.connect() as conn:
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT indicator_name,
                                (indicator_data->>'value')::float as value,
                                observation_date,
@@ -68,8 +67,9 @@ class FedDistrictSource(MacroDataSource):
                         WHERE district = :district
                         AND observation_date <= :target_date
                         ORDER BY indicator_name, observation_date DESC
-                    """),
-                    {"district": self.district, "target_date": target_date}
+                    """
+                    ),
+                    {"district": self.district, "target_date": target_date},
                 )
 
                 seen = set()
@@ -105,6 +105,7 @@ class FedDistrictSource(MacroDataSource):
 @register_source("atlanta_fed", DataCategory.MACRO)
 class AtlantaFedSource(FedDistrictSource):
     """Atlanta Fed - GDPNow, Wage Growth Tracker"""
+
     DISTRICT_NAME = "Atlanta"
     INDICATORS = ["gdpnow", "wage_growth_tracker", "business_inflation_expectations"]
 
@@ -112,6 +113,7 @@ class AtlantaFedSource(FedDistrictSource):
 @register_source("chicago_fed", DataCategory.MACRO)
 class ChicagoFedSource(FedDistrictSource):
     """Chicago Fed - CFNAI, NFCI"""
+
     DISTRICT_NAME = "Chicago"
     INDICATORS = ["cfnai", "nfci", "anfci"]
 
@@ -119,6 +121,7 @@ class ChicagoFedSource(FedDistrictSource):
 @register_source("cleveland_fed", DataCategory.MACRO)
 class ClevelandFedSource(FedDistrictSource):
     """Cleveland Fed - Inflation Expectations, Yield Curve Model"""
+
     DISTRICT_NAME = "Cleveland"
     INDICATORS = ["inflation_expectations", "yield_curve_model", "median_cpi", "trimmed_mean_cpi"]
 
@@ -126,6 +129,7 @@ class ClevelandFedSource(FedDistrictSource):
 @register_source("dallas_fed", DataCategory.MACRO)
 class DallasFedSource(FedDistrictSource):
     """Dallas Fed - Texas Manufacturing, Trimmed Mean PCE"""
+
     DISTRICT_NAME = "Dallas"
     INDICATORS = ["texas_manufacturing", "texas_services", "trimmed_mean_pce"]
 
@@ -133,6 +137,7 @@ class DallasFedSource(FedDistrictSource):
 @register_source("kansas_city_fed", DataCategory.MACRO)
 class KansasCityFedSource(FedDistrictSource):
     """Kansas City Fed - Manufacturing Survey, KCFSI"""
+
     DISTRICT_NAME = "Kansas City"
     INDICATORS = ["manufacturing_survey", "kcfsi", "lmci"]
 
@@ -160,6 +165,7 @@ class KansasCityFedSource(FedDistrictSource):
 @register_source("new_york_fed", DataCategory.MACRO)
 class NewYorkFedSource(FedDistrictSource):
     """New York Fed - Recession Probability, Empire State Mfg"""
+
     DISTRICT_NAME = "New York"
     INDICATORS = ["recession_probability", "gscpi", "empire_state_manufacturing"]
 
@@ -185,6 +191,7 @@ class NewYorkFedSource(FedDistrictSource):
 @register_source("philadelphia_fed", DataCategory.MACRO)
 class PhiladelphiaFedSource(FedDistrictSource):
     """Philadelphia Fed - Manufacturing Survey, ADS Index"""
+
     DISTRICT_NAME = "Philadelphia"
     INDICATORS = ["manufacturing_survey", "ads_index", "leading_index", "coincident_index"]
 
@@ -192,6 +199,7 @@ class PhiladelphiaFedSource(FedDistrictSource):
 @register_source("richmond_fed", DataCategory.MACRO)
 class RichmondFedSource(FedDistrictSource):
     """Richmond Fed - Manufacturing Survey, Services Survey"""
+
     DISTRICT_NAME = "Richmond"
     INDICATORS = ["manufacturing_survey", "services_survey"]
 
@@ -199,6 +207,7 @@ class RichmondFedSource(FedDistrictSource):
 # =============================================================================
 # Composite Fed Source (All Districts)
 # =============================================================================
+
 
 @register_source("all_fed_districts", DataCategory.MACRO)
 class AllFedDistrictsSource(MacroDataSource):
@@ -252,8 +261,15 @@ class AllFedDistrictsSource(MacroDataSource):
 
                 # Extract key summary indicators
                 indicators = result.data.get("indicators", {})
-                for key in ["gdpnow", "cfnai", "nfci", "kcfsi", "recession_probability",
-                            "inflation_expectations", "empire_state_manufacturing"]:
+                for key in [
+                    "gdpnow",
+                    "cfnai",
+                    "nfci",
+                    "kcfsi",
+                    "recession_probability",
+                    "inflation_expectations",
+                    "empire_state_manufacturing",
+                ]:
                     if key in indicators and indicators[key].get("value") is not None:
                         summary[key] = indicators[key]["value"]
             else:

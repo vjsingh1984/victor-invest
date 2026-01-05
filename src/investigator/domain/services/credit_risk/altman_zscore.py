@@ -54,17 +54,19 @@ logger = logging.getLogger(__name__)
 
 class AltmanZone(Enum):
     """Altman Z-Score zones indicating bankruptcy risk."""
-    SAFE = "safe"           # Z > 2.99
-    GREY = "grey"           # 1.81 ≤ Z ≤ 2.99
-    DISTRESS = "distress"   # Z < 1.81
+
+    SAFE = "safe"  # Z > 2.99
+    GREY = "grey"  # 1.81 ≤ Z ≤ 2.99
+    DISTRESS = "distress"  # Z < 1.81
 
 
 class AltmanModel(Enum):
     """Different Altman Z-Score model variants."""
-    ORIGINAL = "original"       # Manufacturing companies (1968)
-    REVISED = "revised"         # Non-manufacturing (Z')
-    EMERGING = "emerging"       # Emerging markets (Z'')
-    SERVICE = "service"         # Service companies
+
+    ORIGINAL = "original"  # Manufacturing companies (1968)
+    REVISED = "revised"  # Non-manufacturing (Z')
+    EMERGING = "emerging"  # Emerging markets (Z'')
+    SERVICE = "service"  # Service companies
 
 
 @dataclass
@@ -76,6 +78,7 @@ class AltmanZScoreResult(CreditScoreResult):
         model_used: Which Altman model variant was applied
         bankruptcy_probability: Estimated probability of bankruptcy
     """
+
     zone: Optional[AltmanZone] = None
     model_used: AltmanModel = AltmanModel.ORIGINAL
     bankruptcy_probability: Optional[float] = None
@@ -84,11 +87,13 @@ class AltmanZScoreResult(CreditScoreResult):
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary."""
         result = super().to_dict()
-        result.update({
-            "zone": self.zone.value if self.zone else None,
-            "model_used": self.model_used.value,
-            "bankruptcy_probability": self.bankruptcy_probability,
-        })
+        result.update(
+            {
+                "zone": self.zone.value if self.zone else None,
+                "model_used": self.model_used.value,
+                "bankruptcy_probability": self.bankruptcy_probability,
+            }
+        )
         return result
 
 
@@ -102,11 +107,11 @@ class AltmanZScoreCalculator:
     """
 
     # Altman Z-Score coefficients (Original model)
-    COEF_X1 = 1.2   # Working Capital / Total Assets
-    COEF_X2 = 1.4   # Retained Earnings / Total Assets
-    COEF_X3 = 3.3   # EBIT / Total Assets
-    COEF_X4 = 0.6   # Market Value Equity / Total Liabilities
-    COEF_X5 = 1.0   # Sales / Total Assets
+    COEF_X1 = 1.2  # Working Capital / Total Assets
+    COEF_X2 = 1.4  # Retained Earnings / Total Assets
+    COEF_X3 = 3.3  # EBIT / Total Assets
+    COEF_X4 = 0.6  # Market Value Equity / Total Liabilities
+    COEF_X5 = 1.0  # Sales / Total Assets
 
     # Zone thresholds
     SAFE_THRESHOLD = 2.99
@@ -314,13 +319,7 @@ class AltmanZScoreCalculator:
         x4 = x4 or 0
         x5 = x5 or 0
 
-        z_score = (
-            self.COEF_X1 * x1 +
-            self.COEF_X2 * x2 +
-            self.COEF_X3 * x3 +
-            self.COEF_X4 * x4 +
-            self.COEF_X5 * x5
-        )
+        z_score = self.COEF_X1 * x1 + self.COEF_X2 * x2 + self.COEF_X3 * x3 + self.COEF_X4 * x4 + self.COEF_X5 * x5
 
         return z_score
 
@@ -344,10 +343,10 @@ class AltmanZScoreCalculator:
         x4 = x4 or 0
 
         z_score = (
-            self.REVISED_COEF_X1 * x1 +
-            self.REVISED_COEF_X2 * x2 +
-            self.REVISED_COEF_X3 * x3 +
-            self.REVISED_COEF_X4 * x4
+            self.REVISED_COEF_X1 * x1
+            + self.REVISED_COEF_X2 * x2
+            + self.REVISED_COEF_X3 * x3
+            + self.REVISED_COEF_X4 * x4
         )
 
         return z_score
@@ -414,6 +413,7 @@ class AltmanZScoreCalculator:
         # Logistic approximation
         # P(bankruptcy) ≈ 1 / (1 + exp(1.5 × (Z - 1.8)))
         import math
+
         try:
             prob = 1.0 / (1.0 + math.exp(1.5 * (z_score - 1.8)))
             return round(prob, 4)

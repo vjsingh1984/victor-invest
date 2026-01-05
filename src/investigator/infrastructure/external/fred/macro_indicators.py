@@ -13,21 +13,23 @@ Database Tables:
 import logging
 import os
 import ssl
-from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import certifi
+
     SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 except ImportError:
     SSL_CONTEXT = ssl.create_default_context()
 
+from contextlib import contextmanager
+
 import aiohttp
 import pandas as pd
-from sqlalchemy import text, create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from contextlib import contextmanager
 
 from investigator.config import get_config
 
@@ -53,6 +55,7 @@ def _get_fred_api_key() -> Optional[str]:
     # Priority 2: Try victor keyring
     try:
         from victor.config.api_keys import get_service_key
+
         key = get_service_key("fred")
         if key:
             return key
@@ -77,11 +80,7 @@ def get_stock_db_manager():
 
     # Create engine for stock database
     engine = create_engine(
-        stock_db_url,
-        pool_size=db_config.pool_size,
-        max_overflow=db_config.max_overflow,
-        echo=False,
-        pool_pre_ping=True
+        stock_db_url, pool_size=db_config.pool_size, max_overflow=db_config.max_overflow, echo=False, pool_pre_ping=True
     )
 
     # Create session factory
@@ -96,66 +95,56 @@ class MacroIndicatorsFetcher:
     # Key indicators for investment analysis
     KEY_INDICATORS = {
         # Economic Growth
-        'GDP': 'Gross Domestic Product',
-        'GDPC1': 'Real GDP',
-        'A939RX0Q048SBEA': 'Real GDP Growth Rate',
-        'GDPNOW': 'GDPNow Forecast',
-        'NYGDPPCAPKDUSA': 'GDP per Capita',
-
+        "GDP": "Gross Domestic Product",
+        "GDPC1": "Real GDP",
+        "A939RX0Q048SBEA": "Real GDP Growth Rate",
+        "GDPNOW": "GDPNow Forecast",
+        "NYGDPPCAPKDUSA": "GDP per Capita",
         # Equity Market
-        'SP500': 'S&P 500 Index',
-
+        "SP500": "S&P 500 Index",
         # Labor Market
-        'UNRATE': 'Unemployment Rate',
-        'PAYEMS': 'Total Nonfarm Payrolls',
-        'JTSJOL': 'Job Openings',
-
+        "UNRATE": "Unemployment Rate",
+        "PAYEMS": "Total Nonfarm Payrolls",
+        "JTSJOL": "Job Openings",
         # Inflation
-        'CPIAUCSL': 'Consumer Price Index',
-        'PCEPI': 'PCE Price Index',
-        'CORESTICKM159SFRBATL': 'Sticky Price CPI',
-        'T10YIE': '10-Year Breakeven Inflation Rate',
-
+        "CPIAUCSL": "Consumer Price Index",
+        "PCEPI": "PCE Price Index",
+        "CORESTICKM159SFRBATL": "Sticky Price CPI",
+        "T10YIE": "10-Year Breakeven Inflation Rate",
         # Interest Rates & Credit
-        'FEDFUNDS': 'Federal Funds Rate',
-        'DFF': 'Fed Funds Effective Rate',
-        'DGS10': '10-Year Treasury Rate',
-        'T10Y2Y': '10Y-2Y Treasury Spread',
-        'BAMLH0A0HYM2': 'High Yield Credit Spread',
-        'MORTGAGE30US': '30-Year Mortgage Rate',
-
+        "FEDFUNDS": "Federal Funds Rate",
+        "DFF": "Fed Funds Effective Rate",
+        "DGS10": "10-Year Treasury Rate",
+        "T10Y2Y": "10Y-2Y Treasury Spread",
+        "BAMLH0A0HYM2": "High Yield Credit Spread",
+        "MORTGAGE30US": "30-Year Mortgage Rate",
         # Debt Metrics
-        'GFDEGDQ188S': 'Federal Debt to GDP',
-        'GFDGDPA188S': 'Gross Federal Debt to GDP',
-        'HDTGPDUSQ163N': 'Household Debt to GDP',
-        'CMDEBT': 'Household Credit Market Debt',
-        'NCBDBIQ027S': 'Corporate Debt Securities',
-        'TBSDODNS': 'Total Business Debt',
-        'TDSP': 'Household Debt Service Ratio',
-        'FODSP': 'Financial Obligations Ratio',
-
+        "GFDEGDQ188S": "Federal Debt to GDP",
+        "GFDGDPA188S": "Gross Federal Debt to GDP",
+        "HDTGPDUSQ163N": "Household Debt to GDP",
+        "CMDEBT": "Household Credit Market Debt",
+        "NCBDBIQ027S": "Corporate Debt Securities",
+        "TBSDODNS": "Total Business Debt",
+        "TDSP": "Household Debt Service Ratio",
+        "FODSP": "Financial Obligations Ratio",
         # Sentiment & Risk
-        'VIXCLS': 'VIX Volatility Index',
-        'UMCSENT': 'Consumer Sentiment',
-
+        "VIXCLS": "VIX Volatility Index",
+        "UMCSENT": "Consumer Sentiment",
         # Housing
-        'HOUST': 'Housing Starts',
-        'CSUSHPISA': 'Case-Shiller Home Price Index',
-
+        "HOUST": "Housing Starts",
+        "CSUSHPISA": "Case-Shiller Home Price Index",
         # Trade & Dollar
-        'DTWEXBGS': 'Trade Weighted Dollar Index',
-        'BOPGSTB': 'Trade Balance',
-        'DEXUSEU': 'USD/Euro Exchange Rate',
-
+        "DTWEXBGS": "Trade Weighted Dollar Index",
+        "BOPGSTB": "Trade Balance",
+        "DEXUSEU": "USD/Euro Exchange Rate",
         # Monetary Policy
-        'M2SL': 'M2 Money Stock',
-        'WALCL': 'Fed Total Assets',
-        'PSAVERT': 'Personal Saving Rate',
-
+        "M2SL": "M2 Money Stock",
+        "WALCL": "Fed Total Assets",
+        "PSAVERT": "Personal Saving Rate",
         # Other
-        'INDPRO': 'Industrial Production',
-        'RETAILIMSA': 'Retail Sales',
-        'PCE': 'Personal Consumption Expenditures',
+        "INDPRO": "Industrial Production",
+        "RETAILIMSA": "Retail Sales",
+        "PCE": "Personal Consumption Expenditures",
     }
 
     def __init__(self):
@@ -169,10 +158,7 @@ class MacroIndicatorsFetcher:
         """Get or create aiohttp session."""
         if self._session is None or self._session.closed:
             connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
-            self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=30),
-                connector=connector
-            )
+            self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), connector=connector)
         return self._session
 
     async def get_indicator_data(
@@ -199,18 +185,15 @@ class MacroIndicatorsFetcher:
             }
         """
         if not self._api_key:
-            self.logger.warning(
-                "FRED_API_KEY not configured. "
-                "Set via: victor keys --set-service fred --keyring"
-            )
+            self.logger.warning("FRED_API_KEY not configured. " "Set via: victor keys --set-service fred --keyring")
             return {}
 
         result: Dict[str, Any] = {
-            'name': self.KEY_INDICATORS.get(series_id, series_id),
-            'category': 'unknown',
-            'frequency': 'daily',
-            'units': '',
-            'values': [],
+            "name": self.KEY_INDICATORS.get(series_id, series_id),
+            "category": "unknown",
+            "frequency": "daily",
+            "units": "",
+            "values": [],
         }
 
         try:
@@ -219,50 +202,50 @@ class MacroIndicatorsFetcher:
             # Fetch series metadata
             meta_url = f"{FRED_API_BASE}/series"
             meta_params = {
-                'series_id': series_id,
-                'api_key': self._api_key,
-                'file_type': 'json',
+                "series_id": series_id,
+                "api_key": self._api_key,
+                "file_type": "json",
             }
 
             async with session.get(meta_url, params=meta_params) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if 'seriess' in data and data['seriess']:
-                        series_info = data['seriess'][0]
-                        result['name'] = series_info.get('title', result['name'])
-                        result['frequency'] = series_info.get('frequency', 'daily')
-                        result['units'] = series_info.get('units', '')
+                    if "seriess" in data and data["seriess"]:
+                        series_info = data["seriess"][0]
+                        result["name"] = series_info.get("title", result["name"])
+                        result["frequency"] = series_info.get("frequency", "daily")
+                        result["units"] = series_info.get("units", "")
 
             # Fetch observations
             obs_url = f"{FRED_API_BASE}/series/observations"
             obs_params = {
-                'series_id': series_id,
-                'api_key': self._api_key,
-                'file_type': 'json',
-                'observation_start': start_date,
-                'observation_end': end_date,
-                'sort_order': 'desc',
+                "series_id": series_id,
+                "api_key": self._api_key,
+                "file_type": "json",
+                "observation_start": start_date,
+                "observation_end": end_date,
+                "sort_order": "desc",
             }
 
             async with session.get(obs_url, params=obs_params) as response:
                 if response.status == 200:
                     data = await response.json()
-                    observations = data.get('observations', [])
+                    observations = data.get("observations", [])
 
                     for obs in observations:
-                        value = obs.get('value')
-                        if value and value != '.':
+                        value = obs.get("value")
+                        if value and value != ".":
                             try:
-                                result['values'].append({
-                                    'date': obs.get('date'),
-                                    'value': float(value),
-                                })
+                                result["values"].append(
+                                    {
+                                        "date": obs.get("date"),
+                                        "value": float(value),
+                                    }
+                                )
                             except ValueError:
                                 pass
 
-            self.logger.debug(
-                f"Fetched {len(result['values'])} values for {series_id}"
-            )
+            self.logger.debug(f"Fetched {len(result['values'])} values for {series_id}")
 
         except Exception as e:
             self.logger.error(f"Error fetching {series_id} from FRED: {e}")
@@ -288,8 +271,9 @@ class MacroIndicatorsFetcher:
         finally:
             session.close()
 
-    def get_latest_values(self, indicator_ids: Optional[List[str]] = None,
-                         lookback_days: int = 1095) -> Dict[str, Dict]:
+    def get_latest_values(
+        self, indicator_ids: Optional[List[str]] = None, lookback_days: int = 1095
+    ) -> Dict[str, Dict]:
         """
         Get latest values for specified indicators
 
@@ -308,7 +292,8 @@ class MacroIndicatorsFetcher:
                 # Get latest value for each indicator
                 # Build the query with dynamic interval
                 lookback_interval = f"{lookback_days} days"
-                query = text(f"""
+                query = text(
+                    f"""
                     WITH latest_values AS (
                         SELECT DISTINCT ON (indicator_id)
                             indicator_id,
@@ -345,11 +330,10 @@ class MacroIndicatorsFetcher:
                     LEFT JOIN previous_values pv ON lv.indicator_id = pv.indicator_id
                     INNER JOIN macro_indicators mi ON lv.indicator_id = mi.id
                     ORDER BY lv.indicator_id
-                """)
+                """
+                )
 
-                result = session.execute(query, {
-                    'indicators': indicator_ids
-                })
+                result = session.execute(query, {"indicators": indicator_ids})
 
                 indicators_data = {}
                 for row in result:
@@ -359,18 +343,22 @@ class MacroIndicatorsFetcher:
 
                     # Calculate changes
                     change_abs = value - prev_value if (value and prev_value) else None
-                    change_pct = ((value - prev_value) / prev_value * 100) if (value and prev_value and prev_value != 0) else None
+                    change_pct = (
+                        ((value - prev_value) / prev_value * 100)
+                        if (value and prev_value and prev_value != 0)
+                        else None
+                    )
 
                     indicators_data[indicator_id] = {
-                        'value': value,
-                        'date': row.date,
-                        'prev_value': prev_value,
-                        'prev_date': row.prev_date if hasattr(row, 'prev_date') else None,
-                        'change_abs': change_abs,
-                        'change_pct': change_pct,
-                        'name': row.name,
-                        'frequency': row.frequency,
-                        'units': row.units,
+                        "value": value,
+                        "date": row.date,
+                        "prev_value": prev_value,
+                        "prev_date": row.prev_date if hasattr(row, "prev_date") else None,
+                        "change_abs": change_abs,
+                        "change_pct": change_pct,
+                        "name": row.name,
+                        "frequency": row.frequency,
+                        "units": row.units,
                     }
 
                 self.logger.info(f"Fetched {len(indicators_data)} macro indicators")
@@ -394,8 +382,13 @@ class MacroIndicatorsFetcher:
         )
         return self.get_latest_values(indicator_ids=indicator_ids, lookback_days=lookback_days)
 
-    def get_time_series(self, indicator_id: str, start_date: Optional[datetime] = None,
-                       end_date: Optional[datetime] = None, limit: int = 1000) -> pd.DataFrame:
+    def get_time_series(
+        self,
+        indicator_id: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 1000,
+    ) -> pd.DataFrame:
         """
         Get time series data for an indicator
 
@@ -410,7 +403,8 @@ class MacroIndicatorsFetcher:
         """
         try:
             with self.get_session() as session:
-                query = text("""
+                query = text(
+                    """
                     SELECT date, value
                     FROM macro_indicator_values
                     WHERE indicator_id = :indicator_id
@@ -419,25 +413,24 @@ class MacroIndicatorsFetcher:
                       AND (:end_date IS NULL OR date <= :end_date)
                     ORDER BY date DESC
                     LIMIT :limit
-                """)
+                """
+                )
 
-                result = session.execute(query, {
-                    'indicator_id': indicator_id,
-                    'start_date': start_date,
-                    'end_date': end_date,
-                    'limit': limit
-                })
+                result = session.execute(
+                    query,
+                    {"indicator_id": indicator_id, "start_date": start_date, "end_date": end_date, "limit": limit},
+                )
 
                 data = [(row.date, float(row.value)) for row in result if row.value]
-                df = pd.DataFrame(data, columns=['date', 'value'])
-                df = df.sort_values('date')  # Sort ascending for analysis
+                df = pd.DataFrame(data, columns=["date", "value"])
+                df = df.sort_values("date")  # Sort ascending for analysis
 
                 self.logger.debug(f"Fetched {len(df)} data points for {indicator_id}")
                 return df
 
         except Exception as e:
             self.logger.error(f"Error fetching time series for {indicator_id}: {e}")
-            return pd.DataFrame(columns=['date', 'value'])
+            return pd.DataFrame(columns=["date", "value"])
 
     def get_vti_price(self) -> Optional[float]:
         """
@@ -448,21 +441,20 @@ class MacroIndicatorsFetcher:
         """
         try:
             with self.get_session() as session:
-                query = text("""
+                query = text(
+                    """
                     SELECT close, date
                     FROM tickerdata
                     WHERE ticker = 'VTI'
                     ORDER BY date DESC
                     LIMIT 1
-                """)
+                """
+                )
                 result = session.execute(query)
                 row = result.first()
 
                 if row:
-                    return {
-                        'price': float(row.close),
-                        'date': row.date
-                    }
+                    return {"price": float(row.close), "date": row.date}
                 return None
         except Exception as e:
             self.logger.error(f"Error fetching VTI price: {e}")
@@ -493,10 +485,10 @@ class MacroIndicatorsFetcher:
             Dict with indicator value, interpretation, and component values
         """
         try:
-            indicators = self.get_latest_values(['GDP'])
+            indicators = self.get_latest_values(["GDP"])
             vti_data = self.get_vti_price()
 
-            if 'GDP' not in indicators:
+            if "GDP" not in indicators:
                 self.logger.warning("Cannot calculate Buffett Indicator: Missing GDP data")
                 return None
 
@@ -504,8 +496,8 @@ class MacroIndicatorsFetcher:
                 self.logger.warning("Cannot calculate Buffett Indicator: Missing VTI price data")
                 return None
 
-            vti_price = vti_data['price']
-            gdp_value = indicators['GDP']['value']  # In billions
+            vti_price = vti_data["price"]
+            gdp_value = indicators["GDP"]["value"]  # In billions
 
             if not vti_price or not gdp_value:
                 return None
@@ -539,16 +531,16 @@ class MacroIndicatorsFetcher:
                 signal = "warning"
 
             return {
-                'ratio': buffett_ratio,
-                'interpretation': interpretation,
-                'signal': signal,
-                'vti_price': vti_price,
-                'vti_date': vti_data['date'],
-                'gdp': gdp_value,
-                'gdp_date': indicators['GDP']['date'],
-                'estimated_w5k_index': estimated_w5k_index,
-                'estimated_market_cap': estimated_market_cap,
-                'note': 'Calculated using VTI ETF as proxy for Wilshire 5000 Total Market Index'
+                "ratio": buffett_ratio,
+                "interpretation": interpretation,
+                "signal": signal,
+                "vti_price": vti_price,
+                "vti_date": vti_data["date"],
+                "gdp": gdp_value,
+                "gdp_date": indicators["GDP"]["date"],
+                "estimated_w5k_index": estimated_w5k_index,
+                "estimated_market_cap": estimated_market_cap,
+                "note": "Calculated using VTI ETF as proxy for Wilshire 5000 Total Market Index",
             }
 
         except Exception as e:
@@ -565,70 +557,80 @@ class MacroIndicatorsFetcher:
         indicators = self.get_latest_values()
 
         summary = {
-            'timestamp': datetime.now().isoformat(),
-            'indicators': indicators,
-            'categories': {},
-            'alerts': [],
-            'overall_assessment': None
+            "timestamp": datetime.now().isoformat(),
+            "indicators": indicators,
+            "categories": {},
+            "alerts": [],
+            "overall_assessment": None,
         }
 
         # Categorize indicators
         categories = {
-            'growth': ['GDP', 'GDPC1', 'A939RX0Q048SBEA', 'GDPNOW', 'NYGDPPCAPKDUSA'],
-            'employment': ['UNRATE', 'PAYEMS', 'JTSJOL'],
-            'inflation': ['CPIAUCSL', 'PCEPI', 'CORESTICKM159SFRBATL', 'T10YIE'],
-            'rates': ['FEDFUNDS', 'DFF', 'DGS10', 'T10Y2Y', 'MORTGAGE30US'],
-            'credit': ['BAMLH0A0HYM2'],
-            'debt': ['GFDEGDQ188S', 'GFDGDPA188S', 'HDTGPDUSQ163N', 'CMDEBT',
-                     'NCBDBIQ027S', 'TBSDODNS', 'TDSP', 'FODSP'],
-            'market': ['SP500', 'VIXCLS'],
-            'sentiment': ['UMCSENT'],
-            'housing': ['HOUST', 'CSUSHPISA'],
-            'monetary': ['M2SL', 'WALCL', 'PSAVERT'],
-            'trade': ['DTWEXBGS', 'BOPGSTB', 'DEXUSEU'],
+            "growth": ["GDP", "GDPC1", "A939RX0Q048SBEA", "GDPNOW", "NYGDPPCAPKDUSA"],
+            "employment": ["UNRATE", "PAYEMS", "JTSJOL"],
+            "inflation": ["CPIAUCSL", "PCEPI", "CORESTICKM159SFRBATL", "T10YIE"],
+            "rates": ["FEDFUNDS", "DFF", "DGS10", "T10Y2Y", "MORTGAGE30US"],
+            "credit": ["BAMLH0A0HYM2"],
+            "debt": [
+                "GFDEGDQ188S",
+                "GFDGDPA188S",
+                "HDTGPDUSQ163N",
+                "CMDEBT",
+                "NCBDBIQ027S",
+                "TBSDODNS",
+                "TDSP",
+                "FODSP",
+            ],
+            "market": ["SP500", "VIXCLS"],
+            "sentiment": ["UMCSENT"],
+            "housing": ["HOUST", "CSUSHPISA"],
+            "monetary": ["M2SL", "WALCL", "PSAVERT"],
+            "trade": ["DTWEXBGS", "BOPGSTB", "DEXUSEU"],
         }
 
         for category, indicator_list in categories.items():
-            summary['categories'][category] = {
-                ind_id: indicators.get(ind_id)
-                for ind_id in indicator_list
-                if ind_id in indicators
+            summary["categories"][category] = {
+                ind_id: indicators.get(ind_id) for ind_id in indicator_list if ind_id in indicators
             }
 
         # Generate alerts for significant changes or levels
         for ind_id, data in indicators.items():
-            if data.get('change_pct'):
+            if data.get("change_pct"):
                 # Alert on large changes
-                if abs(data['change_pct']) > 10:
-                    summary['alerts'].append({
-                        'type': 'large_change',
-                        'indicator': data['name'],
-                        'change_pct': data['change_pct'],
-                        'severity': 'high' if abs(data['change_pct']) > 20 else 'medium'
-                    })
+                if abs(data["change_pct"]) > 10:
+                    summary["alerts"].append(
+                        {
+                            "type": "large_change",
+                            "indicator": data["name"],
+                            "change_pct": data["change_pct"],
+                            "severity": "high" if abs(data["change_pct"]) > 20 else "medium",
+                        }
+                    )
 
         # Special indicators
         buffett = self.calculate_buffett_indicator()
         if buffett:
-            summary['buffett_indicator'] = buffett
+            summary["buffett_indicator"] = buffett
 
-            if buffett['signal'] in ['warning', 'strong_buy']:
-                summary['alerts'].append({
-                    'type': 'buffett_indicator',
-                    'indicator': 'Market Valuation',
-                    'interpretation': buffett['interpretation'],
-                    'ratio': buffett['ratio'],
-                    'severity': 'high' if buffett['signal'] == 'warning' else 'medium'
-                })
+            if buffett["signal"] in ["warning", "strong_buy"]:
+                summary["alerts"].append(
+                    {
+                        "type": "buffett_indicator",
+                        "indicator": "Market Valuation",
+                        "interpretation": buffett["interpretation"],
+                        "ratio": buffett["ratio"],
+                        "severity": "high" if buffett["signal"] == "warning" else "medium",
+                    }
+                )
 
         # Overall assessment
-        risk_factors = len([a for a in summary['alerts'] if a['severity'] == 'high'])
+        risk_factors = len([a for a in summary["alerts"] if a["severity"] == "high"])
         if risk_factors == 0:
-            summary['overall_assessment'] = 'favorable'
+            summary["overall_assessment"] = "favorable"
         elif risk_factors <= 2:
-            summary['overall_assessment'] = 'mixed'
+            summary["overall_assessment"] = "mixed"
         else:
-            summary['overall_assessment'] = 'cautionary'
+            summary["overall_assessment"] = "cautionary"
 
         return summary
 
@@ -644,24 +646,24 @@ def format_indicator_for_display(indicator_id: str, data: Dict) -> str:
     Returns:
         Formatted string for display
     """
-    if not data or not data.get('value'):
+    if not data or not data.get("value"):
         return f"{indicator_id}: No data available"
 
-    value = data['value']
-    units = data.get('units', '')
-    change_pct = data.get('change_pct')
-    date = data.get('date', 'unknown date')
+    value = data["value"]
+    units = data.get("units", "")
+    change_pct = data.get("change_pct")
+    date = data.get("date", "unknown date")
 
     # Format value based on units
-    if 'Percent' in units or indicator_id in ['UNRATE', 'FEDFUNDS', 'DGS10']:
+    if "Percent" in units or indicator_id in ["UNRATE", "FEDFUNDS", "DGS10"]:
         value_str = f"{value:.2f}%"
-    elif 'Index' in units:
+    elif "Index" in units:
         value_str = f"{value:,.2f}"
-    elif 'Billions' in units:
+    elif "Billions" in units:
         value_str = f"${value:,.1f}B"
-    elif 'Millions' in units:
+    elif "Millions" in units:
         value_str = f"${value:,.1f}M"
-    elif 'Thousands' in units:
+    elif "Thousands" in units:
         value_str = f"{value:,.0f}K"
     else:
         value_str = f"{value:,.2f}"
@@ -702,7 +704,7 @@ if __name__ == "__main__":
 
     # Test latest values
     print("Latest Values:")
-    indicators = fetcher.get_latest_values(['GDP', 'SP500', 'UNRATE', 'CPIAUCSL'])
+    indicators = fetcher.get_latest_values(["GDP", "SP500", "UNRATE", "CPIAUCSL"])
     for ind_id, data in indicators.items():
         print(f"  {format_indicator_for_display(ind_id, data)}")
 
@@ -719,5 +721,5 @@ if __name__ == "__main__":
     summary = fetcher.get_macro_summary()
     print(f"  Overall Assessment: {summary['overall_assessment']}")
     print(f"  Number of Alerts: {len(summary['alerts'])}")
-    for alert in summary['alerts']:
+    for alert in summary["alerts"]:
         print(f"    - {alert['type']}: {alert.get('indicator', 'N/A')}")

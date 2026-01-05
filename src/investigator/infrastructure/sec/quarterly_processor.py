@@ -16,16 +16,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from investigator.config import get_config
 from data.models import FinancialStatementData, QuarterlyData
+from investigator.application.processors import Filing, SubmissionProcessor
+from investigator.config import get_config
 from investigator.infrastructure.cache import get_cache_manager
 from investigator.infrastructure.cache.cache_types import CacheType
 from investigator.infrastructure.database.db import safe_json_dumps
+from investigator.infrastructure.database.ticker_mapper import ticker_to_cik
 
 # Now using cache_manager interface for all cache operations
 from investigator.infrastructure.sec.sec_frame_api import SECFrameAPI
-from investigator.application.processors import Filing, SubmissionProcessor
-from investigator.infrastructure.database.ticker_mapper import ticker_to_cik
 
 logger = logging.getLogger(__name__)
 

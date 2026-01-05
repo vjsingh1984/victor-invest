@@ -5,14 +5,11 @@ Provides Treasury yield curve data with spread calculations
 and curve analysis (inversion detection, steepening, etc.)
 """
 
+import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
-import logging
 
-from ..base import (
-    DataSource, DataResult, SourceMetadata,
-    DataCategory, DataFrequency, DataQuality
-)
+from ..base import DataCategory, DataFrequency, DataQuality, DataResult, DataSource, SourceMetadata
 from ..registry import register_source
 
 logger = logging.getLogger(__name__)
@@ -65,15 +62,17 @@ class TreasuryYieldSource(DataSource):
     def _fetch_impl(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
         """Fetch Treasury yields and calculate spreads"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             target_date = as_of_date or date.today()
 
             with engine.connect() as conn:
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT date, yield_1m, yield_3m, yield_6m, yield_1y,
                                yield_2y, yield_5y, yield_10y, yield_20y, yield_30y,
                                spread_10y_2y, spread_10y_3m, is_inverted
@@ -81,8 +80,9 @@ class TreasuryYieldSource(DataSource):
                         WHERE date <= :target_date
                         ORDER BY date DESC
                         LIMIT 1
-                    """),
-                    {"target_date": target_date}
+                    """
+                    ),
+                    {"target_date": target_date},
                 )
                 row = result.fetchone()
 
@@ -177,16 +177,14 @@ class TreasuryYieldSource(DataSource):
 
         return analysis
 
-    def get_historical_spreads(
-        self,
-        spread_type: str = "10y_2y",
-        lookback_days: int = 365
-    ) -> DataResult:
+    def get_historical_spreads(self, spread_type: str = "10y_2y", lookback_days: int = 365) -> DataResult:
         """Get historical spread data"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
-            from sqlalchemy import text
             from datetime import timedelta
+
+            from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             start_date = date.today() - timedelta(days=lookback_days)
@@ -207,14 +205,16 @@ class TreasuryYieldSource(DataSource):
 
             with engine.connect() as conn:
                 result = conn.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT date, {spread_column} as spread
                         FROM treasury_yields
                         WHERE date >= :start_date
                         AND {spread_column} IS NOT NULL
                         ORDER BY date
-                    """),
-                    {"start_date": start_date}
+                    """
+                    ),
+                    {"start_date": start_date},
                 )
                 rows = result.fetchall()
 

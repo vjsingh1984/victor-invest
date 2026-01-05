@@ -8,12 +8,12 @@ TD1/TD2/TD3 FIXES: Added FiscalPeriodNormalizer for proper YTD handling.
 
 from investigator.domain.services.data_normalizer import DataNormalizer
 from investigator.domain.services.fiscal_period_normalizer import (
-    FiscalPeriodNormalizer,
     FiscalPeriod,
+    FiscalPeriodNormalizer,
     QuarterlyConversionResult,
-    get_fiscal_period_normalizer,
-    convert_ytd_to_quarterly,
     compute_q4,
+    convert_ytd_to_quarterly,
+    get_fiscal_period_normalizer,
 )
 
 __all__ = [

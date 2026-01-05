@@ -25,8 +25,8 @@ from rich.table import Table
 
 # Victor framework imports (from local wheel)
 try:
-    from victor.framework import Agent, Event, EventType
     from victor.core.protocols import OrchestratorProtocol
+    from victor.framework import Agent, Event, EventType
     from victor.workflows.streaming import WorkflowEventType
 except ImportError:
     # Fallback for development without victor installed
@@ -179,7 +179,9 @@ def _convert_to_investment_recommendation(result, symbol: str):
                 range_position = (current_price - low_52) / (high_52 - low_52) * 100
                 thesis_parts.append(f"at {range_position:.0f}% of its 52-week range (${low_52:.2f} - ${high_52:.2f})")
 
-        thesis_parts.append(f"The technical outlook is {trend_signal} with {bullish_pct:.0f}% bullish and {bearish_pct:.0f}% bearish signals.")
+        thesis_parts.append(
+            f"The technical outlook is {trend_signal} with {bullish_pct:.0f}% bullish and {bearish_pct:.0f}% bearish signals."
+        )
         thesis_parts.append(f"Composite analysis score: {composite_score:.1f}/100.")
 
         if final_recommendation == "BUY":
@@ -443,6 +445,7 @@ async def _run_analysis(
         except Exception as e:
             console.print(f"[red]Error during analysis: {e}[/red]")
             import traceback
+
             traceback.print_exc()
             return
 
@@ -494,6 +497,7 @@ async def _run_analysis(
         except Exception as e:
             console.print(f"[red]❌ Failed to generate PDF report: {e}[/red]")
             import traceback
+
             traceback.print_exc()
 
 
@@ -622,8 +626,8 @@ def clean_cache(clean_all, clean_db, clean_disk, symbol):
     try:
         from investigator.infrastructure.cache import get_cache_manager
         from investigator.infrastructure.cache.cache_types import CacheType
-        from investigator.infrastructure.cache.rdbms_cache_handler import RdbmsCacheStorageHandler
         from investigator.infrastructure.cache.file_cache_handler import FileCacheStorageHandler
+        from investigator.infrastructure.cache.rdbms_cache_handler import RdbmsCacheStorageHandler
     except ImportError as e:
         console.print(f"[red]Error: Cache infrastructure not available: {e}[/red]")
         return
@@ -656,7 +660,7 @@ def clean_cache(clean_all, clean_db, clean_disk, symbol):
                 console.print("Cleaning database cache...")
                 for ct in [CacheType.LLM_RESPONSE, CacheType.COMPANY_FACTS, CacheType.SEC_RESPONSE]:
                     try:
-                        cache_manager.clear(ct, storage_type='rdbms')
+                        cache_manager.clear(ct, storage_type="rdbms")
                     except Exception:
                         pass
                 console.print("[green]✅ Database cache cleared[/green]")
@@ -677,7 +681,7 @@ def clean_cache(clean_all, clean_db, clean_disk, symbol):
                 console.print("Cleaning disk cache...")
                 for ct in [CacheType.LLM_RESPONSE, CacheType.TECHNICAL_DATA, CacheType.SEC_RESPONSE]:
                     try:
-                        cache_manager.clear(ct, storage_type='disk')
+                        cache_manager.clear(ct, storage_type="disk")
                     except Exception:
                         pass
                 console.print("[green]✅ Disk cache cleared[/green]")
@@ -834,7 +838,7 @@ def from_batch(jsonl_path: str, symbols: Optional[str], output: str, min_upside:
 
     # Load batch results
     results = []
-    with open(jsonl_path, 'r') as f:
+    with open(jsonl_path, "r") as f:
         for line in f:
             if line.strip():
                 try:
@@ -846,29 +850,29 @@ def from_batch(jsonl_path: str, symbols: Optional[str], output: str, min_upside:
 
     # Filter results
     filtered = []
-    symbol_filter = set(s.upper() for s in symbols.split(',')) if symbols else None
+    symbol_filter = set(s.upper() for s in symbols.split(",")) if symbols else None
 
     for r in results:
         # Must be successful
-        if not r.get('success', False):
+        if not r.get("success", False):
             continue
 
         # Must have required data for report
-        if not r.get('fair_value') or not r.get('current_price'):
+        if not r.get("fair_value") or not r.get("current_price"):
             continue
 
         # Apply symbol filter
-        if symbol_filter and r.get('symbol') not in symbol_filter:
+        if symbol_filter and r.get("symbol") not in symbol_filter:
             continue
 
         # Apply upside filter
         if min_upside is not None:
-            upside = r.get('upside_pct', 0) or 0
+            upside = r.get("upside_pct", 0) or 0
             if upside < min_upside:
                 continue
 
         # Apply tier filter
-        if tier and r.get('tier', '').upper() != tier:
+        if tier and r.get("tier", "").upper() != tier:
             continue
 
         filtered.append(r)
@@ -890,7 +894,7 @@ def from_batch(jsonl_path: str, symbols: Optional[str], output: str, min_upside:
 
         success_count = 0
         for r in filtered:
-            symbol = r.get('symbol', 'UNKNOWN')
+            symbol = r.get("symbol", "UNKNOWN")
             console.print(f"  Generating report for [cyan]{symbol}[/cyan]...")
 
             try:
@@ -924,25 +928,25 @@ def _convert_batch_result_to_report_data(batch_result: dict) -> dict:
     Returns:
         Dict compatible with ProfessionalReportGenerator
     """
-    symbol = batch_result.get('symbol', 'UNKNOWN')
-    fair_value = batch_result.get('fair_value')
-    current_price = batch_result.get('current_price')
-    upside_pct = batch_result.get('upside_pct', 0)
-    tier = batch_result.get('tier', 'HOLD')
-    model_fair_values = batch_result.get('model_fair_values', {})
-    model_weights = batch_result.get('model_weights', {})
-    sector = batch_result.get('sector', '')
-    market_cap = batch_result.get('market_cap')
+    symbol = batch_result.get("symbol", "UNKNOWN")
+    fair_value = batch_result.get("fair_value")
+    current_price = batch_result.get("current_price")
+    upside_pct = batch_result.get("upside_pct", 0)
+    tier = batch_result.get("tier", "HOLD")
+    model_fair_values = batch_result.get("model_fair_values", {})
+    model_weights = batch_result.get("model_weights", {})
+    sector = batch_result.get("sector", "")
+    market_cap = batch_result.get("market_cap")
 
     # Map tier to recommendation
     rec_map = {
-        'BUY': ('BUY', 'HIGH'),
-        'STRONG_BUY': ('STRONG BUY', 'HIGH'),
-        'HOLD': ('HOLD', 'MEDIUM'),
-        'SELL': ('SELL', 'LOW'),
-        'STRONG_SELL': ('STRONG SELL', 'LOW'),
+        "BUY": ("BUY", "HIGH"),
+        "STRONG_BUY": ("STRONG BUY", "HIGH"),
+        "HOLD": ("HOLD", "MEDIUM"),
+        "SELL": ("SELL", "LOW"),
+        "STRONG_SELL": ("STRONG SELL", "LOW"),
     }
-    recommendation, confidence = rec_map.get(tier.upper(), ('HOLD', 'MEDIUM'))
+    recommendation, confidence = rec_map.get(tier.upper(), ("HOLD", "MEDIUM"))
 
     # Calculate scores from upside
     if upside_pct is not None and upside_pct > 0:
@@ -963,9 +967,9 @@ def _convert_batch_result_to_report_data(batch_result: dict) -> dict:
             model_upside = ((fv / current_price) - 1) * 100
             weight = (model_weights or {}).get(model, 0.33)
             valuation_models[model] = {
-                'fair_value_per_share': fv,
-                'upside_downside_pct': model_upside,
-                'confidence': weight * 100,
+                "fair_value_per_share": fv,
+                "upside_downside_pct": model_upside,
+                "confidence": weight * 100,
             }
 
     # Build thesis from batch data
@@ -973,7 +977,9 @@ def _convert_batch_result_to_report_data(batch_result: dict) -> dict:
     thesis_parts.append(f"{symbol} in {sector}." if sector else f"{symbol}.")
     if upside_pct is not None:
         if upside_pct > 15:
-            thesis_parts.append(f"Analysis indicates significant undervaluation with {upside_pct:.1f}% upside to fair value.")
+            thesis_parts.append(
+                f"Analysis indicates significant undervaluation with {upside_pct:.1f}% upside to fair value."
+            )
         elif upside_pct > 5:
             thesis_parts.append(f"Moderate upside of {upside_pct:.1f}% to fair value estimate.")
         elif upside_pct > 0:
@@ -984,7 +990,7 @@ def _convert_batch_result_to_report_data(batch_result: dict) -> dict:
         thesis_parts.append(f"Market cap: ${market_cap/1e9:.1f}B.")
 
     # Key catalysts/risks based on tier
-    if tier.upper() in ['BUY', 'STRONG_BUY']:
+    if tier.upper() in ["BUY", "STRONG_BUY"]:
         key_catalysts = [
             f"Fair value estimate of ${fair_value:.2f} suggests upside potential",
             "Valuation models show favorable risk/reward",
@@ -1001,31 +1007,31 @@ def _convert_batch_result_to_report_data(batch_result: dict) -> dict:
         ]
 
     return {
-        'symbol': symbol,
-        'recommendation': recommendation,
-        'confidence': confidence,
-        'overall_score': overall_score,
-        'fundamental_score': min(fundamental_score, 100),
-        'technical_score': max(min(technical_score, 100), 10),
-        'current_price': current_price,
-        'target_price': fair_value,
-        'stop_loss': stop_loss,
-        'investment_thesis': ' '.join(thesis_parts),
-        'key_catalysts': key_catalysts,
-        'key_risks': key_risks,
-        'time_horizon': 'MEDIUM-TERM',
-        'position_size': 'MODERATE' if tier.upper() in ['BUY', 'STRONG_BUY'] else 'SMALL',
-        'valuation_models': valuation_models,
-        'score_breakdown': {
-            'value': min(50 + (upside_pct or 0) * 2, 100),
-            'growth': 60,  # Default without detailed data
-            'business_quality': 70,
-            'data_quality': 80,
+        "symbol": symbol,
+        "recommendation": recommendation,
+        "confidence": confidence,
+        "overall_score": overall_score,
+        "fundamental_score": min(fundamental_score, 100),
+        "technical_score": max(min(technical_score, 100), 10),
+        "current_price": current_price,
+        "target_price": fair_value,
+        "stop_loss": stop_loss,
+        "investment_thesis": " ".join(thesis_parts),
+        "key_catalysts": key_catalysts,
+        "key_risks": key_risks,
+        "time_horizon": "MEDIUM-TERM",
+        "position_size": "MODERATE" if tier.upper() in ["BUY", "STRONG_BUY"] else "SMALL",
+        "valuation_models": valuation_models,
+        "score_breakdown": {
+            "value": min(50 + (upside_pct or 0) * 2, 100),
+            "growth": 60,  # Default without detailed data
+            "business_quality": 70,
+            "data_quality": 80,
         },
         # Market regime placeholder
-        'market_regime': {'regime': 'Normal'},
+        "market_regime": {"regime": "Normal"},
         # Peer data placeholder
-        'peer_comparison': {'peers': [], 'metrics': {}},
+        "peer_comparison": {"peers": [], "metrics": {}},
     }
 
 

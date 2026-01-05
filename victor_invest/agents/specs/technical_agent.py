@@ -19,15 +19,14 @@ price action and market structure.
 """
 
 from victor.agents.spec import (
-    AgentSpec,
     AgentCapabilities,
     AgentConstraints,
+    AgentSpec,
     ModelPreference,
     OutputFormat,
 )
 
 from victor_invest.prompts.investment_prompts import TECHNICAL_ANALYST_PROMPT
-
 
 TECHNICAL_AGENT_SPEC = AgentSpec(
     name="technical_analyst",

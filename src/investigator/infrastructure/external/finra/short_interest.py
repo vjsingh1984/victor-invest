@@ -79,6 +79,7 @@ class ShortInterestData:
         change_from_previous: Change from prior period
         change_percent: Percentage change from prior period
     """
+
     symbol: str
     settlement_date: date
     short_interest: int = 0
@@ -99,12 +100,18 @@ class ShortInterestData:
             "avg_daily_volume": self.avg_daily_volume,
             "days_to_cover": round(self.days_to_cover, 2),
             "short_percent_float": round(self.short_percent_float, 2) if self.short_percent_float else None,
-            "short_percent_outstanding": round(self.short_percent_outstanding, 2) if self.short_percent_outstanding else None,
-            "previous": {
-                "short_interest": self.previous_short_interest,
-                "change": self.change_from_previous,
-                "change_percent": round(self.change_percent, 2) if self.change_percent else None,
-            } if self.previous_short_interest else None,
+            "short_percent_outstanding": (
+                round(self.short_percent_outstanding, 2) if self.short_percent_outstanding else None
+            ),
+            "previous": (
+                {
+                    "short_interest": self.previous_short_interest,
+                    "change": self.change_from_previous,
+                    "change_percent": round(self.change_percent, 2) if self.change_percent else None,
+                }
+                if self.previous_short_interest
+                else None
+            ),
         }
 
 
@@ -120,6 +127,7 @@ class ShortVolumeData:
         total_volume: Total trading volume
         short_percent: Short volume as % of total volume
     """
+
     symbol: str
     trade_date: date
     short_volume: int = 0
@@ -150,6 +158,7 @@ class ShortSqueezeRisk:
         factors: Contributing risk factors
         interpretation: Human-readable assessment
     """
+
     symbol: str
     squeeze_score: float = 0.0
     risk_level: str = "low"
@@ -195,10 +204,7 @@ class ShortInterestFetcher:
                 "User-Agent": "Victor-Invest/1.0 (Investment Research; contact@example.com)",
                 "Accept": "application/json",
             }
-            self._session = aiohttp.ClientSession(
-                timeout=self.timeout,
-                headers=headers
-            )
+            self._session = aiohttp.ClientSession(timeout=self.timeout, headers=headers)
         return self._session
 
     async def close(self):
@@ -242,11 +248,10 @@ class ShortInterestFetcher:
         try:
             from sqlalchemy import create_engine, text
 
-            engine = create_engine(
-                "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database"
-            )
+            engine = create_engine("postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database")
 
-            query = text("""
+            query = text(
+                """
                 SELECT
                     symbol,
                     settlement_date,
@@ -258,7 +263,8 @@ class ShortInterestFetcher:
                 WHERE symbol = :symbol
                 ORDER BY settlement_date DESC
                 LIMIT 2
-            """)
+            """
+            )
 
             with engine.connect() as conn:
                 results = conn.execute(query, {"symbol": symbol}).fetchall()
@@ -319,9 +325,7 @@ class ShortInterestFetcher:
                 current = data[0]
                 previous = data[1] if len(data) > 1 else None
 
-                settlement_date = datetime.strptime(
-                    current.get("settlementDate", ""), "%Y-%m-%d"
-                ).date()
+                settlement_date = datetime.strptime(current.get("settlementDate", ""), "%Y-%m-%d").date()
 
                 short_interest = current.get("shortInterest", 0)
                 avg_volume = current.get("avgDailyShareVolume", 0)
@@ -360,6 +364,7 @@ class ShortInterestFetcher:
             settlement = date(today.year, today.month, 15)
         else:
             import calendar
+
             last_day = calendar.monthrange(today.year, today.month)[1]
             settlement = date(today.year, today.month, last_day)
 
@@ -367,6 +372,7 @@ class ShortInterestFetcher:
             # Use previous settlement
             if settlement.day == 15:
                 import calendar
+
                 prev_month = today.month - 1 if today.month > 1 else 12
                 prev_year = today.year if today.month > 1 else today.year - 1
                 last_day = calendar.monthrange(prev_year, prev_month)[1]
@@ -376,11 +382,7 @@ class ShortInterestFetcher:
 
         return None  # Return None if no real data available
 
-    async def get_short_interest_history(
-        self,
-        symbol: str,
-        periods: int = 12
-    ) -> List[ShortInterestData]:
+    async def get_short_interest_history(self, symbol: str, periods: int = 12) -> List[ShortInterestData]:
         """Get historical short interest data.
 
         Args:
@@ -395,11 +397,10 @@ class ShortInterestFetcher:
         try:
             from sqlalchemy import create_engine, text
 
-            engine = create_engine(
-                "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database"
-            )
+            engine = create_engine("postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database")
 
-            query = text("""
+            query = text(
+                """
                 SELECT
                     symbol,
                     settlement_date,
@@ -411,13 +412,11 @@ class ShortInterestFetcher:
                 WHERE symbol = :symbol
                 ORDER BY settlement_date DESC
                 LIMIT :periods
-            """)
+            """
+            )
 
             with engine.connect() as conn:
-                results = conn.execute(query, {
-                    "symbol": symbol,
-                    "periods": periods
-                }).fetchall()
+                results = conn.execute(query, {"symbol": symbol, "periods": periods}).fetchall()
 
                 history = []
                 prev_short = None
@@ -430,17 +429,19 @@ class ShortInterestFetcher:
                         if prev_short > 0:
                             change_pct = (change / prev_short) * 100
 
-                    history.append(ShortInterestData(
-                        symbol=row[0],
-                        settlement_date=row[1],
-                        short_interest=row[2] or 0,
-                        days_to_cover=float(row[3]) if row[3] else 0.0,
-                        short_percent_float=float(row[4]) if row[4] else None,
-                        avg_daily_volume=row[5] or 0,
-                        previous_short_interest=prev_short,
-                        change_from_previous=change,
-                        change_percent=change_pct,
-                    ))
+                    history.append(
+                        ShortInterestData(
+                            symbol=row[0],
+                            settlement_date=row[1],
+                            short_interest=row[2] or 0,
+                            days_to_cover=float(row[3]) if row[3] else 0.0,
+                            short_percent_float=float(row[4]) if row[4] else None,
+                            avg_daily_volume=row[5] or 0,
+                            previous_short_interest=prev_short,
+                            change_from_previous=change,
+                            change_percent=change_pct,
+                        )
+                    )
                     prev_short = row[2]
 
                 return list(reversed(history))
@@ -449,11 +450,7 @@ class ShortInterestFetcher:
             logger.error(f"Error getting short interest history: {e}")
             return []
 
-    async def get_short_volume(
-        self,
-        symbol: str,
-        days: int = 30
-    ) -> List[ShortVolumeData]:
+    async def get_short_volume(self, symbol: str, days: int = 30) -> List[ShortVolumeData]:
         """Get daily short volume data.
 
         Args:
@@ -468,11 +465,10 @@ class ShortInterestFetcher:
         try:
             from sqlalchemy import create_engine, text
 
-            engine = create_engine(
-                "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database"
-            )
+            engine = create_engine("postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database")
 
-            query = text("""
+            query = text(
+                """
                 SELECT
                     symbol,
                     trade_date,
@@ -483,13 +479,11 @@ class ShortInterestFetcher:
                 WHERE symbol = :symbol
                 ORDER BY trade_date DESC
                 LIMIT :days
-            """)
+            """
+            )
 
             with engine.connect() as conn:
-                results = conn.execute(query, {
-                    "symbol": symbol,
-                    "days": days
-                }).fetchall()
+                results = conn.execute(query, {"symbol": symbol, "days": days}).fetchall()
 
                 return [
                     ShortVolumeData(
@@ -507,10 +501,7 @@ class ShortInterestFetcher:
             logger.debug(f"Error getting short volume: {e}")
             return []
 
-    async def calculate_squeeze_risk(
-        self,
-        symbol: str
-    ) -> ShortSqueezeRisk:
+    async def calculate_squeeze_risk(self, symbol: str) -> ShortSqueezeRisk:
         """Calculate short squeeze risk for a symbol.
 
         Factors considered:
@@ -535,7 +526,7 @@ class ShortInterestFetcher:
                 squeeze_score=0,
                 risk_level="unknown",
                 factors=["No short interest data available"],
-                interpretation="Unable to assess squeeze risk without data"
+                interpretation="Unable to assess squeeze risk without data",
             )
 
         # Get history for trend
@@ -670,11 +661,10 @@ class ShortInterestFetcher:
         try:
             from sqlalchemy import create_engine, text
 
-            engine = create_engine(
-                "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database"
-            )
+            engine = create_engine("postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database")
 
-            query = text("""
+            query = text(
+                """
                 SELECT DISTINCT ON (symbol)
                     symbol,
                     settlement_date,
@@ -684,17 +674,14 @@ class ShortInterestFetcher:
                 FROM short_interest
                 WHERE short_percent_float IS NOT NULL
                 ORDER BY symbol, settlement_date DESC
-            """)
+            """
+            )
 
             with engine.connect() as conn:
                 results = conn.execute(query).fetchall()
 
                 # Sort by short percent of float descending
-                sorted_results = sorted(
-                    results,
-                    key=lambda x: x[4] if x[4] else 0,
-                    reverse=True
-                )[:limit]
+                sorted_results = sorted(results, key=lambda x: x[4] if x[4] else 0, reverse=True)[:limit]
 
                 return [
                     {

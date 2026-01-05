@@ -320,12 +320,14 @@ def merge_analysis_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
             "sec_insights": sec_insights,
         },
         "analysis_complete": True,
-        "component_count": sum([
-            bool(fundamental),
-            bool(technical),
-            bool(market_context),
-            bool(sec_insights),
-        ]),
+        "component_count": sum(
+            [
+                bool(fundamental),
+                bool(technical),
+                bool(market_context),
+                bool(sec_insights),
+            ]
+        ),
     }
 
 
@@ -344,18 +346,21 @@ def calculate_composite_score(ctx: Dict[str, Any]) -> Dict[str, Any]:
     sentiment = ctx.get("sentiment_score", 50)
 
     # Default weights
-    weights = ctx.get("weights", {
-        "fundamental": 0.40,
-        "technical": 0.25,
-        "sec": 0.20,
-        "sentiment": 0.15,
-    })
+    weights = ctx.get(
+        "weights",
+        {
+            "fundamental": 0.40,
+            "technical": 0.25,
+            "sec": 0.20,
+            "sentiment": 0.15,
+        },
+    )
 
     composite = (
-        fundamental * weights.get("fundamental", 0.40) +
-        technical * weights.get("technical", 0.25) +
-        sec * weights.get("sec", 0.20) +
-        sentiment * weights.get("sentiment", 0.15)
+        fundamental * weights.get("fundamental", 0.40)
+        + technical * weights.get("technical", 0.25)
+        + sec * weights.get("sec", 0.20)
+        + sentiment * weights.get("sentiment", 0.15)
     )
 
     return {

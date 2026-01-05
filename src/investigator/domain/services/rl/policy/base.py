@@ -20,18 +20,18 @@ Usage:
             pass
 """
 
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-import logging
 
 import numpy as np
 
-from investigator.domain.services.rl.models import (
-    ValuationContext,
-    Experience,
-)
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
+from investigator.domain.services.rl.models import (
+    Experience,
+    ValuationContext,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -355,8 +355,8 @@ class UniformPolicy(RLPolicy):
 
     def save(self, path: str) -> bool:
         """Save policy (minimal state for uniform)."""
-        import pickle
         import os
+        import pickle
 
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)

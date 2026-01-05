@@ -7,11 +7,11 @@ Tests ExtractionResult, ExtractionAudit, and related dataclasses.
 import pytest
 
 from investigator.infrastructure.sec.metric_extraction.result import (
-    ExtractionResult,
-    ExtractionAudit,
     ExtractionAttempt,
-    MatchMethod,
+    ExtractionAudit,
     ExtractionConfidence,
+    ExtractionResult,
+    MatchMethod,
 )
 
 
@@ -137,12 +137,14 @@ class TestExtractionAudit:
             target_fiscal_period="FY",
         )
 
-        audit.add_attempt(ExtractionAttempt(
-            strategy_name="ByPeriodEndMatcher",
-            tag_name="Revenues",
-            matched=True,
-            entries_found=1,
-        ))
+        audit.add_attempt(
+            ExtractionAttempt(
+                strategy_name="ByPeriodEndMatcher",
+                tag_name="Revenues",
+                matched=True,
+                entries_found=1,
+            )
+        )
 
         summary = audit.summary()
         assert "total_revenue" in summary
@@ -156,19 +158,23 @@ class TestExtractionAudit:
             target_period_end="2025-06-27",
         )
 
-        audit.add_attempt(ExtractionAttempt(
-            strategy_name="ByPeriodEndMatcher",
-            tag_name="Revenues",
-            matched=False,
-            entries_found=0,
-        ))
+        audit.add_attempt(
+            ExtractionAttempt(
+                strategy_name="ByPeriodEndMatcher",
+                tag_name="Revenues",
+                matched=False,
+                entries_found=0,
+            )
+        )
 
-        audit.add_attempt(ExtractionAttempt(
-            strategy_name="ByDateRangeMatcher",
-            tag_name="Revenues",
-            matched=False,
-            entries_found=0,
-        ))
+        audit.add_attempt(
+            ExtractionAttempt(
+                strategy_name="ByDateRangeMatcher",
+                tag_name="Revenues",
+                matched=False,
+                entries_found=0,
+            )
+        )
 
         summary = audit.summary()
         assert "Failed strategies" in summary or "0 succeeded" in summary

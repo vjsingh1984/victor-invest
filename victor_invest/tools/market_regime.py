@@ -113,9 +113,9 @@ Investment Signals by Regime:
         """Initialize market regime analyzers."""
         try:
             from investigator.domain.services.market_regime import (
-                get_yield_curve_analyzer,
                 get_credit_cycle_analyzer,
                 get_recession_indicator,
+                get_yield_curve_analyzer,
             )
 
             self._yield_curve_analyzer = get_yield_curve_analyzer()
@@ -129,12 +129,7 @@ Investment Signals by Regime:
             logger.error(f"Failed to initialize MarketRegimeTool: {e}")
             raise
 
-    async def execute(
-        self,
-        _exec_ctx: Dict[str, Any],
-        action: str = "summary",
-        **kwargs
-    ) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], action: str = "summary", **kwargs) -> ToolResult:
         """Execute market regime query.
 
         Args:
@@ -181,10 +176,7 @@ Investment Signals by Regime:
 
         except Exception as e:
             logger.error(f"MarketRegimeTool execute error: {e}")
-            return ToolResult.error_result(
-                f"Market regime query failed: {str(e)}",
-                metadata={"action": action}
-            )
+            return ToolResult.error_result(f"Market regime query failed: {str(e)}", metadata={"action": action})
 
     async def _get_summary(self) -> ToolResult:
         """Get comprehensive market regime summary."""
@@ -237,7 +229,7 @@ Investment Signals by Regime:
                 "source": "market_regime_services",
                 "credit_cycle": cc_analysis.phase.value,
                 "signal": overall_signal["level"],
-            }
+            },
         )
 
     async def _get_yield_curve(self) -> ToolResult:
@@ -250,7 +242,7 @@ Investment Signals by Regime:
             metadata={
                 "source": "treasury_yield_curve",
                 "shape": analysis.shape.value,
-            }
+            },
         )
 
     async def _get_credit_cycle(self) -> ToolResult:
@@ -264,7 +256,7 @@ Investment Signals by Regime:
                 "source": "credit_cycle_analyzer",
                 "phase": analysis.phase.value,
                 "confidence": analysis.confidence,
-            }
+            },
         )
 
     async def _get_recession(self) -> ToolResult:
@@ -278,7 +270,7 @@ Investment Signals by Regime:
                 "source": "recession_indicator",
                 "phase": assessment.phase.value,
                 "probability": assessment.probability_pct,
-            }
+            },
         )
 
     async def _get_volatility(self) -> ToolResult:
@@ -295,7 +287,7 @@ Investment Signals by Regime:
             metadata={
                 "source": "vix_analysis",
                 "regime": cc_analysis.volatility_regime.value,
-            }
+            },
         )
 
     async def _get_recommendations(self) -> ToolResult:
@@ -321,7 +313,7 @@ Investment Signals by Regime:
             metadata={
                 "source": "market_regime_services",
                 "phase": cc_analysis.phase.value,
-            }
+            },
         )
 
     def _derive_overall_signal(self, yc_analysis, cc_analysis) -> Dict[str, Any]:
@@ -405,8 +397,8 @@ Investment Signals by Regime:
                     "type": "string",
                     "enum": ["summary", "yield_curve", "credit_cycle", "recession", "volatility", "recommendations"],
                     "description": "Type of market regime query",
-                    "default": "summary"
+                    "default": "summary",
                 }
             },
-            "required": []
+            "required": [],
         }

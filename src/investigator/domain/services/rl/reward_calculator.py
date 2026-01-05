@@ -11,7 +11,7 @@ This prevents drift between training and production reward signals.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RewardComponents:
     """Breakdown of reward calculation components."""
+
     reward: float  # Final reward in [-1, 1]
     annualized_return: float  # Annualized position return
     risk_adjusted_return: float  # After beta adjustment
@@ -260,6 +261,4 @@ def calculate_reward(
 
     Use this instead of implementing reward calculation locally.
     """
-    return get_reward_calculator().calculate_simple(
-        predicted_fv, price_at_prediction, actual_price, days, beta
-    )
+    return get_reward_calculator().calculate_simple(predicted_fv, price_at_prediction, actual_price, days, beta)

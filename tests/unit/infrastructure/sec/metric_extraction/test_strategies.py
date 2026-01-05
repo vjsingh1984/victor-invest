@@ -7,18 +7,17 @@ ByAdshOnlyMatcher, and ByAdshFyFpMatcher strategies.
 
 import pytest
 
+from investigator.infrastructure.sec.metric_extraction.result import MatchMethod
 from investigator.infrastructure.sec.metric_extraction.strategies import (
+    ByAdshFyFpMatcher,
+    ByAdshOnlyMatcher,
+    ByDateRangeMatcher,
+    ByFrameFieldMatcher,
+    ByPeriodEndMatcher,
     MatchContext,
     MatchResult,
     PeriodMatchStrategy,
-    ByPeriodEndMatcher,
-    ByDateRangeMatcher,
-    ByFrameFieldMatcher,
-    ByAdshFyFpMatcher,
-    ByAdshOnlyMatcher,
 )
-from investigator.infrastructure.sec.metric_extraction.result import MatchMethod
-
 
 # Sample SEC entries for testing
 SAMPLE_ENTRIES = [
@@ -185,8 +184,9 @@ class TestByPeriodEndMatcher:
             end = entry.get("end")
             if start and end:
                 from datetime import datetime
-                start_date = datetime.strptime(start, '%Y-%m-%d')
-                end_date = datetime.strptime(end, '%Y-%m-%d')
+
+                start_date = datetime.strptime(start, "%Y-%m-%d")
+                end_date = datetime.strptime(end, "%Y-%m-%d")
                 days = (end_date - start_date).days
                 assert days >= 330, f"Entry has {days} days, expected >= 330"
 
@@ -205,8 +205,9 @@ class TestByPeriodEndMatcher:
                 end = entry.get("end")
                 if start and end:
                     from datetime import datetime
-                    start_date = datetime.strptime(start, '%Y-%m-%d')
-                    end_date = datetime.strptime(end, '%Y-%m-%d')
+
+                    start_date = datetime.strptime(start, "%Y-%m-%d")
+                    end_date = datetime.strptime(end, "%Y-%m-%d")
                     days = (end_date - start_date).days
                     assert days < 120, f"Entry has {days} days, expected < 120"
 
@@ -364,8 +365,9 @@ class TestByAdshOnlyMatcher:
             end = entry.get("end")
             if start and end:
                 from datetime import datetime
-                start_date = datetime.strptime(start, '%Y-%m-%d')
-                end_date = datetime.strptime(end, '%Y-%m-%d')
+
+                start_date = datetime.strptime(start, "%Y-%m-%d")
+                end_date = datetime.strptime(end, "%Y-%m-%d")
                 days = (end_date - start_date).days
                 assert days >= 330
 

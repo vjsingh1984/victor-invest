@@ -18,13 +18,64 @@ import yaml
 from investigator.domain.agents.base import InvestmentAgent
 from investigator.domain.models.analysis import AgentResult, AgentTask, TaskStatus
 from investigator.domain.services.company_metadata_service import CompanyMetadataService
+from investigator.domain.services.data_normalizer import (  # TODO: Move to infrastructure
+    DataNormalizer,
+    normalize_financials,
+    round_for_prompt,
+)
+from investigator.domain.services.deterministic_competitive_analyzer import analyze_competitive_position
+
+# Deterministic services (replace LLM calls with rule-based computation)
+from investigator.domain.services.deterministic_valuation_synthesizer import synthesize_valuation
 from investigator.domain.services.dynamic_model_weighting import DynamicModelWeightingService
 from investigator.domain.services.fiscal_period_service import get_fiscal_period_service
-from investigator.domain.services.toon_formatter import to_toon_quarterly, TOONFormatter
+from investigator.domain.services.gordon_growth_model import GordonGrowthModel
+from investigator.domain.services.safe_formatters import format_currency as _fmt_currency
+from investigator.domain.services.safe_formatters import format_int_with_commas as _fmt_int_comma
+from investigator.domain.services.safe_formatters import (
+    format_number,
+)
+from investigator.domain.services.safe_formatters import format_percentage as _fmt_pct
+from investigator.domain.services.safe_formatters import (
+    is_valid_number,
+    safe_round,
+)
+from investigator.domain.services.toon_formatter import TOONFormatter, to_toon_quarterly
+from investigator.domain.services.valuation import SectorValuationRouter  # Sector-aware valuation routing
+
+# New valuation models (Milestone 7 - Plan implementation)
+from investigator.domain.services.valuation.damodaran_dcf import DamodaranDCFModel
+from investigator.domain.services.valuation.dcf import DCFValuation
+
+# Clean architecture imports (Phase 6-7 migration)
+from investigator.domain.services.valuation.helpers import (
+    normalize_model_output,
+    serialize_company_profile,
+)
+
+# Clean architecture imports (migrated from utils/valuation/framework)
+from investigator.domain.services.valuation.models import (
+    CompanyArchetype,
+    CompanyProfile,
+    DataQualityFlag,
+    EVEBITDAModel,
+    PBMultipleModel,
+    PEMultipleModel,
+    PSMultipleModel,
+)
+from investigator.domain.services.valuation.models.common import clamp
+from investigator.domain.services.valuation.models.saas_valuation import SaaSValuationModel
+from investigator.domain.services.valuation.orchestrator import MultiModelValuationOrchestrator
+from investigator.domain.services.valuation.rule_of_40_valuation import RuleOf40Valuation
 from investigator.infrastructure.cache import CacheManager
-from investigator.infrastructure.cache.cache_types import CacheType
 from investigator.infrastructure.cache.cache_key_builder import build_cache_key
+from investigator.infrastructure.cache.cache_types import CacheType
 from investigator.infrastructure.data.sector_multiples_loader import SectorMultiplesLoader
+from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Singleton pattern
+from investigator.infrastructure.database.ticker_mapper import TickerCIKMapper  # TODO: Move to infrastructure
+from investigator.infrastructure.formatters import ValuationTableFormatter
+from investigator.infrastructure.sec.canonical_mapper import get_canonical_mapper
+
 from .constants import (
     FALLBACK_CANONICAL_KEYS,
     PROCESSED_ADDITIONAL_FINANCIAL_KEYS,
@@ -39,46 +90,6 @@ from .logging_utils import (
     log_valuation_snapshot,
 )
 from .models import QuarterlyData
-from investigator.infrastructure.sec.canonical_mapper import get_canonical_mapper
-from investigator.domain.services.data_normalizer import DataNormalizer, normalize_financials, round_for_prompt  # TODO: Move to infrastructure
-from investigator.domain.services.safe_formatters import (
-    format_currency as _fmt_currency,
-    format_percentage as _fmt_pct,
-    format_number,
-    format_int_with_commas as _fmt_int_comma,
-    is_valid_number,
-    safe_round,
-)
-from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Singleton pattern
-from investigator.domain.services.valuation import SectorValuationRouter  # Sector-aware valuation routing
-from investigator.infrastructure.database.ticker_mapper import TickerCIKMapper  # TODO: Move to infrastructure
-# Clean architecture imports (migrated from utils/valuation/framework)
-from investigator.domain.services.valuation.models import (
-    CompanyArchetype,
-    CompanyProfile,
-    DataQualityFlag,
-    PEMultipleModel,
-    PSMultipleModel,
-    PBMultipleModel,
-    EVEBITDAModel,
-)
-from investigator.domain.services.gordon_growth_model import GordonGrowthModel
-from investigator.domain.services.valuation.dcf import DCFValuation
-from investigator.infrastructure.formatters import ValuationTableFormatter
-# Clean architecture imports (Phase 6-7 migration)
-from investigator.domain.services.valuation.helpers import (
-    normalize_model_output,
-    serialize_company_profile,
-)
-from investigator.domain.services.valuation.models.common import clamp
-from investigator.domain.services.valuation.orchestrator import MultiModelValuationOrchestrator
-# New valuation models (Milestone 7 - Plan implementation)
-from investigator.domain.services.valuation.damodaran_dcf import DamodaranDCFModel
-from investigator.domain.services.valuation.rule_of_40_valuation import RuleOf40Valuation
-from investigator.domain.services.valuation.models.saas_valuation import SaaSValuationModel
-# Deterministic services (replace LLM calls with rule-based computation)
-from investigator.domain.services.deterministic_valuation_synthesizer import synthesize_valuation
-from investigator.domain.services.deterministic_competitive_analyzer import analyze_competitive_position
 
 
 # Module-level safe formatting functions for use in prompts
@@ -314,8 +325,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             if cik:
                 self.logger.info(f"🔍 TIER 1.5: Checking processed SEC filings for {symbol}")
                 try:
-                    from investigator.infrastructure.database.db import get_db_manager
                     from sqlalchemy import text
+
+                    from investigator.infrastructure.database.db import get_db_manager
 
                     db_manager = get_db_manager()
                     with db_manager.engine.connect() as conn:
@@ -450,33 +462,32 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         # Use multiple fallback sources for key financial values
         # The financials dict may not always have these keys, but ttm_metrics often does
         free_cash_flow = (
-            financials.get("free_cash_flow") or
-            ttm_metrics.get("free_cash_flow") or
-            ttm_metrics.get("FreeCashFlow") or
-            0
+            financials.get("free_cash_flow")
+            or ttm_metrics.get("free_cash_flow")
+            or ttm_metrics.get("FreeCashFlow")
+            or 0
         )
         revenue = (
-            financials.get("revenues") or
-            financials.get("total_revenue") or
-            ttm_metrics.get("revenues") or
-            ttm_metrics.get("total_revenue") or
-            0
+            financials.get("revenues")
+            or financials.get("total_revenue")
+            or ttm_metrics.get("revenues")
+            or ttm_metrics.get("total_revenue")
+            or 0
         )
         net_income = (
-            financials.get("net_income") or
-            ttm_metrics.get("net_income") or
-            ttm_metrics.get("NetIncomeLoss") or
-            0
+            financials.get("net_income") or ttm_metrics.get("net_income") or ttm_metrics.get("NetIncomeLoss") or 0
         )
         ebitda = (
-            financials.get("ebitda") or
-            financials.get("operating_income") or
-            ttm_metrics.get("ebitda") or
-            ttm_metrics.get("operating_income") or
-            0
+            financials.get("ebitda")
+            or financials.get("operating_income")
+            or ttm_metrics.get("ebitda")
+            or ttm_metrics.get("operating_income")
+            or 0
         )
 
-        self.logger.info(f"{symbol} - _build_company_profile extracted values: FCF=${free_cash_flow/1e9:.2f}B, Revenue=${revenue/1e9:.2f}B, NetIncome=${net_income/1e9:.2f}B, EBITDA=${ebitda/1e9:.2f}B")
+        self.logger.info(
+            f"{symbol} - _build_company_profile extracted values: FCF=${free_cash_flow/1e9:.2f}B, Revenue=${revenue/1e9:.2f}B, NetIncome=${net_income/1e9:.2f}B, EBITDA=${ebitda/1e9:.2f}B"
+        )
 
         profile.has_positive_fcf = (free_cash_flow or 0) > 0
         profile.has_positive_earnings = (net_income or 0) > 0
@@ -499,6 +510,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             if quarterly_data and len(quarterly_data) >= 5:
                 try:
                     from investigator.domain.agents.fundamental.models import QuarterlyData
+
                     revenues = []
                     for q in quarterly_data[:8]:
                         if isinstance(q, QuarterlyData):
@@ -511,7 +523,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
                     if len(revenues) >= 5 and revenues[4] > 0:
                         revenue_growth_yoy = (revenues[0] - revenues[4]) / revenues[4]
-                        self.logger.debug(f"{symbol} - Calculated revenue_growth_yoy from quarterly data: {revenue_growth_yoy*100:.1f}%")
+                        self.logger.debug(
+                            f"{symbol} - Calculated revenue_growth_yoy from quarterly data: {revenue_growth_yoy*100:.1f}%"
+                        )
                 except Exception as e:
                     self.logger.warning(f"{symbol} - Failed to calculate revenue_growth_yoy: {e}")
 
@@ -530,7 +544,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         net_debt = total_debt - cash if total_debt is not None and cash is not None else None
 
         profile.net_debt_to_ebitda = (
-            (net_debt / ebitda) if ebitda not in (None, 0) and net_debt is not None else ratios.get("net_debt_to_ebitda")
+            (net_debt / ebitda)
+            if ebitda not in (None, 0) and net_debt is not None
+            else ratios.get("net_debt_to_ebitda")
         )
         profile.interest_coverage = ratios.get("interest_coverage")
         profile.debt_to_equity = ratios.get("debt_to_equity") or ratios.get("debt_to_capital")
@@ -538,17 +554,19 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         # CRITICAL FIX: Use multiple fallback sources for dividends_paid
         # SEC data stores dividends as negative cash outflow, so we take absolute value
         dividends_paid = abs(
-            financials.get("dividends_paid") or
-            financials.get("PaymentsOfDividends") or
-            ttm_metrics.get("dividends_paid") or
-            ttm_metrics.get("PaymentsOfDividends") or
-            ttm_metrics.get("payments_of_dividends") or
-            0
+            financials.get("dividends_paid")
+            or financials.get("PaymentsOfDividends")
+            or ttm_metrics.get("dividends_paid")
+            or ttm_metrics.get("PaymentsOfDividends")
+            or ttm_metrics.get("payments_of_dividends")
+            or 0
         )
         shares_outstanding = financials.get("shares_outstanding") or market_data.get("shares_outstanding")
         profile.pays_dividends = dividends_paid > 0
         profile.dividends_paid = dividends_paid  # CRITICAL FIX: Set actual value for GGM applicability
-        self.logger.info(f"{symbol} - dividends_paid extracted: ${dividends_paid/1e9:.2f}B, pays_dividends={profile.pays_dividends}")
+        self.logger.info(
+            f"{symbol} - dividends_paid extracted: ${dividends_paid/1e9:.2f}B, pays_dividends={profile.pays_dividends}"
+        )
         profile.dividend_yield = ratios.get("dividend_yield") or market_data.get("dividend_yield")
         profile.dividend_payout_ratio = ratios.get("payout_ratio") or ratios.get("dividend_payout_ratio")
         profile.dividend_growth_rate = ratios.get("dividend_growth_rate")
@@ -575,7 +593,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             market_data.get("total_debt"),
         ]
         profile.total_debt = next((float(d) for d in debt_candidates if d is not None), None)
-        profile.current_price = market_data.get("price") or market_data.get("close") or market_data.get("current_price") or ratios.get("current_price")
+        profile.current_price = (
+            market_data.get("price")
+            or market_data.get("close")
+            or market_data.get("current_price")
+            or ratios.get("current_price")
+        )
         profile.market_cap = market_data.get("market_cap") or market_data.get("market_capitalization")
         if not profile.market_cap and profile.current_price and profile.shares_outstanding:
             try:
@@ -630,11 +653,17 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             # High-growth companies: Rule of 40 > 40% OR revenue growth > 20%
             # Examples: SNOW (Rule of 40 = 46.6%), DASH (revenue growth = 30%+)
             profile.primary_archetype = CompanyArchetype.HIGH_GROWTH
-            self.logger.info(f"{symbol} - Detected HIGH_GROWTH archetype (Rule of 40: {rule_of_40:.1f}%, Revenue Growth: {revenue_growth*100:.1f}%)")
+            self.logger.info(
+                f"{symbol} - Detected HIGH_GROWTH archetype (Rule of 40: {rule_of_40:.1f}%, Revenue Growth: {revenue_growth*100:.1f}%)"
+            )
         elif pays_dividends and payout_ratio >= 40:
             # Dividend aristocrats: Payout ratio >= 40%
             profile.primary_archetype = CompanyArchetype.MATURE_DIVIDEND
-            self.logger.info(f"{symbol} - Detected MATURE_DIVIDEND archetype (Payout: {payout_ratio:.1f}%)" if payout_ratio is not None else f"{symbol} - Detected MATURE_DIVIDEND archetype (Payout: N/A)")
+            self.logger.info(
+                f"{symbol} - Detected MATURE_DIVIDEND archetype (Payout: {payout_ratio:.1f}%)"
+                if payout_ratio is not None
+                else f"{symbol} - Detected MATURE_DIVIDEND archetype (Payout: N/A)"
+            )
         elif sector in ["Banks", "Financial Services", "Insurance", "Financials"]:
             # Financial services companies use different valuation frameworks
             profile.primary_archetype = CompanyArchetype.FINANCIAL
@@ -645,7 +674,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             self.logger.info(f"{symbol} - Detected CYCLICAL archetype (Sector: {sector})")
         else:
             # No specific archetype detected
-            self.logger.debug(f"{symbol} - No primary archetype detected (Rule of 40: {rule_of_40:.1f}%, Revenue Growth: {revenue_growth*100:.1f}%, Sector: {sector})")
+            self.logger.debug(
+                f"{symbol} - No primary archetype detected (Rule of 40: {rule_of_40:.1f}%, Revenue Growth: {revenue_growth*100:.1f}%, Sector: {sector})"
+            )
 
         return profile
 
@@ -679,7 +710,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             self.logger.debug(f"CompanyMetadataService returned sector for {symbol}: {sector}")
             return sector
         except Exception as e:
-            self.logger.warning(f"Error fetching sector via CompanyMetadataService for {symbol}: {e}, using 'Unknown' fallback")
+            self.logger.warning(
+                f"Error fetching sector via CompanyMetadataService for {symbol}: {e}, using 'Unknown' fallback"
+            )
             self._sector_cache[symbol] = "Unknown"
             return "Unknown"
 
@@ -743,7 +776,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     # Scale normalization: Some companies report shares in millions (value < 100,000)
                     # For large-cap companies (market cap > $1B), this is likely in millions
                     # DEI namespace (EntityCommonStockSharesOutstanding) is always in actual shares
-                    if tag_used != 'EntityCommonStockSharesOutstanding' and shares < 100_000:
+                    if tag_used != "EntityCommonStockSharesOutstanding" and shares < 100_000:
                         # Cross-check with market data to detect millions reporting
                         stock_info = self.market_data.get_stock_info(symbol)
                         market_cap = stock_info.get("market_cap", 0)
@@ -810,14 +843,15 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         """
         # Check instance cache first
         cache_key = f"{symbol}:{cik}:float"
-        if hasattr(self, '_float_cache') and cache_key in self._float_cache:
+        if hasattr(self, "_float_cache") and cache_key in self._float_cache:
             return self._float_cache[cache_key]
 
-        if not hasattr(self, '_float_cache'):
+        if not hasattr(self, "_float_cache"):
             self._float_cache = {}
 
         try:
             from sqlalchemy import text
+
             from investigator.infrastructure.database.db import get_db_manager
 
             db_manager = get_db_manager()
@@ -1123,6 +1157,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 if "company_profile" in enriched_result["valuation"]:
                     # Convert CompanyProfile dataclass to dict for JSON serialization
                     from dataclasses import asdict
+
                     enriched_result["valuation"]["company_profile"] = asdict(profile)
                     self.logger.debug(f"{symbol} - Updated CompanyProfile in cached valuation data")
 
@@ -1135,8 +1170,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             if "company_data" in enriched_result:
                 enriched_result["company_data"] = company_data
 
-            revenue_growth_str = f"{profile.revenue_growth_yoy:.1%}" if profile.revenue_growth_yoy is not None else "None"
-            self.logger.info(f"{symbol} - Successfully recalculated derived metrics (revenue_growth_yoy: {revenue_growth_str})")
+            revenue_growth_str = (
+                f"{profile.revenue_growth_yoy:.1%}" if profile.revenue_growth_yoy is not None else "None"
+            )
+            self.logger.info(
+                f"{symbol} - Successfully recalculated derived metrics (revenue_growth_yoy: {revenue_growth_str})"
+            )
 
             return enriched_result
 
@@ -1395,12 +1434,14 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             # CLEAN ARCHITECTURE: Query sec_companyfacts_processed table directly
             # This table has ALL historical quarters (e.g., 66 quarters for AAPL from 2009-2025)
             # No need for hybrid strategy - just get the most recent num_quarters
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db_manager = get_db_manager()
 
-            query = text("""
+            query = text(
+                """
                 SELECT
                     symbol, fiscal_year, fiscal_period, adsh,
                     filed_date as filed,
@@ -1444,7 +1485,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         ELSE 0
                     END DESC
                 LIMIT :sql_limit
-            """)
+            """
+            )
 
             # Calculate SQL LIMIT: For Q4 computation, need extra rows to fetch Q1-Q3 for all years
             # Formula: requested_quarters + 3 ensures we always have enough data
@@ -1472,49 +1514,53 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 cf_qtrs = int(row.cash_flow_statement_qtrs) if row.cash_flow_statement_qtrs else 1
                 inc_qtrs = int(row.income_statement_qtrs) if row.income_statement_qtrs else 1
 
-                quarters_data.append({
-                    "symbol": row.symbol,
-                    "fiscal_year": row.fiscal_year,
-                    "fiscal_period": row.fiscal_period,
-                    "adsh": row.adsh,
-                    "filed": str(row.filed) if row.filed else None,
-                    "period_end": str(row.period_end) if row.period_end else None,
-                    "form": row.form,
-                    # Income Statement
-                    "total_revenue": float(row.total_revenue) if row.total_revenue else 0,
-                    "net_income": float(row.net_income) if row.net_income else 0,
-                    "gross_profit": float(row.gross_profit) if row.gross_profit else 0,
-                    "operating_income": float(row.operating_income) if row.operating_income else 0,
-                    "interest_expense": float(row.interest_expense) if row.interest_expense else 0,
-                    "income_tax_expense": float(row.income_tax_expense) if row.income_tax_expense else 0,
-                    "cost_of_revenue": float(row.cost_of_revenue) if row.cost_of_revenue else 0,
-                    # Balance Sheet
-                    "total_assets": float(row.total_assets) if row.total_assets else 0,
-                    "total_liabilities": float(row.total_liabilities) if row.total_liabilities else 0,
-                    "stockholders_equity": float(row.stockholders_equity) if row.stockholders_equity else 0,
-                    "current_assets": float(row.current_assets) if row.current_assets else 0,
-                    "current_liabilities": float(row.current_liabilities) if row.current_liabilities else 0,
-                    "accounts_receivable": float(row.accounts_receivable) if row.accounts_receivable else 0,
-                    "inventory": float(row.inventory) if row.inventory else 0,
-                    "cash_and_equivalents": float(row.cash_and_equivalents) if row.cash_and_equivalents else 0,
-                    "long_term_debt": float(row.long_term_debt) if row.long_term_debt else 0,
-                    "short_term_debt": float(row.short_term_debt) if row.short_term_debt else 0,
-                    "total_debt": float(row.total_debt) if row.total_debt else 0,
-                    # Cash Flow
-                    "operating_cash_flow": float(row.operating_cash_flow) if row.operating_cash_flow else 0,
-                    "capital_expenditures": float(row.capital_expenditures) if row.capital_expenditures else 0,
-                    "free_cash_flow": float(row.free_cash_flow) if row.free_cash_flow else 0,
-                    "dividends_paid": float(row.dividends_paid) if row.dividends_paid else 0,
-                    # Other
-                    "property_plant_equipment_net": float(row.property_plant_equipment_net) if row.property_plant_equipment_net else 0,
-                    "shares_outstanding": float(row.shares_outstanding) if row.shares_outstanding else 0,
-                    # Keep numeric values for data processor
-                    "cash_flow_statement_qtrs": cf_qtrs,
-                    "income_statement_qtrs": inc_qtrs,
-                    # Add boolean flags for QuarterlyData constructor using centralized service
-                    "is_ytd_cashflow": fiscal_period_service.is_ytd(cf_qtrs),
-                    "is_ytd_income": fiscal_period_service.is_ytd(inc_qtrs),
-                })
+                quarters_data.append(
+                    {
+                        "symbol": row.symbol,
+                        "fiscal_year": row.fiscal_year,
+                        "fiscal_period": row.fiscal_period,
+                        "adsh": row.adsh,
+                        "filed": str(row.filed) if row.filed else None,
+                        "period_end": str(row.period_end) if row.period_end else None,
+                        "form": row.form,
+                        # Income Statement
+                        "total_revenue": float(row.total_revenue) if row.total_revenue else 0,
+                        "net_income": float(row.net_income) if row.net_income else 0,
+                        "gross_profit": float(row.gross_profit) if row.gross_profit else 0,
+                        "operating_income": float(row.operating_income) if row.operating_income else 0,
+                        "interest_expense": float(row.interest_expense) if row.interest_expense else 0,
+                        "income_tax_expense": float(row.income_tax_expense) if row.income_tax_expense else 0,
+                        "cost_of_revenue": float(row.cost_of_revenue) if row.cost_of_revenue else 0,
+                        # Balance Sheet
+                        "total_assets": float(row.total_assets) if row.total_assets else 0,
+                        "total_liabilities": float(row.total_liabilities) if row.total_liabilities else 0,
+                        "stockholders_equity": float(row.stockholders_equity) if row.stockholders_equity else 0,
+                        "current_assets": float(row.current_assets) if row.current_assets else 0,
+                        "current_liabilities": float(row.current_liabilities) if row.current_liabilities else 0,
+                        "accounts_receivable": float(row.accounts_receivable) if row.accounts_receivable else 0,
+                        "inventory": float(row.inventory) if row.inventory else 0,
+                        "cash_and_equivalents": float(row.cash_and_equivalents) if row.cash_and_equivalents else 0,
+                        "long_term_debt": float(row.long_term_debt) if row.long_term_debt else 0,
+                        "short_term_debt": float(row.short_term_debt) if row.short_term_debt else 0,
+                        "total_debt": float(row.total_debt) if row.total_debt else 0,
+                        # Cash Flow
+                        "operating_cash_flow": float(row.operating_cash_flow) if row.operating_cash_flow else 0,
+                        "capital_expenditures": float(row.capital_expenditures) if row.capital_expenditures else 0,
+                        "free_cash_flow": float(row.free_cash_flow) if row.free_cash_flow else 0,
+                        "dividends_paid": float(row.dividends_paid) if row.dividends_paid else 0,
+                        # Other
+                        "property_plant_equipment_net": (
+                            float(row.property_plant_equipment_net) if row.property_plant_equipment_net else 0
+                        ),
+                        "shares_outstanding": float(row.shares_outstanding) if row.shares_outstanding else 0,
+                        # Keep numeric values for data processor
+                        "cash_flow_statement_qtrs": cf_qtrs,
+                        "income_statement_qtrs": inc_qtrs,
+                        # Add boolean flags for QuarterlyData constructor using centralized service
+                        "is_ytd_cashflow": fiscal_period_service.is_ytd(cf_qtrs),
+                        "is_ytd_income": fiscal_period_service.is_ytd(inc_qtrs),
+                    }
+                )
 
             # ═══════════════════════════════════════════════════════════════════════════
             # FY Period Handling - CORRECT Design
@@ -1532,8 +1578,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             # DO NOT filter FY periods here - they are needed for Q4 computation!
             # ═══════════════════════════════════════════════════════════════════════════
 
-            fy_count = sum(1 for q in quarters_data if q.get('fiscal_period') == 'FY')
-            q_count = sum(1 for q in quarters_data if q.get('fiscal_period', '').startswith('Q'))
+            fy_count = sum(1 for q in quarters_data if q.get("fiscal_period") == "FY")
+            q_count = sum(1 for q in quarters_data if q.get("fiscal_period", "").startswith("Q"))
 
             self.logger.info(
                 f"✅ Retrieved {len(quarters_data)} periods from processed table for {symbol} "
@@ -1630,7 +1676,6 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                             "operating_income": income_statement.get("operating_income", 0),
                             "interest_expense": income_statement.get("interest_expense", 0),
                             "income_tax_expense": income_statement.get("income_tax_expense", 0),
-
                             # Balance Sheet (10 fields)
                             "total_assets": balance_sheet.get("total_assets", 0),
                             "total_liabilities": balance_sheet.get("total_liabilities", 0),
@@ -1643,12 +1688,10 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                             "short_term_debt": balance_sheet.get("short_term_debt", 0),
                             "cash_and_equivalents": balance_sheet.get("cash_and_equivalents", 0),
                             "net_debt": balance_sheet.get("net_debt", 0),
-
                             # Cash Flow (3 fields)
                             "operating_cash_flow": cash_flow.get("operating_cash_flow", 0),
                             "capital_expenditures": cash_flow.get("capital_expenditures", 0),
                             "dividends_paid": cash_flow.get("dividends_paid", 0),
-
                             # Extract shares_outstanding for DCF/symbol_update
                             "weighted_average_diluted_shares_outstanding": q.get("shares_outstanding", 0),
                         }
@@ -1685,6 +1728,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
                     # Initialize strategy for bulk table access
                     from investigator.infrastructure.sec.data_strategy import get_fiscal_period_strategy
+
                     strategy = get_fiscal_period_strategy()
 
                     # Extract data from bulk tables using collected tag list
@@ -1745,7 +1789,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         "capital_expenditures": capex_value,
                         "free_cash_flow": fcf_value if fcf_value is not None else 0,
                         "dividends_paid": extract_canonical_value("dividends_paid"),
-                        "weighted_average_diluted_shares_outstanding": extract_canonical_value("weighted_average_diluted_shares_outstanding"),
+                        "weighted_average_diluted_shares_outstanding": extract_canonical_value(
+                            "weighted_average_diluted_shares_outstanding"
+                        ),
                     }
 
                     # Calculate ratios
@@ -1763,7 +1809,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     data_quality=quality,
                     filing_date=str(q["filed"]),
                     is_ytd_cashflow=is_ytd_cashflow if use_processed else False,  # Pass YTD flags
-                    is_ytd_income=is_ytd_income if use_processed else False
+                    is_ytd_income=is_ytd_income if use_processed else False,
                 )
 
                 # Thread ADSH through (Phase 10)
@@ -1823,14 +1869,16 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             or None if no data found
         """
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             db_manager = get_db_manager()
             with db_manager.engine.connect() as conn:
                 # Query for most recent period (prefer FY, then latest Q)
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT *
                         FROM sec_companyfacts_processed
                         WHERE symbol = :symbol
@@ -1844,8 +1892,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                                 WHEN 'Q1' THEN 0
                             END DESC
                         LIMIT 1
-                    """),
-                    {"symbol": symbol}
+                    """
+                    ),
+                    {"symbol": symbol},
                 ).fetchone()
 
                 if not result:
@@ -1881,13 +1930,15 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     )
                     # Delete corrupt record from database
                     conn.execute(
-                        text("""
+                        text(
+                            """
                             DELETE FROM sec_companyfacts_processed
                             WHERE symbol = :symbol
                               AND fiscal_year = :fiscal_year
                               AND fiscal_period = :fiscal_period
-                        """),
-                        {"symbol": symbol, "fiscal_year": fiscal_year, "fiscal_period": fiscal_period}
+                        """
+                        ),
+                        {"symbol": symbol, "fiscal_year": fiscal_year, "fiscal_period": fiscal_period},
                     )
                     conn.commit()
                     self.logger.warning(
@@ -1917,31 +1968,30 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     "gross_profit": safe_float("gross_profit"),
                     "operating_income": safe_float("operating_income"),
                     "cost_of_revenue": safe_float("cost_of_revenue"),
-
                     # Balance Sheet (NOTE: Field name mappings for compatibility)
-                    "assets": safe_float("total_assets"),           # total_assets → assets
-                    "equity": safe_float("stockholders_equity"),    # stockholders_equity → equity
-                    "assets_current": safe_float("current_assets"), # current_assets → assets_current
+                    "assets": safe_float("total_assets"),  # total_assets → assets
+                    "equity": safe_float("stockholders_equity"),  # stockholders_equity → equity
+                    "assets_current": safe_float("current_assets"),  # current_assets → assets_current
                     "liabilities_current": safe_float("current_liabilities"),
-                    "liabilities": safe_float("total_liabilities"), # total_liabilities → liabilities
+                    "liabilities": safe_float("total_liabilities"),  # total_liabilities → liabilities
                     "total_debt": safe_float("total_debt"),
                     "long_term_debt": safe_float("long_term_debt"),
                     "debt_current": safe_float("short_term_debt"),  # short_term_debt → debt_current
                     "inventory": safe_float("inventory"),
                     "cash_and_equivalents": safe_float("cash_and_equivalents"),
-
                     # Cash Flow
                     "operating_cash_flow": safe_float("operating_cash_flow"),
                     "capital_expenditures": safe_float("capital_expenditures"),
                     "free_cash_flow": safe_float("free_cash_flow"),
                     "shares_outstanding": safe_float("shares_outstanding"),
-
                     # Metadata
                     "fiscal_year": row.get("fiscal_year"),
                     "fiscal_period": row.get("fiscal_period"),
                     "symbol": row.get("symbol"),
                     "data_date": row.get("filed_date").isoformat() if row.get("filed_date") else None,
-                    "weighted_average_diluted_shares_outstanding": safe_float("weighted_average_diluted_shares_outstanding"),
+                    "weighted_average_diluted_shares_outstanding": safe_float(
+                        "weighted_average_diluted_shares_outstanding"
+                    ),
                     "cash_and_equivalents": safe_float("cash_and_equivalents"),
                 }
 
@@ -1959,9 +2009,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     financial_metrics["cash"] = cash_guess
 
                 if not financial_metrics.get("shares_outstanding"):
-                    shares_guess = (
-                        financial_metrics.get("weighted_average_diluted_shares_outstanding")
-                        or safe_float("shares_outstanding")
+                    shares_guess = financial_metrics.get("weighted_average_diluted_shares_outstanding") or safe_float(
+                        "shares_outstanding"
                     )
                     financial_metrics["shares_outstanding"] = shares_guess
 
@@ -1975,7 +2024,6 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     "gross_margin": safe_float("gross_margin"),
                     "operating_margin": safe_float("operating_margin"),
                     "net_margin": safe_float("net_margin"),
-
                     # Metadata
                     "symbol": row.get("symbol"),
                     "data_date": row.get("filed_date").isoformat() if row.get("filed_date") else None,
@@ -1993,9 +2041,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 }
 
         except Exception as e:
-            self.logger.error(
-                f"[CLEAN ARCH] Failed to fetch company data from processed table for {symbol}: {e}"
-            )
+            self.logger.error(f"[CLEAN ARCH] Failed to fetch company data from processed table for {symbol}: {e}")
             return None
 
     def _fetch_from_processed_table(
@@ -2091,9 +2137,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             free_cash_flow_val = to_float(row.get("free_cash_flow"))
 
             # Derive FCF when missing or zero (common gap in historical records)
-            if (raw_fcf is None or abs(free_cash_flow_val) < 1e-6) and (
-                ocf_val is not None and capex_val is not None
-            ):
+            if (raw_fcf is None or abs(free_cash_flow_val) < 1e-6) and (ocf_val is not None and capex_val is not None):
                 derived_fcf = float(ocf_val) - abs(float(capex_val))
                 free_cash_flow_val = derived_fcf
                 if abs(derived_fcf) > 1e-6:
@@ -2112,7 +2156,6 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 "fiscal_year": fiscal_year,
                 "fiscal_period": fiscal_period,
                 "adsh": adsh,
-
                 # Income Statement (YTD based on income_statement_qtrs)
                 "income_statement": {
                     "total_revenue": to_float(row.get("total_revenue")),
@@ -2121,7 +2164,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     "operating_income": to_float(row.get("operating_income")),
                     "cost_of_revenue": to_float(row.get("cost_of_revenue")),
                     "research_and_development_expense": to_float(row.get("research_and_development_expense")),
-                    "selling_general_administrative_expense": to_float(row.get("selling_general_administrative_expense")),
+                    "selling_general_administrative_expense": to_float(
+                        row.get("selling_general_administrative_expense")
+                    ),
                     "operating_expenses": to_float(row.get("operating_expenses")),
                     "interest_expense": to_float(row.get("interest_expense")),
                     "income_tax_expense": to_float(row.get("income_tax_expense")),
@@ -2129,10 +2174,11 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     "earnings_per_share_diluted": to_float(row.get("earnings_per_share_diluted")),
                     "preferred_stock_dividends": to_float(row.get("preferred_stock_dividends")),
                     "common_stock_dividends": to_float(row.get("common_stock_dividends")),
-                    "weighted_average_diluted_shares_outstanding": to_float(row.get("weighted_average_diluted_shares_outstanding")),
-                    "is_ytd": is_ytd_income
+                    "weighted_average_diluted_shares_outstanding": to_float(
+                        row.get("weighted_average_diluted_shares_outstanding")
+                    ),
+                    "is_ytd": is_ytd_income,
                 },
-
                 # Cash Flow Statement (YTD based on cash_flow_statement_qtrs)
                 "cash_flow": {
                     "operating_cash_flow": ocf_val,
@@ -2145,9 +2191,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     "stock_based_compensation": to_float(row.get("stock_based_compensation")),
                     "preferred_stock_dividends": to_float(row.get("preferred_stock_dividends")),
                     "common_stock_dividends": to_float(row.get("common_stock_dividends")),
-                    "is_ytd": is_ytd_cashflow
+                    "is_ytd": is_ytd_cashflow,
                 },
-
                 # Balance Sheet (ALWAYS point-in-time snapshot)
                 "balance_sheet": {
                     "total_assets": to_float(row.get("total_assets")),
@@ -2177,13 +2222,11 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     "book_value_per_share": to_float(row.get("book_value_per_share")),
                     "working_capital": to_float(row.get("working_capital")),
                 },
-
                 "market_metrics": {
                     "market_cap": to_float(row.get("market_cap")),
                     "enterprise_value": to_float(row.get("enterprise_value")),
                     "shares_outstanding": to_float(row.get("shares_outstanding")),
                 },
-
                 # Financial Ratios (organized by category)
                 "ratios": {
                     "liquidity": {
@@ -2213,24 +2256,23 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         "effective_tax_rate": to_float(row.get("effective_tax_rate")),
                     },
                 },
-
                 # Data Quality
                 "data_quality_score": to_float(row.get("data_quality_score")),
             }
 
             # 🔍 DEBUG TRACE: Log interest_expense after income_statement extraction from database
-            interest_expense = data['income_statement'].get('interest_expense', 0)
-            income_tax_expense = data['income_statement'].get('income_tax_expense', 0)
+            interest_expense = data["income_statement"].get("interest_expense", 0)
+            income_tax_expense = data["income_statement"].get("income_tax_expense", 0)
             self.logger.info(
                 f"🔍 [FUNDAMENTAL_FETCH] {symbol} {fiscal_year}-{fiscal_period} income_statement: "
                 f"interest_expense=${interest_expense/1e6:.2f}M, income_tax=${income_tax_expense/1e9:.2f}B"
             )
 
             # DEBUG: Log successful retrieval with detailed YTD info
-            revenue = data['income_statement']['total_revenue']
-            ocf = data['cash_flow']['operating_cash_flow']
-            capex = data['cash_flow']['capital_expenditures']
-            fcf = data['cash_flow']['free_cash_flow']
+            revenue = data["income_statement"]["total_revenue"]
+            ocf = data["cash_flow"]["operating_cash_flow"]
+            capex = data["cash_flow"]["capital_expenditures"]
+            fcf = data["cash_flow"]["free_cash_flow"]
 
             # Show YTD status for each statement type
             inc_ytd_str = "YTD" if is_ytd_income else "PIT"
@@ -2772,7 +2814,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         self.logger.info(f"RATIOS_CALC_DEBUG - _calculate_financial_ratios() called for {symbol}")
         self.logger.info(f"RATIOS_CALC_DEBUG - company_data keys: {list(company_data.keys())}")
         quarterly_data_check = company_data.get("quarterly_data", [])
-        self.logger.info(f"RATIOS_CALC_DEBUG - quarterly_data exists: {quarterly_data_check is not None}, length: {len(quarterly_data_check) if quarterly_data_check else 0}")
+        self.logger.info(
+            f"RATIOS_CALC_DEBUG - quarterly_data exists: {quarterly_data_check is not None}, length: {len(quarterly_data_check) if quarterly_data_check else 0}"
+        )
 
         # Valuation ratios
         if market_data and financials:
@@ -2834,9 +2878,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         f"(vs quarterly: ${quarterly_ni:,.0f}) → EPS=${ratios['eps']:.2f}"
                     )
                 else:
-                    self.logger.warning(
-                        f"{symbol} - TTM net income not available, falling back to quarterly for EPS"
-                    )
+                    self.logger.warning(f"{symbol} - TTM net income not available, falling back to quarterly for EPS")
 
             # Price to Book
             book_value = financials.get("stockholders_equity") or 0
@@ -2915,7 +2957,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         # CRITICAL FIX: Calculate revenue_growth_yoy from quarterly data BEFORE _build_company_profile
         # This fixes the P/S granular calculation which requires revenue_growth_yoy in CompanyProfile
         quarterly_data = company_data.get("quarterly_data", [])
-        self.logger.info(f"REVENUE_GROWTH_DEBUG - quarterly_data exists: {quarterly_data is not None}, length: {len(quarterly_data) if quarterly_data else 0}")
+        self.logger.info(
+            f"REVENUE_GROWTH_DEBUG - quarterly_data exists: {quarterly_data is not None}, length: {len(quarterly_data) if quarterly_data else 0}"
+        )
         if quarterly_data and len(quarterly_data) >= 5:
             # Calculate YoY revenue growth (comparing most recent quarter to 4 quarters ago)
             try:
@@ -2925,8 +2969,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 quarterly_only = []
                 for q in quarterly_data:
                     if isinstance(q, QuarterlyData):
-                        period = q.fiscal_period if hasattr(q, 'fiscal_period') else None
-                        fiscal_year = q.fiscal_year if hasattr(q, 'fiscal_year') else 0
+                        period = q.fiscal_period if hasattr(q, "fiscal_period") else None
+                        fiscal_year = q.fiscal_year if hasattr(q, "fiscal_year") else 0
                     elif isinstance(q, dict):
                         period = q.get("fiscal_period")
                         fiscal_year = q.get("fiscal_year", 0)
@@ -2940,9 +2984,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 # Sort by fiscal year (descending) then by quarter (Q4 > Q3 > Q2 > Q1)
                 quarter_order = {"Q4": 4, "Q3": 3, "Q2": 2, "Q1": 1}
                 quarterly_sorted = sorted(
-                    quarterly_only,
-                    key=lambda x: (x[1], quarter_order.get(x[2], 0)),
-                    reverse=True  # Newest first
+                    quarterly_only, key=lambda x: (x[1], quarter_order.get(x[2], 0)), reverse=True  # Newest first
                 )
 
                 # Get revenues from most recent quarters
@@ -3256,9 +3298,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 else:
                     if not math.isfinite(existing_value):
                         needs_log = True
-                    elif abs(existing_value - recomputed) > max(
-                        leverage_abs_tol, leverage_rel_tol * abs(recomputed)
-                    ):
+                    elif abs(existing_value - recomputed) > max(leverage_abs_tol, leverage_rel_tol * abs(recomputed)):
                         needs_log = True
 
             if needs_log:
@@ -3398,6 +3438,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 label, score = "Managed", 65.0
             else:
                 label, score = "Leveraged", 45.0
+
             def _fmt_ratio(value: Optional[float]) -> str:
                 if value is None:
                     return "n/a"
@@ -3462,7 +3503,14 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         debt_serviceability = assess_debt_serviceability()
         flexibility = assess_flexibility()
 
-        score_components = [liquidity[2], solvency[2], capital_structure[2], working_capital[2], debt_serviceability[2], flexibility[2]]
+        score_components = [
+            liquidity[2],
+            solvency[2],
+            capital_structure[2],
+            working_capital[2],
+            debt_serviceability[2],
+            flexibility[2],
+        ]
         overall_health_score = round(sum(score_components) / len(score_components), 1)
 
         risk_factors: List[Dict[str, str]] = []
@@ -3579,7 +3627,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         payload = {
             "revenue_growth_sustainability": {
                 "assessment": yoy_label,
-                "commentary": f"Average Y/Y growth {yoy_growth:.1f}%" if yoy_growth is not None else "Insufficient data",
+                "commentary": (
+                    f"Average Y/Y growth {yoy_growth:.1f}%" if yoy_growth is not None else "Insufficient data"
+                ),
             },
             "earnings_growth_quality": {
                 "assessment": earnings_label,
@@ -3587,7 +3637,11 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             },
             "growth_consistency_and_volatility": {
                 "assessment": consistency_label,
-                "commentary": f"Consistency score {consistency_score:.0f}/100" if consistency_score is not None else "Consistency data unavailable.",
+                "commentary": (
+                    f"Consistency score {consistency_score:.0f}/100"
+                    if consistency_score is not None
+                    else "Consistency data unavailable."
+                ),
             },
             "market_share_trends": {
                 "assessment": market_label,
@@ -3596,7 +3650,11 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             "growth_drivers_and_catalysts": growth_drivers,
             "future_growth_potential": {
                 "assessment": "High" if yoy_label in {"High", "Moderate"} else "Balanced",
-                "commentary": "Pipeline supported by demand indicators." if yoy_label in {"High", "Moderate"} else "Requires catalysts to re-accelerate.",
+                "commentary": (
+                    "Pipeline supported by demand indicators."
+                    if yoy_label in {"High", "Moderate"}
+                    else "Requires catalysts to re-accelerate."
+                ),
             },
             "growth_risks_and_headwinds": growth_risks,
             "distribution_snapshot": {
@@ -3721,15 +3779,17 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             profitability_drivers.append("Scaling opportunities")
 
         profitability_score = round(
-            sum([
-                gross_score,
-                op_score,
-                net_score,
-                roe_score,
-                roa_score,
-                leverage_score,
-                cost_score,
-            ])
+            sum(
+                [
+                    gross_score,
+                    op_score,
+                    net_score,
+                    roe_score,
+                    roa_score,
+                    leverage_score,
+                    cost_score,
+                ]
+            )
             / 7,
             1,
         )
@@ -3782,10 +3842,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
         if profile.beta is None:
             fallback_beta = (
-                ratios.get("beta")
-                or market_data.get("beta")
-                or company_data.get("beta")
-                or stock_info.get("beta")
+                ratios.get("beta") or market_data.get("beta") or company_data.get("beta") or stock_info.get("beta")
             )
             try:
                 if fallback_beta is not None:
@@ -3893,7 +3950,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             # Very low beta (< 0.3) is likely low R² / statistically insignificant
             # Very high beta (> 2.5) may be distorted by outliers
             BETA_FLOOR = 0.50  # Minimum reasonable beta for cost of equity
-            BETA_CAP = 2.50    # Maximum reasonable beta
+            BETA_CAP = 2.50  # Maximum reasonable beta
 
             beta_adjustment = None
             if raw_beta < BETA_FLOOR:
@@ -4075,6 +4132,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 if current_price:
                     # Get database URL from config
                     from investigator.config import get_config
+
                     config = get_config()
                     database_url = (
                         f"postgresql://{config.database.username}:{config.database.password}"
@@ -4087,7 +4145,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         industry=company_profile.industry,
                         financials=financials,
                         current_price=current_price,
-                        database_url=database_url
+                        database_url=database_url,
                     )
 
                     # Router returns None for non-special sectors (use standard DCF)
@@ -4119,14 +4177,18 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
         # Add required fields for orchestrator blending BEFORE applying penalty
         # (DCF uses raw dict format, not ValuationModelResult)
-        if isinstance(dcf_professional, dict) and dcf_professional.get('fair_value_per_share'):
-            dcf_professional.setdefault('model', 'dcf')
-            dcf_professional.setdefault('applicable', True)
-            dcf_professional.setdefault('confidence_score', 0.7)  # Default DCF confidence (may be reduced by penalty)
-            dcf_professional.setdefault('weight', 0.0)  # Will be calculated by orchestrator
-            self.logger.info(f"🔧 {symbol} - Added orchestrator fields to DCF: model={dcf_professional.get('model')}, applicable={dcf_professional.get('applicable')}, confidence={dcf_professional.get('confidence_score')}")
+        if isinstance(dcf_professional, dict) and dcf_professional.get("fair_value_per_share"):
+            dcf_professional.setdefault("model", "dcf")
+            dcf_professional.setdefault("applicable", True)
+            dcf_professional.setdefault("confidence_score", 0.7)  # Default DCF confidence (may be reduced by penalty)
+            dcf_professional.setdefault("weight", 0.0)  # Will be calculated by orchestrator
+            self.logger.info(
+                f"🔧 {symbol} - Added orchestrator fields to DCF: model={dcf_professional.get('model')}, applicable={dcf_professional.get('applicable')}, confidence={dcf_professional.get('confidence_score')}"
+            )
         else:
-            self.logger.warning(f"⚠️ {symbol} - DCF did not get orchestrator fields: isinstance={isinstance(dcf_professional, dict)}, fair_value={dcf_professional.get('fair_value_per_share') if isinstance(dcf_professional, dict) else 'N/A'}")
+            self.logger.warning(
+                f"⚠️ {symbol} - DCF did not get orchestrator fields: isinstance={isinstance(dcf_professional, dict)}, fair_value={dcf_professional.get('fair_value_per_share') if isinstance(dcf_professional, dict) else 'N/A'}"
+            )
 
         # Apply cost of capital penalty (may reduce confidence_score)
         dcf_professional = self._apply_cost_of_capital_penalty(dcf_professional, cost_of_capital_issues)
@@ -4159,7 +4221,10 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         pe_model = PEMultipleModel(
             company_profile=company_profile,
             ttm_eps=ttm_eps,
-            current_price=market_data.get("price") or market_data.get("close") or market_data.get("current_price") or ratios.get("current_price"),
+            current_price=market_data.get("price")
+            or market_data.get("close")
+            or market_data.get("current_price")
+            or ratios.get("current_price"),
             sector_median_pe=sector_median_pe,
             growth_adjusted_pe=growth_adjusted_pe,
             earnings_quality_score=company_profile.earnings_quality_score,
@@ -4173,11 +4238,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         log_individual_model_result(self.logger, symbol, "P/E", normalized_pe)
 
         # === EV/EBITDA MODEL ===
-        ttm_ebitda = (
-            financials.get("ebitda")
-            or ratios.get("ebitda")
-            or financials.get("operating_income")
-        )
+        ttm_ebitda = financials.get("ebitda") or ratios.get("ebitda") or financials.get("operating_income")
         enterprise_value = self._calculate_enterprise_value(market_data, financials)
         sector_ev_ebitda = (
             company_data.get("sector_metrics", {}).get("median_ev_ebitda")
@@ -4226,11 +4287,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         sector_ps_from_data = company_data.get("sector_data", {}).get("median_ps")
         sector_ps_from_lookup = self._lookup_sector_multiple(company_profile.sector, "ps")
 
-        sector_ps = (
-            sector_ps_from_metrics
-            or sector_ps_from_data
-            or sector_ps_from_lookup
-        )
+        sector_ps = sector_ps_from_metrics or sector_ps_from_data or sector_ps_from_lookup
 
         valuation_settings = getattr(self.config, "valuation", None)
         liquidity_floor = 5_000_000
@@ -4239,7 +4296,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         elif valuation_settings is not None:
             liquidity_floor = getattr(valuation_settings, "liquidity_floor_usd", liquidity_floor)
 
-        current_price = market_data.get("price") or market_data.get("close") or market_data.get("current_price") or ratios.get("current_price")
+        current_price = (
+            market_data.get("price")
+            or market_data.get("close")
+            or market_data.get("current_price")
+            or ratios.get("current_price")
+        )
 
         ps_model = PSMultipleModel(
             company_profile=company_profile,
@@ -4267,7 +4329,10 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             company_profile=company_profile,
             book_value_per_share=company_profile.book_value_per_share,
             tangible_book_value_per_share=ratios.get("tangible_book_value_per_share"),
-            current_price=market_data.get("price") or market_data.get("close") or market_data.get("current_price") or ratios.get("current_price"),
+            current_price=market_data.get("price")
+            or market_data.get("close")
+            or market_data.get("current_price")
+            or ratios.get("current_price"),
             sector_median_pb=sector_pb,
         )
 
@@ -4283,9 +4348,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         if sector_specific and "P/BV" in sector_specific.get("method", ""):
             # Convert insurance ValuationResult to orchestrator-compatible format
             confidence_map = {"high": 0.9, "medium": 0.7, "low": 0.5}
-            insurance_confidence = confidence_map.get(
-                sector_specific.get("confidence", "medium"), 0.7
-            )
+            insurance_confidence = confidence_map.get(sector_specific.get("confidence", "medium"), 0.7)
 
             # Override normalized_pb with insurance-specific values
             normalized_pb = {
@@ -4320,8 +4383,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         # Data quality note: preferred_stock_dividends has only 27% coverage across Russell 1000
         if preferred_divs > 0:
             self.logger.debug(
-                f"{symbol} - Preferred stock dividends found: ${preferred_divs:,.0f} "
-                f"(27%% coverage - rare field)"
+                f"{symbol} - Preferred stock dividends found: ${preferred_divs:,.0f} " f"(27%% coverage - rare field)"
             )
 
         net_income = financials.get("net_income", 0) or 0
@@ -4377,7 +4439,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 current_fcf=financials.get("free_cash_flow") or financials.get("fcf"),
                 revenue_growth=company_profile.revenue_growth_yoy,
                 fcf_margin=ratios.get("fcf_margin") or ratios.get("free_cash_flow_margin"),
-                current_revenue=financials.get("revenues") or financials.get("revenue") or financials.get("total_revenue"),
+                current_revenue=financials.get("revenues")
+                or financials.get("revenue")
+                or financials.get("total_revenue"),
                 shares_outstanding=company_profile.shares_outstanding,
             )
             normalized_damodaran = normalize_model_output(damodaran_result)
@@ -4389,9 +4453,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
         # === RULE OF 40 VALUATION (Milestone 7.2) ===
         # Applies to growth companies, especially SaaS
-        is_saas_company = (
-            company_profile.industry and
-            any(kw in company_profile.industry.lower() for kw in ["software", "saas", "cloud", "internet"])
+        is_saas_company = company_profile.industry and any(
+            kw in company_profile.industry.lower() for kw in ["software", "saas", "cloud", "internet"]
         )
         is_growth_company = company_profile.revenue_growth_yoy and company_profile.revenue_growth_yoy > 0.10
 
@@ -4401,8 +4464,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 rule_of_40_result = rule_of_40_model.calculate(
                     revenue_growth=company_profile.revenue_growth_yoy,
                     fcf_margin=ratios.get("fcf_margin") or ratios.get("free_cash_flow_margin"),
-                    current_revenue=financials.get("revenues") or financials.get("revenue") or financials.get("total_revenue"),
-                    current_price=market_data.get("price") or market_data.get("close") or market_data.get("current_price"),
+                    current_revenue=financials.get("revenues")
+                    or financials.get("revenue")
+                    or financials.get("total_revenue"),
+                    current_price=market_data.get("price")
+                    or market_data.get("close")
+                    or market_data.get("current_price"),
                     shares_outstanding=company_profile.shares_outstanding,
                 )
                 normalized_rule_of_40 = normalize_model_output(rule_of_40_result)
@@ -4425,8 +4492,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 saas_model = SaaSValuationModel(company_profile)
                 saas_result = saas_model.calculate(
                     revenue_growth=company_profile.revenue_growth_yoy,
-                    current_revenue=financials.get("revenues") or financials.get("revenue") or financials.get("total_revenue"),
-                    current_price=market_data.get("price") or market_data.get("close") or market_data.get("current_price"),
+                    current_revenue=financials.get("revenues")
+                    or financials.get("revenue")
+                    or financials.get("total_revenue"),
+                    current_price=market_data.get("price")
+                    or market_data.get("close")
+                    or market_data.get("current_price"),
                     shares_outstanding=company_profile.shares_outstanding,
                     gross_margin=ratios.get("gross_margin") or ratios.get("gross_profit_margin"),
                     # SaaS-specific metrics (may not be available for all companies)
@@ -4467,13 +4538,19 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             sector_spec = valuation_results.get("sector_specific")
             if isinstance(sector_spec, dict) and "P/BV" not in sector_spec.get("method", ""):
                 models_for_blending.append(sector_spec)
-                self.logger.info(f"✅ [SECTOR_VALUATION] {symbol} - Added sector-specific valuation to blending: {sector_spec.get('method')}")
+                self.logger.info(
+                    f"✅ [SECTOR_VALUATION] {symbol} - Added sector-specific valuation to blending: {sector_spec.get('method')}"
+                )
 
             # Add new valuation models (Milestone 7)
-            if isinstance(valuation_results.get("damodaran_dcf"), dict) and valuation_results["damodaran_dcf"].get("applicable"):
+            if isinstance(valuation_results.get("damodaran_dcf"), dict) and valuation_results["damodaran_dcf"].get(
+                "applicable"
+            ):
                 models_for_blending.append(valuation_results["damodaran_dcf"])
                 self.logger.info(f"✅ {symbol} - Added Damodaran DCF to blending")
-            if isinstance(valuation_results.get("rule_of_40"), dict) and valuation_results["rule_of_40"].get("applicable"):
+            if isinstance(valuation_results.get("rule_of_40"), dict) and valuation_results["rule_of_40"].get(
+                "applicable"
+            ):
                 models_for_blending.append(valuation_results["rule_of_40"])
                 self.logger.info(f"✅ {symbol} - Added Rule of 40 to blending")
             if isinstance(valuation_results.get("saas"), dict) and valuation_results["saas"].get("applicable"):
@@ -4486,15 +4563,15 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             if allowed_models is not None:
                 # CRITICAL: For insurance companies, always include 'pb' regardless of archetype
                 # Insurance companies are valued primarily on book value (P/BV)
-                is_insurance = company_profile.industry and 'insur' in company_profile.industry.lower()
-                if is_insurance and 'pb' not in allowed_models:
-                    allowed_models = list(allowed_models) + ['pb']
+                is_insurance = company_profile.industry and "insur" in company_profile.industry.lower()
+                if is_insurance and "pb" not in allowed_models:
+                    allowed_models = list(allowed_models) + ["pb"]
                     self.logger.info(f"🏦 {symbol} - Added 'pb' to allowed_models for insurance company")
 
-                models_for_blending = [
-                    model for model in models_for_blending if model.get("model") in allowed_models
-                ]
-                self.logger.debug(f"{symbol} - Filtered models (allowed={allowed_models}): {[m.get('model') for m in models_for_blending]}")
+                models_for_blending = [model for model in models_for_blending if model.get("model") in allowed_models]
+                self.logger.debug(
+                    f"{symbol} - Filtered models (allowed={allowed_models}): {[m.get('model') for m in models_for_blending]}"
+                )
 
             # CRITICAL FIX: Ensure market_cap and related fields are in financials dict for dynamic weighting
             # Dynamic weighting service expects these in financials, but they're calculated in ratios
@@ -4502,7 +4579,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             if ratios:
                 if "market_cap" in ratios and "market_cap" not in financials:
                     financials["market_cap"] = ratios["market_cap"]
-                    self.logger.debug(f"{symbol} - Copied market_cap from ratios to financials: ${ratios['market_cap']:,.0f}")
+                    self.logger.debug(
+                        f"{symbol} - Copied market_cap from ratios to financials: ${ratios['market_cap']:,.0f}"
+                    )
                 if "shares_outstanding" in ratios and "shares_outstanding" not in financials:
                     financials["shares_outstanding"] = ratios["shares_outstanding"]
                 if "current_price" in ratios and "current_price" not in financials:
@@ -4515,12 +4594,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 # Try common revenue key variants
                 ttm_metrics = company_data.get("ttm_metrics", {})
                 revenue_value = (
-                    financials.get("revenues") or
-                    financials.get("total_revenue") or
-                    ttm_metrics.get("revenues") or
-                    ttm_metrics.get("total_revenue") or
-                    ttm_metrics.get("revenue") or
-                    0
+                    financials.get("revenues")
+                    or financials.get("total_revenue")
+                    or ttm_metrics.get("revenues")
+                    or ttm_metrics.get("total_revenue")
+                    or ttm_metrics.get("revenue")
+                    or 0
                 )
                 if revenue_value and revenue_value > 0:
                     financials["revenue"] = revenue_value
@@ -4529,51 +4608,51 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             # CRITICAL FIX: Add FCF quarters count for DCF applicability check
             # ModelApplicabilityRules requires this field to determine if DCF is applicable
             fcf_quarters_count = 0
-            if hasattr(company_profile, 'quarterly_metrics') and company_profile.quarterly_metrics:
+            if hasattr(company_profile, "quarterly_metrics") and company_profile.quarterly_metrics:
                 for quarter in company_profile.quarterly_metrics:
                     if isinstance(quarter, dict):
-                        cash_flow = quarter.get('cash_flow', {})
-                        if isinstance(cash_flow, dict) and cash_flow.get('free_cash_flow') is not None:
+                        cash_flow = quarter.get("cash_flow", {})
+                        if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
                             fcf_quarters_count += 1
                     else:
-                        if hasattr(quarter, 'cash_flow'):
-                            cash_flow = getattr(quarter, 'cash_flow', {})
-                            if isinstance(cash_flow, dict) and cash_flow.get('free_cash_flow') is not None:
+                        if hasattr(quarter, "cash_flow"):
+                            cash_flow = getattr(quarter, "cash_flow", {})
+                            if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
                                 fcf_quarters_count += 1
 
             financials["fcf_quarters_count"] = fcf_quarters_count
 
             # Add TTM free cash flow if available
-            if hasattr(company_profile, 'free_cash_flow') and company_profile.free_cash_flow:
+            if hasattr(company_profile, "free_cash_flow") and company_profile.free_cash_flow:
                 financials["free_cash_flow"] = company_profile.free_cash_flow
-            elif hasattr(company_profile, 'ttm_metrics') and isinstance(company_profile.ttm_metrics, dict):
-                financials["free_cash_flow"] = company_profile.ttm_metrics.get('free_cash_flow', 0)
+            elif hasattr(company_profile, "ttm_metrics") and isinstance(company_profile.ttm_metrics, dict):
+                financials["free_cash_flow"] = company_profile.ttm_metrics.get("free_cash_flow", 0)
 
             # CRITICAL FIX: Add dividends_paid for GGM applicability check
             # ModelApplicabilityRules._check_ggm_applicability requires this field
-            if hasattr(company_profile, 'dividends_paid') and company_profile.dividends_paid:
+            if hasattr(company_profile, "dividends_paid") and company_profile.dividends_paid:
                 financials["dividends_paid"] = company_profile.dividends_paid
             elif "dividends_paid" not in financials or financials.get("dividends_paid", 0) == 0:
                 # Fallback to extracting from financials dict itself
                 financials["dividends_paid"] = abs(financials.get("dividends_paid", 0) or 0)
 
             # CRITICAL FIX: Add ebitda for EV/EBITDA applicability check
-            if hasattr(company_profile, 'ebitda') and company_profile.ebitda:
+            if hasattr(company_profile, "ebitda") and company_profile.ebitda:
                 financials["ebitda"] = company_profile.ebitda
             elif "ebitda" not in financials or financials.get("ebitda", 0) == 0:
                 # Fallback: Try to get from ttm_metrics or calculate from operating_income
                 ttm_metrics = company_data.get("ttm_metrics", {})
                 ebitda_value = (
-                    ttm_metrics.get("ebitda") or
-                    ttm_metrics.get("operating_income") or
-                    financials.get("operating_income") or
-                    0
+                    ttm_metrics.get("ebitda")
+                    or ttm_metrics.get("operating_income")
+                    or financials.get("operating_income")
+                    or 0
                 )
                 if ebitda_value:
                     financials["ebitda"] = ebitda_value
 
             # CRITICAL FIX: Add payout_ratio for GGM applicability check
-            if hasattr(company_profile, 'dividend_payout_ratio') and company_profile.dividend_payout_ratio:
+            if hasattr(company_profile, "dividend_payout_ratio") and company_profile.dividend_payout_ratio:
                 financials["payout_ratio"] = company_profile.dividend_payout_ratio
             elif ratios and ratios.get("payout_ratio"):
                 financials["payout_ratio"] = ratios["payout_ratio"]
@@ -4581,7 +4660,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 financials["payout_ratio"] = ratios["dividend_payout_ratio"]
 
             # CRITICAL FIX: Add net_income for P/E and GGM applicability
-            if hasattr(company_profile, 'net_income') and company_profile.net_income:
+            if hasattr(company_profile, "net_income") and company_profile.net_income:
                 financials["net_income"] = company_profile.net_income
             elif "net_income" not in financials or financials.get("net_income", 0) == 0:
                 ttm_metrics = company_data.get("ttm_metrics", {})
@@ -4592,10 +4671,10 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             # CRITICAL FIX: Add stockholders_equity for P/B applicability
             if "stockholders_equity" not in financials and "book_value" not in financials:
                 book_value = (
-                    financials.get("stockholders_equity") or
-                    financials.get("total_stockholders_equity") or
-                    company_data.get("ttm_metrics", {}).get("stockholders_equity") or
-                    0
+                    financials.get("stockholders_equity")
+                    or financials.get("total_stockholders_equity")
+                    or company_data.get("ttm_metrics", {}).get("stockholders_equity")
+                    or 0
                 )
                 if book_value:
                     financials["stockholders_equity"] = book_value
@@ -4661,6 +4740,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 pass
         except Exception as exc:  # pragma: no cover - defensive
             import traceback
+
             self.logger.error(f"{symbol} - Multi-model blending failed: {exc}")
             self.logger.debug(f"{symbol} - Traceback: {traceback.format_exc()}")
 
@@ -4685,64 +4765,76 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
             # DCF
             if isinstance(dcf_professional, dict):
-                all_models_data.append({
-                    'name': 'DCF',
-                    'fair_value': dcf_professional.get('fair_value_per_share', 0),
-                    'confidence': dcf_professional.get('confidence_score', 0) * 100,  # Convert to percentage
-                    'weight': dcf_professional.get('weight', 0),
-                    'applicable': dcf_professional.get('applicable', True)
-                })
+                all_models_data.append(
+                    {
+                        "name": "DCF",
+                        "fair_value": dcf_professional.get("fair_value_per_share", 0),
+                        "confidence": dcf_professional.get("confidence_score", 0) * 100,  # Convert to percentage
+                        "weight": dcf_professional.get("weight", 0),
+                        "applicable": dcf_professional.get("applicable", True),
+                    }
+                )
 
             # GGM
             ggm_entry = valuation_results.get("ggm", {})
             if isinstance(ggm_entry, dict):
-                all_models_data.append({
-                    'name': 'GGM',
-                    'fair_value': ggm_entry.get('fair_value_per_share', 0),
-                    'confidence': ggm_entry.get('confidence_score', 0) * 100,
-                    'weight': ggm_entry.get('weight', 0),
-                    'applicable': ggm_entry.get('applicable', False)
-                })
+                all_models_data.append(
+                    {
+                        "name": "GGM",
+                        "fair_value": ggm_entry.get("fair_value_per_share", 0),
+                        "confidence": ggm_entry.get("confidence_score", 0) * 100,
+                        "weight": ggm_entry.get("weight", 0),
+                        "applicable": ggm_entry.get("applicable", False),
+                    }
+                )
 
             # P/E
             if isinstance(normalized_pe, dict):
-                all_models_data.append({
-                    'name': 'P/E',
-                    'fair_value': normalized_pe.get('fair_value_per_share', 0),
-                    'confidence': normalized_pe.get('confidence_score', 0) * 100,
-                    'weight': normalized_pe.get('weight', 0),
-                    'applicable': normalized_pe.get('applicable', True)
-                })
+                all_models_data.append(
+                    {
+                        "name": "P/E",
+                        "fair_value": normalized_pe.get("fair_value_per_share", 0),
+                        "confidence": normalized_pe.get("confidence_score", 0) * 100,
+                        "weight": normalized_pe.get("weight", 0),
+                        "applicable": normalized_pe.get("applicable", True),
+                    }
+                )
 
             # EV/EBITDA
             if isinstance(normalized_ev_ebitda, dict):
-                all_models_data.append({
-                    'name': 'EV/EBITDA',
-                    'fair_value': normalized_ev_ebitda.get('fair_value_per_share', 0),
-                    'confidence': normalized_ev_ebitda.get('confidence_score', 0) * 100,
-                    'weight': normalized_ev_ebitda.get('weight', 0),
-                    'applicable': normalized_ev_ebitda.get('applicable', True)
-                })
+                all_models_data.append(
+                    {
+                        "name": "EV/EBITDA",
+                        "fair_value": normalized_ev_ebitda.get("fair_value_per_share", 0),
+                        "confidence": normalized_ev_ebitda.get("confidence_score", 0) * 100,
+                        "weight": normalized_ev_ebitda.get("weight", 0),
+                        "applicable": normalized_ev_ebitda.get("applicable", True),
+                    }
+                )
 
             # P/S
             if isinstance(normalized_ps, dict):
-                all_models_data.append({
-                    'name': 'P/S',
-                    'fair_value': normalized_ps.get('fair_value_per_share', 0),
-                    'confidence': normalized_ps.get('confidence_score', 0) * 100,
-                    'weight': normalized_ps.get('weight', 0),
-                    'applicable': normalized_ps.get('applicable', True)
-                })
+                all_models_data.append(
+                    {
+                        "name": "P/S",
+                        "fair_value": normalized_ps.get("fair_value_per_share", 0),
+                        "confidence": normalized_ps.get("confidence_score", 0) * 100,
+                        "weight": normalized_ps.get("weight", 0),
+                        "applicable": normalized_ps.get("applicable", True),
+                    }
+                )
 
             # P/B
             if isinstance(normalized_pb, dict):
-                all_models_data.append({
-                    'name': 'P/B',
-                    'fair_value': normalized_pb.get('fair_value_per_share', 0),
-                    'confidence': normalized_pb.get('confidence_score', 0) * 100,
-                    'weight': normalized_pb.get('weight', 0),
-                    'applicable': normalized_pb.get('applicable', True)
-                })
+                all_models_data.append(
+                    {
+                        "name": "P/B",
+                        "fair_value": normalized_pb.get("fair_value_per_share", 0),
+                        "confidence": normalized_pb.get("confidence_score", 0) * 100,
+                        "weight": normalized_pb.get("weight", 0),
+                        "applicable": normalized_pb.get("applicable", True),
+                    }
+                )
 
             # Get tier classification
             tier_display = tier_classification if tier_classification else "N/A"
@@ -4751,7 +4843,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             valuation_table = ValuationTableFormatter.format_valuation_summary_table(
                 symbol=symbol,
                 all_models=all_models_data,
-                dynamic_weights={m['name'].lower(): m['weight'] for m in all_models_data},
+                dynamic_weights={m["name"].lower(): m["weight"] for m in all_models_data},
                 blended_fair_value=blended_fair_value if blended_fair_value else 0,
                 current_price=current_price,
                 tier=tier_display,
@@ -4809,11 +4901,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         extra_bits.append(f"WACC {_fmt_pct(assumptions.get('wacc'))}")
                     if metadata.get("rule_of_40"):
                         r40 = metadata["rule_of_40"]
-                        score = round_for_prompt(r40.get('score', 0), 1)
+                        score = round_for_prompt(r40.get("score", 0), 1)
                         if score is not None:
-                            extra_bits.append(
-                                f"Rule of 40 {score:.1f} ({r40.get('classification', '').upper()})"
-                            )
+                            extra_bits.append(f"Rule of 40 {score:.1f} ({r40.get('classification', '').upper()})")
                 if model.get("model") == "ggm":
                     if "growth_rate" in assumptions:
                         extra_bits.append(f"Growth {_fmt_pct(assumptions.get('growth_rate'))}")
@@ -4823,36 +4913,22 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     if assumptions.get("target_pe"):
                         extra_bits.append(f"Target P/E {_fmt_float(assumptions.get('target_pe'), 2)}")
                     if assumptions.get("sector_median_pe"):
-                        extra_bits.append(
-                            f"Sector Median {_fmt_float(assumptions.get('sector_median_pe'), 2)}"
-                        )
+                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_pe'), 2)}")
                 if model.get("model") == "ev_ebitda":
                     if assumptions.get("target_ev_ebitda"):
-                        extra_bits.append(
-                            f"Target EV/EBITDA {_fmt_float(assumptions.get('target_ev_ebitda'), 2)}"
-                        )
+                        extra_bits.append(f"Target EV/EBITDA {_fmt_float(assumptions.get('target_ev_ebitda'), 2)}")
                     if assumptions.get("sector_median_ev_ebitda"):
-                        extra_bits.append(
-                            f"Sector Median {_fmt_float(assumptions.get('sector_median_ev_ebitda'), 2)}"
-                        )
+                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_ev_ebitda'), 2)}")
                 if model.get("model") == "ps":
                     if assumptions.get("target_ps"):
-                        extra_bits.append(
-                            f"Target P/S {_fmt_float(assumptions.get('target_ps'), 2)}"
-                        )
+                        extra_bits.append(f"Target P/S {_fmt_float(assumptions.get('target_ps'), 2)}")
                     if assumptions.get("sector_median_ps"):
-                        extra_bits.append(
-                            f"Sector Median {_fmt_float(assumptions.get('sector_median_ps'), 2)}"
-                        )
+                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_ps'), 2)}")
                 if model.get("model") == "pb":
                     if assumptions.get("target_pb"):
-                        extra_bits.append(
-                            f"Target P/B {_fmt_float(assumptions.get('target_pb'), 2)}"
-                        )
+                        extra_bits.append(f"Target P/B {_fmt_float(assumptions.get('target_pb'), 2)}")
                     if assumptions.get("sector_median_pb"):
-                        extra_bits.append(
-                            f"Sector Median {_fmt_float(assumptions.get('sector_median_pb'), 2)}"
-                        )
+                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_pb'), 2)}")
                 if extra_bits:
                     line += " | " + ", ".join(extra_bits)
             else:
@@ -5012,10 +5088,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         if self.use_deterministic and self.deterministic_competitive_analysis:
             self.logger.debug(f"{symbol} - Using deterministic competitive analysis (LLM bypass)")
 
-            response_data = analyze_competitive_position(
-                symbol=symbol,
-                company_data=company_data
-            )
+            response_data = analyze_competitive_position(symbol=symbol, company_data=company_data)
 
             return self._build_deterministic_response("competitive_position", response_data)
 
@@ -5136,7 +5209,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
         try:
             self.logger.warning(f"[SECTOR_LOOKUP_DEBUG] Looking up {sector}/{multiple}")
-            self.logger.warning(f"[SECTOR_LOOKUP_DEBUG] _sector_multiples_loader exists: {self._sector_multiples_loader is not None}")
+            self.logger.warning(
+                f"[SECTOR_LOOKUP_DEBUG] _sector_multiples_loader exists: {self._sector_multiples_loader is not None}"
+            )
 
             if self._sector_multiples_loader:
                 record = self._sector_multiples_loader.get(sector)
@@ -5158,7 +5233,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 self.logger.warning(f"[SECTOR_LOOKUP_DEBUG] No valuation_settings, returning None")
                 return None
 
-            self.logger.warning(f"[SECTOR_LOOKUP_DEBUG] Config multiples keys: {list(multiples.keys()) if multiples else 'empty'}")
+            self.logger.warning(
+                f"[SECTOR_LOOKUP_DEBUG] Config multiples keys: {list(multiples.keys()) if multiples else 'empty'}"
+            )
             sector_key = sector.lower()
             for key, values in multiples.items():
                 if key.lower() == sector_key:
@@ -5192,16 +5269,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         if market_cap is None:
             return None
 
-        total_debt = (
-            financials.get("total_debt")
-            or financials.get("long_term_debt")
-            or market_data.get("total_debt")
-        )
-        cash = (
-            financials.get("cash")
-            or financials.get("cash_and_equivalents")
-            or market_data.get("cash")
-        )
+        total_debt = financials.get("total_debt") or financials.get("long_term_debt") or market_data.get("total_debt")
+        cash = financials.get("cash") or financials.get("cash_and_equivalents") or market_data.get("cash")
 
         try:
             market_cap_val = float(market_cap)
@@ -5240,18 +5309,18 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         """
         try:
             # Extract symbol
-            symbol = company_profile.symbol if hasattr(company_profile, 'symbol') else "UNKNOWN"
+            symbol = company_profile.symbol if hasattr(company_profile, "symbol") else "UNKNOWN"
 
             # Use provided financials and ratios if available, otherwise reconstruct from company_profile
             if financials is None:
                 # Backward compatibility: reconstruct from company_profile
                 self.logger.debug(f"{symbol} - No financials provided, reconstructing from company_profile")
                 financials = {
-                    "net_income": getattr(company_profile, 'net_income', 0),
-                    "revenue": getattr(company_profile, 'revenue', 0),
-                    "dividends_paid": getattr(company_profile, 'dividends_paid', 0),
-                    "ebitda": getattr(company_profile, 'ebitda', 0),
-                    "book_value": getattr(company_profile, 'book_value', 0),
+                    "net_income": getattr(company_profile, "net_income", 0),
+                    "revenue": getattr(company_profile, "revenue", 0),
+                    "dividends_paid": getattr(company_profile, "dividends_paid", 0),
+                    "ebitda": getattr(company_profile, "ebitda", 0),
+                    "book_value": getattr(company_profile, "book_value", 0),
                     "market_cap": 0,  # Will be extracted from model results below
                     "current_price": 0,  # Will be extracted from model results below
                 }
@@ -5261,40 +5330,40 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
             # Count quarters with FCF data for DCF applicability
             fcf_quarters_count = 0
-            if hasattr(company_profile, 'quarterly_metrics') and company_profile.quarterly_metrics:
+            if hasattr(company_profile, "quarterly_metrics") and company_profile.quarterly_metrics:
                 for quarter in company_profile.quarterly_metrics:
                     # Check if this quarter has FCF data
                     if isinstance(quarter, dict):
-                        cash_flow = quarter.get('cash_flow', {})
+                        cash_flow = quarter.get("cash_flow", {})
                         if isinstance(cash_flow, dict):
-                            fcf = cash_flow.get('free_cash_flow')
+                            fcf = cash_flow.get("free_cash_flow")
                             if fcf is not None:
                                 fcf_quarters_count += 1
                     else:
                         # Handle object access pattern
-                        if hasattr(quarter, 'cash_flow'):
-                            cash_flow = getattr(quarter, 'cash_flow', {})
+                        if hasattr(quarter, "cash_flow"):
+                            cash_flow = getattr(quarter, "cash_flow", {})
                             if isinstance(cash_flow, dict):
-                                fcf = cash_flow.get('free_cash_flow')
+                                fcf = cash_flow.get("free_cash_flow")
                                 if fcf is not None:
                                     fcf_quarters_count += 1
 
             financials["fcf_quarters_count"] = fcf_quarters_count
 
             # Add TTM free cash flow for DCF calculation
-            if hasattr(company_profile, 'free_cash_flow'):
-                financials["free_cash_flow"] = getattr(company_profile, 'free_cash_flow', 0)
-            elif hasattr(company_profile, 'ttm_metrics') and isinstance(company_profile.ttm_metrics, dict):
-                financials["free_cash_flow"] = company_profile.ttm_metrics.get('free_cash_flow', 0)
+            if hasattr(company_profile, "free_cash_flow"):
+                financials["free_cash_flow"] = getattr(company_profile, "free_cash_flow", 0)
+            elif hasattr(company_profile, "ttm_metrics") and isinstance(company_profile.ttm_metrics, dict):
+                financials["free_cash_flow"] = company_profile.ttm_metrics.get("free_cash_flow", 0)
             else:
                 financials["free_cash_flow"] = 0
 
             # CRITICAL FIX: Add dividends_paid for GGM applicability
-            if hasattr(company_profile, 'dividends_paid') and company_profile.dividends_paid:
+            if hasattr(company_profile, "dividends_paid") and company_profile.dividends_paid:
                 financials["dividends_paid"] = company_profile.dividends_paid
 
             # CRITICAL FIX: Add ebitda for EV/EBITDA applicability
-            if hasattr(company_profile, 'ebitda') and company_profile.ebitda:
+            if hasattr(company_profile, "ebitda") and company_profile.ebitda:
                 financials["ebitda"] = company_profile.ebitda
 
             # CRITICAL FIX: Infer fcf_quarters_count from TTM FCF if not detected from quarterly data
@@ -5315,16 +5384,22 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 # Backward compatibility: reconstruct from company_profile
                 self.logger.debug(f"{symbol} - No ratios provided, reconstructing from company_profile")
                 ratios = {
-                    "payout_ratio": getattr(company_profile, 'dividend_payout_ratio', 0),
-                    "rule_of_40_score": getattr(company_profile, 'rule_of_40_score', 0),
-                    "revenue_growth_pct": getattr(company_profile, 'revenue_growth_yoy', 0),
-                    "fcf_margin_pct": getattr(company_profile, 'fcf_margin', 0) * 100 if getattr(company_profile, 'fcf_margin', None) else 0,
+                    "payout_ratio": getattr(company_profile, "dividend_payout_ratio", 0),
+                    "rule_of_40_score": getattr(company_profile, "rule_of_40_score", 0),
+                    "revenue_growth_pct": getattr(company_profile, "revenue_growth_yoy", 0),
+                    "fcf_margin_pct": (
+                        getattr(company_profile, "fcf_margin", 0) * 100
+                        if getattr(company_profile, "fcf_margin", None)
+                        else 0
+                    ),
                     "ttm_eps": 0,  # Will be extracted from model results below
                 }
 
             # Extract enhanced weighting data from model results
             # This data is in the model assumptions/metadata, not company_profile
-            self.logger.debug(f"{symbol} - DEBUG: models_for_blending type: {type(models_for_blending)}, length: {len(models_for_blending) if models_for_blending else 0}")
+            self.logger.debug(
+                f"{symbol} - DEBUG: models_for_blending type: {type(models_for_blending)}, length: {len(models_for_blending) if models_for_blending else 0}"
+            )
 
             for idx, model_result in enumerate(models_for_blending):
                 if model_result is None:
@@ -5334,47 +5409,59 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 self.logger.debug(f"{symbol} - DEBUG: model_result[{idx}] type: {type(model_result)}")
                 if isinstance(model_result, dict):
                     self.logger.debug(f"{symbol} - DEBUG: model_result[{idx}] keys: {list(model_result.keys())}")
-                    if 'model_name' in model_result:
-                        self.logger.debug(f"{symbol} - DEBUG: model_result[{idx}] model_name: {model_result.get('model_name')}")
+                    if "model_name" in model_result:
+                        self.logger.debug(
+                            f"{symbol} - DEBUG: model_result[{idx}] model_name: {model_result.get('model_name')}"
+                        )
                 else:
-                    self.logger.debug(f"{symbol} - DEBUG: model_result[{idx}] attributes: {[a for a in dir(model_result) if not a.startswith('_')][:10]}")
-                    if hasattr(model_result, 'model_name'):
-                        self.logger.debug(f"{symbol} - DEBUG: model_result[{idx}] model_name: {getattr(model_result, 'model_name', None)}")
+                    self.logger.debug(
+                        f"{symbol} - DEBUG: model_result[{idx}] attributes: {[a for a in dir(model_result) if not a.startswith('_')][:10]}"
+                    )
+                    if hasattr(model_result, "model_name"):
+                        self.logger.debug(
+                            f"{symbol} - DEBUG: model_result[{idx}] model_name: {getattr(model_result, 'model_name', None)}"
+                        )
 
                 # Handle both dict and object access patterns
                 # NOTE: model results use 'model' key, not 'model_name'
-                model_name = model_result.get('model') if isinstance(model_result, dict) else getattr(model_result, 'model', None)
+                model_name = (
+                    model_result.get("model")
+                    if isinstance(model_result, dict)
+                    else getattr(model_result, "model", None)
+                )
 
                 # Extract from P/E model (has current_price and ttm_eps)
                 if model_name == "pe":
                     if isinstance(model_result, dict):
-                        assumptions = model_result.get('assumptions', {})
-                        metadata = model_result.get('metadata', {})
+                        assumptions = model_result.get("assumptions", {})
+                        metadata = model_result.get("metadata", {})
                     else:
-                        assumptions = getattr(model_result, 'assumptions', {})
-                        metadata = getattr(model_result, 'metadata', {})
+                        assumptions = getattr(model_result, "assumptions", {})
+                        metadata = getattr(model_result, "metadata", {})
 
-                    current_price = metadata.get('current_price')
+                    current_price = metadata.get("current_price")
                     if current_price is not None:
                         financials["current_price"] = current_price
 
-                    ttm_eps = assumptions.get('ttm_eps')
+                    ttm_eps = assumptions.get("ttm_eps")
                     if ttm_eps is not None:
                         ratios["ttm_eps"] = ttm_eps
 
                 # Extract from any model that has market_cap
                 if isinstance(model_result, dict):
-                    assumptions = model_result.get('assumptions', {})
-                    metadata = model_result.get('metadata', {})
+                    assumptions = model_result.get("assumptions", {})
+                    metadata = model_result.get("metadata", {})
                 else:
-                    assumptions = getattr(model_result, 'assumptions', {}) if hasattr(model_result, 'assumptions') else {}
-                    metadata = getattr(model_result, 'metadata', {}) if hasattr(model_result, 'metadata') else {}
+                    assumptions = (
+                        getattr(model_result, "assumptions", {}) if hasattr(model_result, "assumptions") else {}
+                    )
+                    metadata = getattr(model_result, "metadata", {}) if hasattr(model_result, "metadata") else {}
 
-                market_cap_from_assumptions = assumptions.get('market_cap', 0) if isinstance(assumptions, dict) else 0
+                market_cap_from_assumptions = assumptions.get("market_cap", 0) if isinstance(assumptions, dict) else 0
                 if market_cap_from_assumptions > 0:
                     financials["market_cap"] = market_cap_from_assumptions
 
-                market_cap_from_metadata = metadata.get('market_cap', 0) if isinstance(metadata, dict) else 0
+                market_cap_from_metadata = metadata.get("market_cap", 0) if isinstance(metadata, dict) else 0
                 if market_cap_from_metadata > 0:
                     financials["market_cap"] = market_cap_from_metadata
 
@@ -5386,50 +5473,50 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         continue
 
                     if isinstance(model_result, dict):
-                        assumptions = model_result.get('assumptions', {})
+                        assumptions = model_result.get("assumptions", {})
                     else:
-                        assumptions = getattr(model_result, 'assumptions', {})
+                        assumptions = getattr(model_result, "assumptions", {})
 
-                    shares = assumptions.get('shares_outstanding', 0) if isinstance(assumptions, dict) else 0
+                    shares = assumptions.get("shares_outstanding", 0) if isinstance(assumptions, dict) else 0
                     if shares > 0:
                         financials["market_cap"] = financials["current_price"] * shares
                         break
 
             # Extract data quality (if available)
-            data_quality = getattr(company_profile, 'data_quality', None)
+            data_quality = getattr(company_profile, "data_quality", None)
 
             # CRITICAL FIX: Add FCF quarters count for DCF applicability check
             # Count quarters with FCF data - required for ModelApplicabilityRules
             fcf_quarters_count = 0
-            if hasattr(company_profile, 'quarterly_metrics') and company_profile.quarterly_metrics:
+            if hasattr(company_profile, "quarterly_metrics") and company_profile.quarterly_metrics:
                 for quarter in company_profile.quarterly_metrics:
                     # Check if this quarter has FCF data
                     if isinstance(quarter, dict):
-                        cash_flow = quarter.get('cash_flow', {})
-                        if isinstance(cash_flow, dict) and cash_flow.get('free_cash_flow') is not None:
+                        cash_flow = quarter.get("cash_flow", {})
+                        if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
                             fcf_quarters_count += 1
                     else:
                         # Handle object access pattern
-                        if hasattr(quarter, 'cash_flow'):
-                            cash_flow = getattr(quarter, 'cash_flow', {})
-                            if isinstance(cash_flow, dict) and cash_flow.get('free_cash_flow') is not None:
+                        if hasattr(quarter, "cash_flow"):
+                            cash_flow = getattr(quarter, "cash_flow", {})
+                            if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
                                 fcf_quarters_count += 1
 
             # Add to financials dict for applicability check
             financials["fcf_quarters_count"] = fcf_quarters_count
 
             # Add TTM free cash flow if available
-            if hasattr(company_profile, 'free_cash_flow') and company_profile.free_cash_flow:
+            if hasattr(company_profile, "free_cash_flow") and company_profile.free_cash_flow:
                 financials["free_cash_flow"] = company_profile.free_cash_flow
-            elif hasattr(company_profile, 'ttm_metrics') and isinstance(company_profile.ttm_metrics, dict):
-                financials["free_cash_flow"] = company_profile.ttm_metrics.get('free_cash_flow', 0)
+            elif hasattr(company_profile, "ttm_metrics") and isinstance(company_profile.ttm_metrics, dict):
+                financials["free_cash_flow"] = company_profile.ttm_metrics.get("free_cash_flow", 0)
 
             # CRITICAL FIX: Add dividends_paid for GGM applicability
-            if hasattr(company_profile, 'dividends_paid') and company_profile.dividends_paid:
+            if hasattr(company_profile, "dividends_paid") and company_profile.dividends_paid:
                 financials["dividends_paid"] = company_profile.dividends_paid
 
             # CRITICAL FIX: Add ebitda for EV/EBITDA applicability
-            if hasattr(company_profile, 'ebitda') and company_profile.ebitda:
+            if hasattr(company_profile, "ebitda") and company_profile.ebitda:
                 financials["ebitda"] = company_profile.ebitda
 
             # CRITICAL FIX: Infer fcf_quarters_count from TTM FCF if not detected from quarterly data
@@ -5484,7 +5571,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             def _normalize_key(key: Optional[str]) -> Optional[str]:
                 return key.lower() if key else None
 
-            primary_key = _normalize_key(company_profile.primary_archetype.name if company_profile.primary_archetype else None)
+            primary_key = _normalize_key(
+                company_profile.primary_archetype.name if company_profile.primary_archetype else None
+            )
             fallback_node = None
             if primary_key and primary_key in fallback_cfg:
                 fallback_node = fallback_cfg[primary_key]
@@ -5497,7 +5586,11 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             if not fallback_node:
                 return None, "no_fallback_node"
 
-            weights = fallback_node.get("weights") if isinstance(fallback_node, dict) else getattr(fallback_node, "weights", None)
+            weights = (
+                fallback_node.get("weights")
+                if isinstance(fallback_node, dict)
+                else getattr(fallback_node, "weights", None)
+            )
             if not isinstance(weights, dict):
                 return None, "invalid_fallback_weights"
 
@@ -5738,22 +5831,21 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         fiscal_period = analysis_data.get("fiscal_period")  # Extract period from analysis_data
 
         # Check if TOON format is enabled
-        use_toon = (
-            getattr(self.config.ollama, 'use_toon_format', False) and
-            getattr(self.config.ollama, 'toon_agents', {}).get('fundamental_analysis', False)
-        )
+        use_toon = getattr(self.config.ollama, "use_toon_format", False) and getattr(
+            self.config.ollama, "toon_agents", {}
+        ).get("fundamental_analysis", False)
 
         # Format data section (TOON or JSON)
         if use_toon:
             # Extract quarterly data for TOON formatting (63% token savings)
-            quarterly_data = analysis_data.get('quarterly_data', [])
+            quarterly_data = analysis_data.get("quarterly_data", [])
 
             if quarterly_data and isinstance(quarterly_data, list) and len(quarterly_data) > 0:
                 try:
                     # Convert QuarterlyData objects to dicts if needed
                     quarterly_dicts = []
                     for q in quarterly_data:
-                        if hasattr(q, '__dict__'):
+                        if hasattr(q, "__dict__"):
                             quarterly_dicts.append(vars(q))
                         elif isinstance(q, dict):
                             quarterly_dicts.append(q)
@@ -5763,10 +5855,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                         toon_quarterly = to_toon_quarterly(quarterly_dicts)
 
                         # Remove quarterly_data from analysis_data to avoid duplication
-                        remaining_data = {k: v for k, v in analysis_data.items() if k != 'quarterly_data'}
+                        remaining_data = {k: v for k, v in analysis_data.items() if k != "quarterly_data"}
 
                         # Build data section with TOON quarterly + JSON for other data
-                        data_section = f"{toon_quarterly}\n\nAdditional Analysis:\n{json.dumps(remaining_data, indent=2)[:8000]}"
+                        data_section = (
+                            f"{toon_quarterly}\n\nAdditional Analysis:\n{json.dumps(remaining_data, indent=2)[:8000]}"
+                        )
                     else:
                         # No valid quarterly data, fall back to JSON
                         data_section = json.dumps(analysis_data, indent=2)[:10000]
@@ -5928,19 +6022,17 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             self.logger.info(f"🔍 [QUARTER_FILTER] {symbol} - ALL QUARTERS BEFORE FY FILTERING:")
             for idx, q in enumerate(quarterly_data):
                 if isinstance(q, QuarterlyData):
-                    fp = getattr(q, 'fiscal_period', 'UNKNOWN')
-                    fy = getattr(q, 'fiscal_year', 'UNKNOWN')
-                    period_end = getattr(q, 'period_end_date', 'UNKNOWN')
+                    fp = getattr(q, "fiscal_period", "UNKNOWN")
+                    fy = getattr(q, "fiscal_year", "UNKNOWN")
+                    period_end = getattr(q, "period_end_date", "UNKNOWN")
                 elif isinstance(q, dict):
-                    fp = q.get('fiscal_period', 'UNKNOWN')
-                    fy = q.get('fiscal_year', 'UNKNOWN')
-                    period_end = q.get('period_end_date', 'UNKNOWN')
+                    fp = q.get("fiscal_period", "UNKNOWN")
+                    fy = q.get("fiscal_year", "UNKNOWN")
+                    period_end = q.get("period_end_date", "UNKNOWN")
                 else:
-                    fp = fy = period_end = 'UNKNOWN_TYPE'
+                    fp = fy = period_end = "UNKNOWN_TYPE"
 
-                self.logger.info(
-                    f"  [{idx}] fiscal_year={fy}, fiscal_period={fp}, period_end={period_end}"
-                )
+                self.logger.info(f"  [{idx}] fiscal_year={fy}, fiscal_period={fp}, period_end={period_end}")
 
         if not quarterly_data or len(quarterly_data) < 4:
             self.logger.warning(
@@ -5957,18 +6049,18 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         for q in quarterly_data:
             # Extract fiscal_period from QuarterlyData or dict
             if isinstance(q, QuarterlyData):
-                fiscal_period = getattr(q, 'fiscal_period', '').upper()
-                fiscal_year = getattr(q, 'fiscal_year', 'UNKNOWN')
-                period_end = getattr(q, 'period_end_date', 'UNKNOWN')
+                fiscal_period = getattr(q, "fiscal_period", "").upper()
+                fiscal_year = getattr(q, "fiscal_year", "UNKNOWN")
+                period_end = getattr(q, "period_end_date", "UNKNOWN")
             elif isinstance(q, dict):
-                fiscal_period = q.get('fiscal_period', '').upper()
-                fiscal_year = q.get('fiscal_year', 'UNKNOWN')
-                period_end = q.get('period_end_date', 'UNKNOWN')
+                fiscal_period = q.get("fiscal_period", "").upper()
+                fiscal_year = q.get("fiscal_year", "UNKNOWN")
+                period_end = q.get("period_end_date", "UNKNOWN")
             else:
                 continue
 
             # Only include actual quarters (Q1, Q2, Q3, Q4), exclude FY
-            if fiscal_period in ['Q1', 'Q2', 'Q3', 'Q4']:
+            if fiscal_period in ["Q1", "Q2", "Q3", "Q4"]:
                 actual_quarters.append(q)
             else:
                 # Track what got filtered out
@@ -5981,29 +6073,25 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
         # ENHANCED DEBUG: Show what was filtered out
         if filtered_out:
-            self.logger.info(
-                f"🔍 [QUARTER_FILTER] {symbol} - FILTERED OUT (FY periods): {', '.join(filtered_out)}"
-            )
+            self.logger.info(f"🔍 [QUARTER_FILTER] {symbol} - FILTERED OUT (FY periods): {', '.join(filtered_out)}")
 
         # ENHANCED DEBUG: Show quarters AFTER filtering (what we'll use for TTM)
         if actual_quarters:
             self.logger.info(f"🔍 [QUARTER_FILTER] {symbol} - QUARTERS AFTER FY FILTERING (will use first 4 for TTM):")
             for idx, q in enumerate(actual_quarters[:8]):  # Show first 8
                 if isinstance(q, QuarterlyData):
-                    fp = getattr(q, 'fiscal_period', 'UNKNOWN')
-                    fy = getattr(q, 'fiscal_year', 'UNKNOWN')
-                    period_end = getattr(q, 'period_end_date', 'UNKNOWN')
+                    fp = getattr(q, "fiscal_period", "UNKNOWN")
+                    fy = getattr(q, "fiscal_year", "UNKNOWN")
+                    period_end = getattr(q, "period_end_date", "UNKNOWN")
                 elif isinstance(q, dict):
-                    fp = q.get('fiscal_period', 'UNKNOWN')
-                    fy = q.get('fiscal_year', 'UNKNOWN')
-                    period_end = q.get('period_end_date', 'UNKNOWN')
+                    fp = q.get("fiscal_period", "UNKNOWN")
+                    fy = q.get("fiscal_year", "UNKNOWN")
+                    period_end = q.get("period_end_date", "UNKNOWN")
                 else:
-                    fp = fy = period_end = 'UNKNOWN_TYPE'
+                    fp = fy = period_end = "UNKNOWN_TYPE"
 
                 prefix = "**WILL USE**" if idx < 4 else "available"
-                self.logger.info(
-                    f"  [{idx}] {prefix}: {fy}-{fp} (period_end={period_end})"
-                )
+                self.logger.info(f"  [{idx}] {prefix}: {fy}-{fp} (period_end={period_end})")
 
         if len(actual_quarters) < 4:
             self.logger.warning(
@@ -6020,9 +6108,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
         for idx, q in enumerate(last_4_quarters):
             # Debug: Log quarter structure
-            self.logger.info(
-                f"🔍 [TTM_DEBUG] {symbol} - Q{idx+1} type: {type(q).__name__}"
-            )
+            self.logger.info(f"🔍 [TTM_DEBUG] {symbol} - Q{idx+1} type: {type(q).__name__}")
 
             # Handle both dict and QuarterlyData object
             if isinstance(q, QuarterlyData):
@@ -6032,8 +6118,8 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     f"{list(q.__dict__.keys()) if hasattr(q, '__dict__') else 'no __dict__'}"
                 )
 
-                ni = q.financial_data.get("net_income", 0) if hasattr(q, 'financial_data') else 0
-                period = f"{q.fiscal_year}-{q.fiscal_period}" if hasattr(q, 'fiscal_year') else "Unknown"
+                ni = q.financial_data.get("net_income", 0) if hasattr(q, "financial_data") else 0
+                period = f"{q.fiscal_year}-{q.fiscal_period}" if hasattr(q, "fiscal_year") else "Unknown"
 
                 # Debug: Log extracted values
                 self.logger.info(
@@ -6043,14 +6129,15 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
             elif isinstance(q, dict):
                 # Debug: Log dict keys
-                self.logger.info(
-                    f"🔍 [TTM_DEBUG] {symbol} - Q{idx+1} dict keys: {list(q.keys())[:10]}..."
-                )
+                self.logger.info(f"🔍 [TTM_DEBUG] {symbol} - Q{idx+1} dict keys: {list(q.keys())[:10]}...")
 
                 # Try multiple paths to find net_income
-                ni = (q.get("financial_data", {}).get("net_income") or
-                      q.get("net_income") or
-                      q.get("financials", {}).get("net_income") or 0)
+                ni = (
+                    q.get("financial_data", {}).get("net_income")
+                    or q.get("net_income")
+                    or q.get("financials", {}).get("net_income")
+                    or 0
+                )
 
                 period = f"{q.get('fiscal_year', 'Unknown')}-{q.get('fiscal_period', 'Q?')}"
 
@@ -6071,8 +6158,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
         if ttm_net_income > 0:
             self.logger.info(
-                f"✅ {symbol} - TTM Net Income: ${ttm_net_income:,.0f} "
-                f"(sum of {', '.join(quarter_details)})"
+                f"✅ {symbol} - TTM Net Income: ${ttm_net_income:,.0f} " f"(sum of {', '.join(quarter_details)})"
             )
         else:
             self.logger.warning(
@@ -6143,7 +6229,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
             # Extract depreciation_amortization from cash_flow for EBITDA calculation
             operating_income = safe_get(income_stmt, "operating_income") or safe_get(quarterly, "operating_income")
-            depreciation_amortization = safe_get(cash_flow, "depreciation_amortization") or safe_get(quarterly, "depreciation_amortization")
+            depreciation_amortization = safe_get(cash_flow, "depreciation_amortization") or safe_get(
+                quarterly, "depreciation_amortization"
+            )
 
             # Calculate EBITDA on-the-fly: Operating Income + D&A
             ebitda = 0
@@ -6199,13 +6287,9 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             balance_sheet = latest_quarter.get("balance_sheet", {})
 
             # Calculate EBITDA on-the-fly from dict format
-            operating_income = (
-                latest_quarter.get("operating_income", 0)
-                or income_stmt.get("operating_income", 0)
-            )
-            depreciation_amortization = (
-                latest_quarter.get("depreciation_amortization", 0)
-                or cash_flow.get("depreciation_amortization", 0)
+            operating_income = latest_quarter.get("operating_income", 0) or income_stmt.get("operating_income", 0)
+            depreciation_amortization = latest_quarter.get("depreciation_amortization", 0) or cash_flow.get(
+                "depreciation_amortization", 0
             )
 
             # Calculate EBITDA
@@ -6216,27 +6300,41 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                 ebitda = operating_income
 
             return {
-                "revenues": latest_quarter.get("revenue", 0) or latest_quarter.get("revenues", 0) or income_stmt.get("total_revenue", 0),
-                "net_income": latest_quarter.get("net_income", 0) or latest_quarter.get("earnings", 0) or income_stmt.get("net_income", 0),
+                "revenues": latest_quarter.get("revenue", 0)
+                or latest_quarter.get("revenues", 0)
+                or income_stmt.get("total_revenue", 0),
+                "net_income": latest_quarter.get("net_income", 0)
+                or latest_quarter.get("earnings", 0)
+                or income_stmt.get("net_income", 0),
                 "total_assets": latest_quarter.get("total_assets", 0) or balance_sheet.get("total_assets", 0),
-                "total_liabilities": latest_quarter.get("total_liabilities", 0) or balance_sheet.get("total_liabilities", 0),
+                "total_liabilities": latest_quarter.get("total_liabilities", 0)
+                or balance_sheet.get("total_liabilities", 0),
                 "stockholders_equity": latest_quarter.get("stockholders_equity", 0)
-                or latest_quarter.get("shareholderEquity", 0) or balance_sheet.get("stockholders_equity", 0),
-                "total_debt": latest_quarter.get("total_debt", 0) or latest_quarter.get("long_term_debt", 0) or balance_sheet.get("total_debt", 0),
-                "cash": latest_quarter.get("cash", 0) or latest_quarter.get("cash_and_equivalents", 0) or balance_sheet.get("cash_and_equivalents", 0),
+                or latest_quarter.get("shareholderEquity", 0)
+                or balance_sheet.get("stockholders_equity", 0),
+                "total_debt": latest_quarter.get("total_debt", 0)
+                or latest_quarter.get("long_term_debt", 0)
+                or balance_sheet.get("total_debt", 0),
+                "cash": latest_quarter.get("cash", 0)
+                or latest_quarter.get("cash_and_equivalents", 0)
+                or balance_sheet.get("cash_and_equivalents", 0),
                 "current_assets": latest_quarter.get("current_assets", 0) or balance_sheet.get("current_assets", 0),
-                "current_liabilities": latest_quarter.get("current_liabilities", 0) or balance_sheet.get("current_liabilities", 0),
+                "current_liabilities": latest_quarter.get("current_liabilities", 0)
+                or balance_sheet.get("current_liabilities", 0),
                 "gross_profit": latest_quarter.get("gross_profit", 0) or income_stmt.get("gross_profit", 0),
                 "operating_income": operating_income,
                 "depreciation_amortization": depreciation_amortization,  # NEW: Extract D&A
                 "ebitda": ebitda,  # NEW: Calculate EBITDA on-the-fly
-                "operating_cash_flow": latest_quarter.get("operating_cash_flow", 0) or cash_flow.get("operating_cash_flow", 0),
-                "capital_expenditures": latest_quarter.get("capital_expenditures", 0) or cash_flow.get("capital_expenditures", 0),
+                "operating_cash_flow": latest_quarter.get("operating_cash_flow", 0)
+                or cash_flow.get("operating_cash_flow", 0),
+                "capital_expenditures": latest_quarter.get("capital_expenditures", 0)
+                or cash_flow.get("capital_expenditures", 0),
                 "free_cash_flow": latest_quarter.get("free_cash_flow", 0) or cash_flow.get("free_cash_flow", 0),
                 "inventory": latest_quarter.get("inventory", 0) or balance_sheet.get("inventory", 0),
                 "cost_of_revenue": latest_quarter.get("cost_of_revenue", 0) or income_stmt.get("cost_of_revenue", 0),
                 "dividends": latest_quarter.get("dividends", 0) or cash_flow.get("dividends_paid", 0),
-                "shares_outstanding": latest_quarter.get("shares_outstanding", 0) or balance_sheet.get("shares_outstanding", 0),
+                "shares_outstanding": latest_quarter.get("shares_outstanding", 0)
+                or balance_sheet.get("shares_outstanding", 0),
             }
 
         return {}

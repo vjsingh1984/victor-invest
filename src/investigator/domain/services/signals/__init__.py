@@ -5,17 +5,16 @@ Provides entry/exit signal generation for stock analysis.
 """
 
 from investigator.domain.services.signals.entry_exit_engine import (
+    EntryExitEngine,
     EntrySignal,
     ExitSignal,
     OptimalEntryZone,
-    SignalType,
+    ScalingStrategy,
     SignalConfidence,
     SignalTiming,
-    ScalingStrategy,
-    EntryExitEngine,
+    SignalType,
     get_entry_exit_engine,
 )
-
 from investigator.domain.services.signals.signal_integrator import (
     IntegratedSignals,
     SignalIntegrator,

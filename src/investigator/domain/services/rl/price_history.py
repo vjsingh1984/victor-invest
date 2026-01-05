@@ -19,7 +19,7 @@ Usage:
 import asyncio
 import logging
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine

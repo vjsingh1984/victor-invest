@@ -11,12 +11,11 @@ Author: Claude Code (Architecture Redesign Phase 1)
 Date: 2025-11-12
 """
 
-import re
 import logging
-from typing import Tuple, Optional, Dict, Any
-from datetime import datetime
+import re
 from dataclasses import dataclass
-
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

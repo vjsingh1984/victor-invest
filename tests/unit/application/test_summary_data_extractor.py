@@ -6,19 +6,19 @@ including fallback chains, field normalization, and edge case handling.
 """
 
 import pytest
-from investigator.application.summary_data_extractor import (
-    SummaryDataExtractor,
-    ExtractionResult,
-    ExtractionConfidence,
-    PriceTargetExtractor,
-    InvestmentGradeExtractor,
-    CurrentPriceExtractor,
-    KeyStrengthsExtractor,
-    KeyRisksExtractor,
-    InvestmentThesisExtractor,
-    RecommendationExtractor,
-)
 
+from investigator.application.summary_data_extractor import (
+    CurrentPriceExtractor,
+    ExtractionConfidence,
+    ExtractionResult,
+    InvestmentGradeExtractor,
+    InvestmentThesisExtractor,
+    KeyRisksExtractor,
+    KeyStrengthsExtractor,
+    PriceTargetExtractor,
+    RecommendationExtractor,
+    SummaryDataExtractor,
+)
 
 # =============================================================================
 # Test Data Fixtures
@@ -26,48 +26,48 @@ from investigator.application.summary_data_extractor import (
 
 # Simulates complete agent output with proper structure
 COMPLETE_ANALYSIS_RESULTS = {
-    'symbol': 'AAPL',
-    'timestamp': '2025-01-15T10:00:00Z',
-    'agents': {
-        'fundamental': {
-            'valuation': {
-                'fair_value': 185.50,
-                'investment_grade': 'B+',
+    "symbol": "AAPL",
+    "timestamp": "2025-01-15T10:00:00Z",
+    "agents": {
+        "fundamental": {
+            "valuation": {
+                "fair_value": 185.50,
+                "investment_grade": "B+",
             },
-            'ratios': {
-                'current_price': 175.00,
+            "ratios": {
+                "current_price": 175.00,
             },
-            'confidence': {
-                'confidence_level': 'High',
+            "confidence": {
+                "confidence_level": "High",
             },
-            'data_quality': {
-                'data_quality_score': 85.5,
+            "data_quality": {
+                "data_quality_score": 85.5,
             },
-            'multi_model_summary': {
-                'blended_fair_value': 185.50,
-                'blended_upside_pct': 6.0,
+            "multi_model_summary": {
+                "blended_fair_value": 185.50,
+                "blended_upside_pct": 6.0,
             },
         },
-        'synthesis': {
-            'synthesis': {
-                'response': {
-                    'recommendation_and_action_plan': {
-                        'recommendation': 'BUY',
-                        'time_horizon': '12-18 months',
+        "synthesis": {
+            "synthesis": {
+                "response": {
+                    "recommendation_and_action_plan": {
+                        "recommendation": "BUY",
+                        "time_horizon": "12-18 months",
                     },
-                    'investment_thesis': {
-                        'core_thesis': 'Strong product lineup with growing services revenue.',
-                        'bull_case': [
-                            'Growing services revenue with high margins',
-                            'Strong brand loyalty and ecosystem lock-in',
-                            'Consistent capital returns to shareholders',
+                    "investment_thesis": {
+                        "core_thesis": "Strong product lineup with growing services revenue.",
+                        "bull_case": [
+                            "Growing services revenue with high margins",
+                            "Strong brand loyalty and ecosystem lock-in",
+                            "Consistent capital returns to shareholders",
                         ],
                     },
-                    'risk_analysis': {
-                        'primary_risks': [
-                            'China supply chain concentration',
-                            'Regulatory scrutiny in key markets',
-                            'Slower iPhone upgrade cycles',
+                    "risk_analysis": {
+                        "primary_risks": [
+                            "China supply chain concentration",
+                            "Regulatory scrutiny in key markets",
+                            "Slower iPhone upgrade cycles",
                         ],
                     },
                 },
@@ -79,17 +79,17 @@ COMPLETE_ANALYSIS_RESULTS = {
 
 # Simulates output where fair_value is used instead of price_target_12_month
 ANALYSIS_WITH_FAIR_VALUE = {
-    'symbol': 'STX',
-    'agents': {
-        'fundamental': {
-            'valuation': {
-                'fair_value': 95.00,  # Not price_target_12_month
+    "symbol": "STX",
+    "agents": {
+        "fundamental": {
+            "valuation": {
+                "fair_value": 95.00,  # Not price_target_12_month
             },
-            'ratios': {
-                'current_price': 85.00,
+            "ratios": {
+                "current_price": 85.00,
             },
-            'multi_model_summary': {
-                'blended_fair_value': 95.00,
+            "multi_model_summary": {
+                "blended_fair_value": 95.00,
             },
         },
     },
@@ -98,15 +98,15 @@ ANALYSIS_WITH_FAIR_VALUE = {
 
 # Simulates minimal/broken output - the bug case
 BROKEN_ANALYSIS_RESULTS = {
-    'symbol': 'BROKEN',
-    'agents': {
-        'fundamental': {
-            'valuation': {},  # Empty valuation
-            'ratios': {},     # No price
+    "symbol": "BROKEN",
+    "agents": {
+        "fundamental": {
+            "valuation": {},  # Empty valuation
+            "ratios": {},  # No price
         },
-        'synthesis': {
-            'synthesis': {
-                'response': {},  # Empty response
+        "synthesis": {
+            "synthesis": {
+                "response": {},  # Empty response
             },
         },
     },
@@ -115,16 +115,16 @@ BROKEN_ANALYSIS_RESULTS = {
 
 # Simulates bull_case as dict instead of list (edge case)
 BULL_CASE_AS_DICT = {
-    'symbol': 'TEST',
-    'agents': {
-        'synthesis': {
-            'synthesis': {
-                'response': {
-                    'investment_thesis': {
-                        'bull_case': {
-                            'key_assumptions': [
-                                'Revenue growth accelerates',
-                                'Margin expansion continues',
+    "symbol": "TEST",
+    "agents": {
+        "synthesis": {
+            "synthesis": {
+                "response": {
+                    "investment_thesis": {
+                        "bull_case": {
+                            "key_assumptions": [
+                                "Revenue growth accelerates",
+                                "Margin expansion continues",
                             ],
                         },
                     },
@@ -137,17 +137,17 @@ BULL_CASE_AS_DICT = {
 
 # Simulates investment_grade missing but upside available for calculation
 NO_GRADE_WITH_UPSIDE = {
-    'symbol': 'CALC',
-    'agents': {
-        'fundamental': {
-            'valuation': {
-                'fair_value': 150.00,
+    "symbol": "CALC",
+    "agents": {
+        "fundamental": {
+            "valuation": {
+                "fair_value": 150.00,
             },
-            'ratios': {
-                'current_price': 100.00,  # 50% upside
+            "ratios": {
+                "current_price": 100.00,  # 50% upside
             },
-            'multi_model_summary': {
-                'blended_upside_pct': 50.0,
+            "multi_model_summary": {
+                "blended_upside_pct": 50.0,
             },
         },
     },
@@ -158,47 +158,28 @@ NO_GRADE_WITH_UPSIDE = {
 # ExtractionResult Tests
 # =============================================================================
 
+
 class TestExtractionResult:
     """Tests for ExtractionResult dataclass."""
 
     def test_has_value_with_valid_string(self):
-        result = ExtractionResult(
-            value="BUY",
-            confidence=ExtractionConfidence.HIGH,
-            source_path="test.path"
-        )
+        result = ExtractionResult(value="BUY", confidence=ExtractionConfidence.HIGH, source_path="test.path")
         assert result.has_value is True
 
     def test_has_value_with_none(self):
-        result = ExtractionResult(
-            value=None,
-            confidence=ExtractionConfidence.NONE,
-            source_path="test"
-        )
+        result = ExtractionResult(value=None, confidence=ExtractionConfidence.NONE, source_path="test")
         assert result.has_value is False
 
     def test_has_value_with_na_string(self):
-        result = ExtractionResult(
-            value="N/A",
-            confidence=ExtractionConfidence.MEDIUM,
-            source_path="test"
-        )
+        result = ExtractionResult(value="N/A", confidence=ExtractionConfidence.MEDIUM, source_path="test")
         assert result.has_value is False
 
     def test_has_value_with_empty_list(self):
-        result = ExtractionResult(
-            value=[],
-            confidence=ExtractionConfidence.HIGH,
-            source_path="test"
-        )
+        result = ExtractionResult(value=[], confidence=ExtractionConfidence.HIGH, source_path="test")
         assert result.has_value is False
 
     def test_has_value_with_valid_list(self):
-        result = ExtractionResult(
-            value=["item1", "item2"],
-            confidence=ExtractionConfidence.HIGH,
-            source_path="test"
-        )
+        result = ExtractionResult(value=["item1", "item2"], confidence=ExtractionConfidence.HIGH, source_path="test")
         assert result.has_value is True
 
     def test_not_found_factory(self):
@@ -212,6 +193,7 @@ class TestExtractionResult:
 # =============================================================================
 # Individual Extractor Tests
 # =============================================================================
+
 
 class TestPriceTargetExtractor:
     """Tests for PriceTargetExtractor."""
@@ -228,10 +210,10 @@ class TestPriceTargetExtractor:
     def test_extracts_from_blended_fair_value(self):
         """Should fallback to multi_model_summary.blended_fair_value."""
         data = {
-            'agents': {
-                'fundamental': {
-                    'multi_model_summary': {
-                        'blended_fair_value': 200.00,
+            "agents": {
+                "fundamental": {
+                    "multi_model_summary": {
+                        "blended_fair_value": 200.00,
                     },
                 },
             },
@@ -246,10 +228,10 @@ class TestPriceTargetExtractor:
     def test_rejects_zero_price(self):
         """Should not accept zero as valid price target."""
         data = {
-            'agents': {
-                'fundamental': {
-                    'valuation': {
-                        'fair_value': 0,
+            "agents": {
+                "fundamental": {
+                    "valuation": {
+                        "fair_value": 0,
                     },
                 },
             },
@@ -277,7 +259,7 @@ class TestInvestmentGradeExtractor:
         result = extractor.extract(COMPLETE_ANALYSIS_RESULTS)
 
         assert result.has_value is True
-        assert result.value == 'B+'
+        assert result.value == "B+"
         assert result.confidence == ExtractionConfidence.HIGH
 
     def test_calculates_grade_from_upside(self):
@@ -287,7 +269,7 @@ class TestInvestmentGradeExtractor:
 
         assert result.has_value is True
         # 50% upside should give A+
-        assert result.value == 'A+'
+        assert result.value == "A+"
         assert result.confidence == ExtractionConfidence.LOW
         assert result.fallback_used is True
         assert "derived_from" in result.source_path
@@ -295,13 +277,13 @@ class TestInvestmentGradeExtractor:
     def test_calculates_grade_from_prices(self):
         """Should calculate grade from price difference when upside_pct missing."""
         data = {
-            'agents': {
-                'fundamental': {
-                    'valuation': {
-                        'fair_value': 120.00,
+            "agents": {
+                "fundamental": {
+                    "valuation": {
+                        "fair_value": 120.00,
                     },
-                    'ratios': {
-                        'current_price': 100.00,
+                    "ratios": {
+                        "current_price": 100.00,
                     },
                 },
             },
@@ -311,7 +293,7 @@ class TestInvestmentGradeExtractor:
 
         assert result.has_value is True
         # 20% upside should give A
-        assert result.value == 'A'
+        assert result.value == "A"
 
 
 class TestCurrentPriceExtractor:
@@ -326,10 +308,10 @@ class TestCurrentPriceExtractor:
 
     def test_rejects_negative_price(self):
         data = {
-            'agents': {
-                'fundamental': {
-                    'ratios': {
-                        'current_price': -50.00,
+            "agents": {
+                "fundamental": {
+                    "ratios": {
+                        "current_price": -50.00,
                     },
                 },
             },
@@ -350,7 +332,7 @@ class TestKeyStrengthsExtractor:
 
         assert result.has_value is True
         assert len(result.value) == 3
-        assert 'Growing services revenue' in result.value[0]
+        assert "Growing services revenue" in result.value[0]
 
     def test_extracts_from_bull_case_dict(self):
         """Should handle bull_case as dict with key_assumptions."""
@@ -359,22 +341,22 @@ class TestKeyStrengthsExtractor:
 
         assert result.has_value is True
         assert len(result.value) == 2
-        assert 'Revenue growth accelerates' in result.value[0]
+        assert "Revenue growth accelerates" in result.value[0]
 
     def test_limits_to_three_items(self):
         """Should return max 3 strengths."""
         data = {
-            'agents': {
-                'synthesis': {
-                    'synthesis': {
-                        'response': {
-                            'investment_thesis': {
-                                'bull_case': [
-                                    'Strength 1',
-                                    'Strength 2',
-                                    'Strength 3',
-                                    'Strength 4',
-                                    'Strength 5',
+            "agents": {
+                "synthesis": {
+                    "synthesis": {
+                        "response": {
+                            "investment_thesis": {
+                                "bull_case": [
+                                    "Strength 1",
+                                    "Strength 2",
+                                    "Strength 3",
+                                    "Strength 4",
+                                    "Strength 5",
                                 ],
                             },
                         },
@@ -404,7 +386,7 @@ class TestKeyRisksExtractor:
 
         assert result.has_value is True
         assert len(result.value) == 3
-        assert 'China supply chain' in result.value[0]
+        assert "China supply chain" in result.value[0]
 
 
 class TestRecommendationExtractor:
@@ -415,16 +397,16 @@ class TestRecommendationExtractor:
         result = extractor.extract(COMPLETE_ANALYSIS_RESULTS)
 
         assert result.has_value is True
-        assert result.value == 'BUY'
+        assert result.value == "BUY"
 
     def test_uppercases_recommendation(self):
         data = {
-            'agents': {
-                'synthesis': {
-                    'synthesis': {
-                        'response': {
-                            'recommendation_and_action_plan': {
-                                'recommendation': 'hold',
+            "agents": {
+                "synthesis": {
+                    "synthesis": {
+                        "response": {
+                            "recommendation_and_action_plan": {
+                                "recommendation": "hold",
                             },
                         },
                     },
@@ -434,12 +416,13 @@ class TestRecommendationExtractor:
         extractor = RecommendationExtractor()
         result = extractor.extract(data)
 
-        assert result.value == 'HOLD'
+        assert result.value == "HOLD"
 
 
 # =============================================================================
 # SummaryDataExtractor Integration Tests
 # =============================================================================
+
 
 class TestSummaryDataExtractor:
     """Integration tests for SummaryDataExtractor."""
@@ -449,36 +432,36 @@ class TestSummaryDataExtractor:
         extractor = SummaryDataExtractor(COMPLETE_ANALYSIS_RESULTS)
         summary = extractor.extract_minimal_summary()
 
-        assert summary['symbol'] == 'AAPL'
+        assert summary["symbol"] == "AAPL"
 
         # Valuation
-        assert summary['valuation']['current_price'] == 175.00
-        assert summary['valuation']['price_target_12m'] == 185.50
-        assert summary['valuation']['investment_grade'] == 'B+'
-        assert summary['valuation']['expected_return_pct'] is not None
+        assert summary["valuation"]["current_price"] == 175.00
+        assert summary["valuation"]["price_target_12m"] == 185.50
+        assert summary["valuation"]["investment_grade"] == "B+"
+        assert summary["valuation"]["expected_return_pct"] is not None
 
         # Recommendation
-        assert summary['recommendation']['action'] == 'BUY'
-        assert summary['recommendation']['confidence'] == 'High'
-        assert summary['recommendation']['time_horizon'] == '12-18 months'
+        assert summary["recommendation"]["action"] == "BUY"
+        assert summary["recommendation"]["confidence"] == "High"
+        assert summary["recommendation"]["time_horizon"] == "12-18 months"
 
         # Thesis
-        assert len(summary['thesis']['key_strengths']) == 3
-        assert len(summary['thesis']['key_risks']) == 3
-        assert 'Strong product lineup' in summary['thesis']['investment_thesis']
+        assert len(summary["thesis"]["key_strengths"]) == 3
+        assert len(summary["thesis"]["key_risks"]) == 3
+        assert "Strong product lineup" in summary["thesis"]["investment_thesis"]
 
         # Data quality
-        assert summary['data_quality']['overall_score'] == 85.5
+        assert summary["data_quality"]["overall_score"] == 85.5
 
     def test_handles_fair_value_as_price_target(self):
         """Should map fair_value to price_target_12m."""
         extractor = SummaryDataExtractor(ANALYSIS_WITH_FAIR_VALUE)
         summary = extractor.extract_minimal_summary()
 
-        assert summary['valuation']['price_target_12m'] == 95.00
-        assert summary['valuation']['current_price'] == 85.00
+        assert summary["valuation"]["price_target_12m"] == 95.00
+        assert summary["valuation"]["current_price"] == 85.00
         # Expected return: (95-85)/85 * 100 = 11.76%
-        assert summary['valuation']['expected_return_pct'] == pytest.approx(11.76, rel=0.01)
+        assert summary["valuation"]["expected_return_pct"] == pytest.approx(11.76, rel=0.01)
 
     def test_calculates_investment_grade_when_missing(self):
         """Should calculate investment grade from upside when explicit grade missing."""
@@ -486,7 +469,7 @@ class TestSummaryDataExtractor:
         summary = extractor.extract_minimal_summary()
 
         # 50% upside should yield A+
-        assert summary['valuation']['investment_grade'] == 'A+'
+        assert summary["valuation"]["investment_grade"] == "A+"
 
     def test_handles_broken_data_gracefully(self):
         """Should not crash on broken/minimal data."""
@@ -494,12 +477,12 @@ class TestSummaryDataExtractor:
         summary = extractor.extract_minimal_summary()
 
         # Should have symbol
-        assert summary['symbol'] == 'BROKEN'
+        assert summary["symbol"] == "BROKEN"
 
         # Missing fields should have N/A or None
-        assert summary['valuation']['price_target_12m'] is None
-        assert summary['recommendation']['action'] == 'N/A'
-        assert summary['thesis']['key_strengths'] == []
+        assert summary["valuation"]["price_target_12m"] is None
+        assert summary["recommendation"]["action"] == "N/A"
+        assert summary["thesis"]["key_strengths"] == []
 
     def test_audit_trail_tracks_extractions(self):
         """Should track extraction attempts in audit trail."""
@@ -511,13 +494,13 @@ class TestSummaryDataExtractor:
 
         # Check audit has entries
         audit_summary = audit.get_summary()
-        assert 'price_target_12m' in audit_summary
-        assert 'investment_grade' in audit_summary
+        assert "price_target_12m" in audit_summary
+        assert "investment_grade" in audit_summary
 
         # Check audit details
-        price_audit = audit_summary['price_target_12m']
-        assert price_audit['found'] is True
-        assert price_audit['confidence'] in ['high', 'medium']
+        price_audit = audit_summary["price_target_12m"]
+        assert price_audit["found"] is True
+        assert price_audit["confidence"] in ["high", "medium"]
 
     def test_audit_disabled(self):
         """Should work without audit trail."""
@@ -525,18 +508,18 @@ class TestSummaryDataExtractor:
         summary = extractor.extract_minimal_summary()
 
         assert extractor.get_audit() is None
-        assert summary['symbol'] == 'AAPL'
+        assert summary["symbol"] == "AAPL"
 
     def test_expected_return_calculation(self):
         """Should correctly calculate expected return percentage."""
         data = {
-            'agents': {
-                'fundamental': {
-                    'valuation': {
-                        'fair_value': 150.00,
+            "agents": {
+                "fundamental": {
+                    "valuation": {
+                        "fair_value": 150.00,
                     },
-                    'ratios': {
-                        'current_price': 100.00,
+                    "ratios": {
+                        "current_price": 100.00,
                     },
                 },
             },
@@ -545,18 +528,18 @@ class TestSummaryDataExtractor:
         summary = extractor.extract_minimal_summary()
 
         # (150-100)/100 * 100 = 50%
-        assert summary['valuation']['expected_return_pct'] == 50.0
+        assert summary["valuation"]["expected_return_pct"] == 50.0
 
     def test_handles_zero_current_price(self):
         """Should handle zero current price without division error."""
         data = {
-            'agents': {
-                'fundamental': {
-                    'valuation': {
-                        'fair_value': 100.00,
+            "agents": {
+                "fundamental": {
+                    "valuation": {
+                        "fair_value": 100.00,
                     },
-                    'ratios': {
-                        'current_price': 0,
+                    "ratios": {
+                        "current_price": 0,
                     },
                 },
             },
@@ -565,7 +548,7 @@ class TestSummaryDataExtractor:
         summary = extractor.extract_minimal_summary()
 
         # Should not crash, expected_return should be None
-        assert summary['valuation']['expected_return_pct'] is None
+        assert summary["valuation"]["expected_return_pct"] is None
 
 
 class TestExtractorExtensibility:
@@ -582,14 +565,14 @@ class TestExtractorExtensibility:
 
             def _get_paths(self):
                 return [
-                    ('agents', 'fundamental', 'custom', 'metric'),
+                    ("agents", "fundamental", "custom", "metric"),
                 ]
 
         data = {
-            'agents': {
-                'fundamental': {
-                    'custom': {
-                        'metric': 42.0,
+            "agents": {
+                "fundamental": {
+                    "custom": {
+                        "metric": 42.0,
                     },
                 },
             },
@@ -598,7 +581,7 @@ class TestExtractorExtensibility:
         extractor = SummaryDataExtractor(data)
         extractor.register_extractor(CustomMetricExtractor())
 
-        result = extractor.extract_field('custom_metric')
+        result = extractor.extract_field("custom_metric")
         assert result.has_value is True
         assert result.value == 42.0
 
@@ -607,17 +590,18 @@ class TestExtractorExtensibility:
 # Edge Case Tests
 # =============================================================================
 
+
 class TestEdgeCases:
     """Tests for edge cases and unusual data formats."""
 
     def test_handles_string_valuation_response(self):
         """Should handle valuation.response being a string instead of dict."""
         data = {
-            'agents': {
-                'fundamental': {
-                    'valuation': {
-                        'response': "N/A",  # String instead of dict
-                        'fair_value': 100.0,  # But fair_value is present
+            "agents": {
+                "fundamental": {
+                    "valuation": {
+                        "response": "N/A",  # String instead of dict
+                        "fair_value": 100.0,  # But fair_value is present
                     },
                 },
             },
@@ -625,20 +609,20 @@ class TestEdgeCases:
         extractor = SummaryDataExtractor(data)
         summary = extractor.extract_minimal_summary()
 
-        assert summary['valuation']['price_target_12m'] == 100.0
+        assert summary["valuation"]["price_target_12m"] == 100.0
 
     def test_handles_nested_dicts_in_strengths(self):
         """Should extract text from dict items in strengths list."""
         data = {
-            'agents': {
-                'synthesis': {
-                    'synthesis': {
-                        'response': {
-                            'investment_thesis': {
-                                'bull_case': [
-                                    {'description': 'Strong moat'},
-                                    {'text': 'Growing market'},
-                                    {'assumption': 'Margin expansion'},
+            "agents": {
+                "synthesis": {
+                    "synthesis": {
+                        "response": {
+                            "investment_thesis": {
+                                "bull_case": [
+                                    {"description": "Strong moat"},
+                                    {"text": "Growing market"},
+                                    {"assumption": "Margin expansion"},
                                 ],
                             },
                         },
@@ -649,28 +633,28 @@ class TestEdgeCases:
         extractor = SummaryDataExtractor(data)
         summary = extractor.extract_minimal_summary()
 
-        strengths = summary['thesis']['key_strengths']
+        strengths = summary["thesis"]["key_strengths"]
         assert len(strengths) == 3
-        assert 'Strong moat' in strengths
-        assert 'Growing market' in strengths
-        assert 'Margin expansion' in strengths
+        assert "Strong moat" in strengths
+        assert "Growing market" in strengths
+        assert "Margin expansion" in strengths
 
     def test_handles_without_agents_wrapper(self):
         """Should work without 'agents' wrapper (legacy format)."""
         data = {
-            'symbol': 'LEGACY',
-            'fundamental': {
-                'valuation': {
-                    'fair_value': 50.0,
+            "symbol": "LEGACY",
+            "fundamental": {
+                "valuation": {
+                    "fair_value": 50.0,
                 },
-                'ratios': {
-                    'current_price': 45.0,
+                "ratios": {
+                    "current_price": 45.0,
                 },
             },
         }
         extractor = SummaryDataExtractor(data)
         summary = extractor.extract_minimal_summary()
 
-        assert summary['symbol'] == 'LEGACY'
-        assert summary['valuation']['price_target_12m'] == 50.0
-        assert summary['valuation']['current_price'] == 45.0
+        assert summary["symbol"] == "LEGACY"
+        assert summary["valuation"]["price_target_12m"] == 50.0
+        assert summary["valuation"]["current_price"] == 45.0

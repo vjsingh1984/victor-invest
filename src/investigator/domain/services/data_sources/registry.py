@@ -8,15 +8,20 @@ Provides centralized management of all data sources with:
 - Configuration-driven source selection
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Callable, Dict, List, Optional, Type, Set
-import logging
 from functools import lru_cache
+from typing import Any, Callable, Dict, List, Optional, Set, Type
 
 from .base import (
-    DataSource, DataCategory, DataFrequency, DataResult,
-    SourceMetadata, CompositeDataSource, MacroDataSource
+    CompositeDataSource,
+    DataCategory,
+    DataFrequency,
+    DataResult,
+    DataSource,
+    MacroDataSource,
+    SourceMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,10 +46,12 @@ def register_source(name: str, category: Optional[DataCategory] = None):
         class TreasuryYieldSource(DataSource):
             ...
     """
+
     def decorator(cls: Type[DataSource]) -> Type[DataSource]:
         _SOURCE_REGISTRY[name] = cls
         logger.debug(f"Registered data source: {name} -> {cls.__name__}")
         return cls
+
     return decorator
 
 
@@ -57,10 +64,12 @@ def register_factory(name: str):
         def create_macro_source():
             return CompositeDataSource(...)
     """
+
     def decorator(func: Callable[[], DataSource]) -> Callable[[], DataSource]:
         _SOURCE_FACTORIES[name] = func
         logger.debug(f"Registered factory: {name}")
         return func
+
     return decorator
 
 
@@ -68,9 +77,11 @@ def register_factory(name: str):
 # Data Source Registry
 # =============================================================================
 
+
 @dataclass
 class SourceConfig:
     """Configuration for a data source"""
+
     enabled: bool = True
     priority: int = 100  # Lower = higher priority
     cache_ttl_hours: int = 24
@@ -103,17 +114,10 @@ class DataSourceRegistry:
         self._initialized = True
         self._sources: Dict[str, DataSource] = {}
         self._configs: Dict[str, SourceConfig] = {}
-        self._category_index: Dict[DataCategory, Set[str]] = {
-            cat: set() for cat in DataCategory
-        }
+        self._category_index: Dict[DataCategory, Set[str]] = {cat: set() for cat in DataCategory}
         self._logger = logging.getLogger("DataSourceRegistry")
 
-    def register(
-        self,
-        name: str,
-        source: DataSource,
-        config: Optional[SourceConfig] = None
-    ) -> None:
+    def register(self, name: str, source: DataSource, config: Optional[SourceConfig] = None) -> None:
         """Register a data source instance"""
         self._sources[name] = source
         self._configs[name] = config or SourceConfig()
@@ -121,11 +125,7 @@ class DataSourceRegistry:
         self._logger.info(f"Registered source: {name} ({source.category.name})")
 
     def register_class(
-        self,
-        name: str,
-        source_class: Type[DataSource],
-        config: Optional[SourceConfig] = None,
-        **kwargs
+        self, name: str, source_class: Type[DataSource], config: Optional[SourceConfig] = None, **kwargs
     ) -> None:
         """Register a data source class (lazy instantiation)"""
         _SOURCE_REGISTRY[name] = source_class
@@ -159,10 +159,7 @@ class DataSourceRegistry:
 
     def get_enabled(self) -> List[DataSource]:
         """Get all enabled sources"""
-        return [
-            self.get(name) for name, config in self._configs.items()
-            if config.enabled and self.get(name)
-        ]
+        return [self.get(name) for name, config in self._configs.items() if config.enabled and self.get(name)]
 
     def get_by_priority(self, category: Optional[DataCategory] = None) -> List[DataSource]:
         """Get sources sorted by priority"""
@@ -178,22 +175,14 @@ class DataSourceRegistry:
         return [s for _, s in sources]
 
     def create_composite(
-        self,
-        name: str,
-        source_names: List[str],
-        strategy: str = "first_success"
+        self, name: str, source_names: List[str], strategy: str = "first_success"
     ) -> CompositeDataSource:
         """Create a composite source from multiple sources"""
         sources = [self.get(n) for n in source_names if self.get(n)]
         if not sources:
             raise ValueError(f"No valid sources found: {source_names}")
 
-        composite = CompositeDataSource(
-            name=name,
-            category=sources[0].category,
-            sources=sources,
-            strategy=strategy
-        )
+        composite = CompositeDataSource(name=name, category=sources[0].category, sources=sources, strategy=strategy)
         self.register(name, composite)
         return composite
 
@@ -206,14 +195,16 @@ class DataSourceRegistry:
             source = self.get(name)
             if source:
                 config = self._configs.get(name, SourceConfig())
-                result.append({
-                    "name": name,
-                    "category": source.category.name,
-                    "frequency": source.frequency.name,
-                    "enabled": config.enabled,
-                    "priority": config.priority,
-                    "metadata": source.metadata.__dict__ if hasattr(source, 'metadata') else {},
-                })
+                result.append(
+                    {
+                        "name": name,
+                        "category": source.category.name,
+                        "frequency": source.frequency.name,
+                        "enabled": config.enabled,
+                        "priority": config.priority,
+                        "metadata": source.metadata.__dict__ if hasattr(source, "metadata") else {},
+                    }
+                )
         return result
 
     def invalidate_all_caches(self) -> None:
@@ -226,6 +217,7 @@ class DataSourceRegistry:
 # Global Registry Access
 # =============================================================================
 
+
 @lru_cache(maxsize=1)
 def get_registry() -> DataSourceRegistry:
     """Get the global data source registry"""
@@ -237,19 +229,11 @@ def get_source(name: str) -> Optional[DataSource]:
     return get_registry().get(name)
 
 
-def fetch_data(
-    source_name: str,
-    symbol: str,
-    as_of_date: Optional[date] = None
-) -> DataResult:
+def fetch_data(source_name: str, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
     """Convenience function to fetch data from a named source"""
     source = get_source(source_name)
     if not source:
-        return DataResult(
-            success=False,
-            error=f"Source not found: {source_name}",
-            source=source_name
-        )
+        return DataResult(success=False, error=f"Source not found: {source_name}", source=source_name)
     return source.fetch(symbol, as_of_date)
 
 
@@ -308,10 +292,12 @@ def get_source_group(group_name: str) -> List[DataSource]:
 # Configuration Loader
 # =============================================================================
 
+
 def load_sources_from_config(config_path: str) -> None:
     """Load and register sources from YAML configuration"""
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     path = Path(config_path)
     if not path.exists():
@@ -338,6 +324,7 @@ def load_sources_from_config(config_path: str) -> None:
 # =============================================================================
 # Health Check
 # =============================================================================
+
 
 def check_source_health(source_name: str) -> Dict[str, Any]:
     """Check health of a data source"""

@@ -26,9 +26,9 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from investigator.domain.services.market_regime import (
-    get_yield_curve_analyzer,
-    get_recession_indicator,
     get_credit_cycle_analyzer,
+    get_recession_indicator,
+    get_yield_curve_analyzer,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,17 +63,17 @@ class ComprehensiveRegime:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'regime': self.regime,
-            'yield_curve_shape': self.yield_curve_shape,
-            'yield_curve_inverted': self.yield_curve_inverted,
-            'credit_cycle_phase': self.credit_cycle_phase,
-            'volatility_regime': self.volatility_regime,
-            'recession_probability': self.recession_probability,
-            'risk_off_signal': self.risk_off_signal,
-            'vix_level': self.vix_level,
-            'credit_spread': self.credit_spread,
-            'snapshot_date': self.snapshot_date.isoformat() if self.snapshot_date else None,
-            'recommendations': self.recommendations,
+            "regime": self.regime,
+            "yield_curve_shape": self.yield_curve_shape,
+            "yield_curve_inverted": self.yield_curve_inverted,
+            "credit_cycle_phase": self.credit_cycle_phase,
+            "volatility_regime": self.volatility_regime,
+            "recession_probability": self.recession_probability,
+            "risk_off_signal": self.risk_off_signal,
+            "vix_level": self.vix_level,
+            "credit_spread": self.credit_spread,
+            "snapshot_date": self.snapshot_date.isoformat() if self.snapshot_date else None,
+            "recommendations": self.recommendations,
         }
 
 
@@ -131,8 +131,10 @@ class MarketRegimeAnalyzer:
             try:
                 yc_analysis = asyncio.run(self.yield_curve_analyzer.analyze())
                 if yc_analysis:
-                    yield_curve_shape = yc_analysis.shape.value if hasattr(yc_analysis.shape, 'value') else str(yc_analysis.shape)
-                    yield_curve_inverted = yc_analysis.is_inverted if hasattr(yc_analysis, 'is_inverted') else False
+                    yield_curve_shape = (
+                        yc_analysis.shape.value if hasattr(yc_analysis.shape, "value") else str(yc_analysis.shape)
+                    )
+                    yield_curve_inverted = yc_analysis.is_inverted if hasattr(yc_analysis, "is_inverted") else False
             except Exception as e:
                 self.logger.warning(f"Yield curve analysis failed: {e}")
 
@@ -140,7 +142,7 @@ class MarketRegimeAnalyzer:
             try:
                 recession = asyncio.run(self.recession_indicator.assess())
                 if recession:
-                    recession_probability = recession.probability if hasattr(recession, 'probability') else 0.0
+                    recession_probability = recession.probability if hasattr(recession, "probability") else 0.0
             except Exception as e:
                 self.logger.warning(f"Recession assessment failed: {e}")
 
@@ -148,8 +150,8 @@ class MarketRegimeAnalyzer:
             try:
                 cc_analysis = asyncio.run(self.credit_cycle_analyzer.analyze())
                 if cc_analysis:
-                    credit_cycle_phase = cc_analysis.phase if hasattr(cc_analysis, 'phase') else "unknown"
-                    credit_spread = cc_analysis.high_yield_spread if hasattr(cc_analysis, 'high_yield_spread') else None
+                    credit_cycle_phase = cc_analysis.phase if hasattr(cc_analysis, "phase") else "unknown"
+                    credit_spread = cc_analysis.high_yield_spread if hasattr(cc_analysis, "high_yield_spread") else None
             except Exception as e:
                 self.logger.warning(f"Credit cycle analysis failed: {e}")
 
@@ -158,10 +160,11 @@ class MarketRegimeAnalyzer:
                 from investigator.infrastructure.external.fred.macro_indicators import (
                     get_macro_indicator_fetcher,
                 )
+
                 fetcher = get_macro_indicator_fetcher()
-                vix_data = fetcher.get_latest_values(['VIXCLS'])
-                if vix_data and 'VIXCLS' in vix_data:
-                    vix_level = vix_data['VIXCLS'].get('value')
+                vix_data = fetcher.get_latest_values(["VIXCLS"])
+                if vix_data and "VIXCLS" in vix_data:
+                    vix_level = vix_data["VIXCLS"].get("value")
                     if vix_level:
                         if vix_level > 30:
                             volatility_regime = "high"
@@ -182,10 +185,10 @@ class MarketRegimeAnalyzer:
 
             # Determine risk-off signal
             risk_off_signal = (
-                yield_curve_inverted or
-                recession_probability > 0.5 or
-                volatility_regime == "high" or
-                (credit_spread and credit_spread > 500)  # 500 bps
+                yield_curve_inverted
+                or recession_probability > 0.5
+                or volatility_regime == "high"
+                or (credit_spread and credit_spread > 500)  # 500 bps
             )
 
             # Generate recommendations

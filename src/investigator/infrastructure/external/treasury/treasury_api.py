@@ -49,6 +49,7 @@ import aiohttp
 # Try to use certifi for SSL certificates (fixes macOS issues)
 try:
     import certifi
+
     SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 except ImportError:
     SSL_CONTEXT = ssl.create_default_context()
@@ -76,6 +77,7 @@ class TreasuryYield:
         yield_pct: Yield percentage
         maturity_months: Maturity in months for sorting
     """
+
     date: date
     maturity: str
     yield_pct: Optional[float]
@@ -120,6 +122,7 @@ class YieldCurveData:
         is_inverted: Whether 10Y-2Y spread is negative
         is_deeply_inverted: Whether spread < -50 bps
     """
+
     date: date
     yield_1m: Optional[float] = None
     yield_2m: Optional[float] = None
@@ -236,10 +239,7 @@ class TreasuryApiClient:
         if self._session is None or self._session.closed:
             # Use TCPConnector with SSL context for proper certificate handling
             connector = aiohttp.TCPConnector(ssl=SSL_CONTEXT)
-            self._session = aiohttp.ClientSession(
-                timeout=self.timeout,
-                connector=connector
-            )
+            self._session = aiohttp.ClientSession(timeout=self.timeout, connector=connector)
         return self._session
 
     async def close(self):
@@ -272,9 +272,7 @@ class TreasuryApiClient:
             return None
 
     async def _fetch_treasury_yields(
-        self,
-        as_of_date: Optional[date] = None,
-        days_back: int = 10
+        self, as_of_date: Optional[date] = None, days_back: int = 10
     ) -> List[Dict[str, Any]]:
         """Fetch treasury yields from Treasury.gov.
 
@@ -307,12 +305,7 @@ class TreasuryApiClient:
         # Fallback: Try FRED for Treasury yields
         return await self._fetch_from_fred_fallback(target_date)
 
-    def _parse_treasury_csv(
-        self,
-        csv_text: str,
-        target_date: date,
-        days_back: int
-    ) -> List[Dict[str, Any]]:
+    def _parse_treasury_csv(self, csv_text: str, target_date: date, days_back: int) -> List[Dict[str, Any]]:
         """Parse Treasury CSV response.
 
         Args:
@@ -323,12 +316,12 @@ class TreasuryApiClient:
         Returns:
             List of yield dictionaries for the target date
         """
-        lines = csv_text.strip().split('\n')
+        lines = csv_text.strip().split("\n")
         if len(lines) < 2:
             return []
 
         # Parse header
-        header = lines[0].split(',')
+        header = lines[0].split(",")
         header = [h.strip().strip('"') for h in header]
 
         # Find the date column and yield columns
@@ -337,36 +330,36 @@ class TreasuryApiClient:
 
         for i, col in enumerate(header):
             col_lower = col.lower()
-            if 'date' in col_lower:
+            if "date" in col_lower:
                 date_col_idx = i
-            elif 'mo' in col_lower or 'yr' in col_lower:
+            elif "mo" in col_lower or "yr" in col_lower:
                 # Map column names to standard keys
-                if '1 mo' in col_lower or '1mo' in col_lower:
-                    yield_cols['1m'] = i
-                elif '2 mo' in col_lower or '2mo' in col_lower:
-                    yield_cols['2m'] = i
-                elif '3 mo' in col_lower or '3mo' in col_lower:
-                    yield_cols['3m'] = i
-                elif '4 mo' in col_lower or '4mo' in col_lower:
-                    yield_cols['4m'] = i
-                elif '6 mo' in col_lower or '6mo' in col_lower:
-                    yield_cols['6m'] = i
-                elif '1 yr' in col_lower or '1yr' in col_lower:
-                    yield_cols['1y'] = i
-                elif '2 yr' in col_lower or '2yr' in col_lower:
-                    yield_cols['2y'] = i
-                elif '3 yr' in col_lower or '3yr' in col_lower:
-                    yield_cols['3y'] = i
-                elif '5 yr' in col_lower or '5yr' in col_lower:
-                    yield_cols['5y'] = i
-                elif '7 yr' in col_lower or '7yr' in col_lower:
-                    yield_cols['7y'] = i
-                elif '10 yr' in col_lower or '10yr' in col_lower:
-                    yield_cols['10y'] = i
-                elif '20 yr' in col_lower or '20yr' in col_lower:
-                    yield_cols['20y'] = i
-                elif '30 yr' in col_lower or '30yr' in col_lower:
-                    yield_cols['30y'] = i
+                if "1 mo" in col_lower or "1mo" in col_lower:
+                    yield_cols["1m"] = i
+                elif "2 mo" in col_lower or "2mo" in col_lower:
+                    yield_cols["2m"] = i
+                elif "3 mo" in col_lower or "3mo" in col_lower:
+                    yield_cols["3m"] = i
+                elif "4 mo" in col_lower or "4mo" in col_lower:
+                    yield_cols["4m"] = i
+                elif "6 mo" in col_lower or "6mo" in col_lower:
+                    yield_cols["6m"] = i
+                elif "1 yr" in col_lower or "1yr" in col_lower:
+                    yield_cols["1y"] = i
+                elif "2 yr" in col_lower or "2yr" in col_lower:
+                    yield_cols["2y"] = i
+                elif "3 yr" in col_lower or "3yr" in col_lower:
+                    yield_cols["3y"] = i
+                elif "5 yr" in col_lower or "5yr" in col_lower:
+                    yield_cols["5y"] = i
+                elif "7 yr" in col_lower or "7yr" in col_lower:
+                    yield_cols["7y"] = i
+                elif "10 yr" in col_lower or "10yr" in col_lower:
+                    yield_cols["10y"] = i
+                elif "20 yr" in col_lower or "20yr" in col_lower:
+                    yield_cols["20y"] = i
+                elif "30 yr" in col_lower or "30yr" in col_lower:
+                    yield_cols["30y"] = i
 
         if date_col_idx is None:
             logger.warning("Could not find date column in Treasury CSV")
@@ -381,7 +374,7 @@ class TreasuryApiClient:
             if not line.strip():
                 continue
 
-            cols = line.split(',')
+            cols = line.split(",")
             cols = [c.strip().strip('"') for c in cols]
 
             if len(cols) <= date_col_idx:
@@ -390,10 +383,10 @@ class TreasuryApiClient:
             # Parse date
             date_str = cols[date_col_idx]
             try:
-                row_date = datetime.strptime(date_str, '%m/%d/%Y').date()
+                row_date = datetime.strptime(date_str, "%m/%d/%Y").date()
             except ValueError:
                 try:
-                    row_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    row_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                 except ValueError:
                     continue
 
@@ -407,12 +400,12 @@ class TreasuryApiClient:
             return []
 
         # Extract yields from best row
-        yields = [{'date': best_date}]
+        yields = [{"date": best_date}]
         for maturity, col_idx in yield_cols.items():
             if col_idx < len(best_row):
                 try:
                     value = best_row[col_idx].strip()
-                    if value and value.lower() != 'n/a':
+                    if value and value.lower() != "n/a":
                         yields[0][maturity] = float(value)
                 except (ValueError, IndexError):
                     pass
@@ -430,34 +423,31 @@ class TreasuryApiClient:
         """
         # FRED series IDs for treasury yields
         fred_series = {
-            '1m': 'DGS1MO',
-            '3m': 'DGS3MO',
-            '6m': 'DGS6MO',
-            '1y': 'DGS1',
-            '2y': 'DGS2',
-            '3y': 'DGS3',
-            '5y': 'DGS5',
-            '7y': 'DGS7',
-            '10y': 'DGS10',
-            '20y': 'DGS20',
-            '30y': 'DGS30',
+            "1m": "DGS1MO",
+            "3m": "DGS3MO",
+            "6m": "DGS6MO",
+            "1y": "DGS1",
+            "2y": "DGS2",
+            "3y": "DGS3",
+            "5y": "DGS5",
+            "7y": "DGS7",
+            "10y": "DGS10",
+            "20y": "DGS20",
+            "30y": "DGS30",
         }
 
         try:
             # Try to get from local FRED cache if available
-            from investigator.infrastructure.external.fred.macro_indicators import (
-                get_macro_indicator_service
-            )
+            from investigator.infrastructure.external.fred.macro_indicators import get_macro_indicator_service
 
             service = get_macro_indicator_service()
-            yields = {'date': target_date}
+            yields = {"date": target_date}
 
             for maturity, series_id in fred_series.items():
                 try:
                     # Get latest value from FRED service
                     value = await asyncio.get_event_loop().run_in_executor(
-                        None,
-                        lambda: service.get_latest_value(series_id)
+                        None, lambda: service.get_latest_value(series_id)
                     )
                     if value is not None:
                         yields[maturity] = value
@@ -487,30 +477,26 @@ class TreasuryApiClient:
             return None
 
         data = yields[0]
-        yield_date = data.get('date', date.today())
+        yield_date = data.get("date", date.today())
 
         return YieldCurveData(
             date=yield_date,
-            yield_1m=data.get('1m'),
-            yield_2m=data.get('2m'),
-            yield_3m=data.get('3m'),
-            yield_4m=data.get('4m'),
-            yield_6m=data.get('6m'),
-            yield_1y=data.get('1y'),
-            yield_2y=data.get('2y'),
-            yield_3y=data.get('3y'),
-            yield_5y=data.get('5y'),
-            yield_7y=data.get('7y'),
-            yield_10y=data.get('10y'),
-            yield_20y=data.get('20y'),
-            yield_30y=data.get('30y'),
+            yield_1m=data.get("1m"),
+            yield_2m=data.get("2m"),
+            yield_3m=data.get("3m"),
+            yield_4m=data.get("4m"),
+            yield_6m=data.get("6m"),
+            yield_1y=data.get("1y"),
+            yield_2y=data.get("2y"),
+            yield_3y=data.get("3y"),
+            yield_5y=data.get("5y"),
+            yield_7y=data.get("7y"),
+            yield_10y=data.get("10y"),
+            yield_20y=data.get("20y"),
+            yield_30y=data.get("30y"),
         )
 
-    async def get_yield_history(
-        self,
-        days: int = 365,
-        maturity: str = "10y"
-    ) -> List[Dict[str, Any]]:
+    async def get_yield_history(self, days: int = 365, maturity: str = "10y") -> List[Dict[str, Any]]:
         """Get historical yields for a specific maturity.
 
         Args:
@@ -533,13 +519,13 @@ class TreasuryApiClient:
             async with session.get(url) as response:
                 if response.status == 200:
                     text = await response.text()
-                    lines = text.strip().split('\n')
+                    lines = text.strip().split("\n")
 
                     if len(lines) < 2:
                         return []
 
                     # Parse header
-                    header = lines[0].split(',')
+                    header = lines[0].split(",")
                     header = [h.strip().strip('"').lower() for h in header]
 
                     # Find date and target maturity columns
@@ -547,9 +533,9 @@ class TreasuryApiClient:
                     yield_col = None
 
                     for i, col in enumerate(header):
-                        if 'date' in col:
+                        if "date" in col:
                             date_col = i
-                        elif maturity.replace('y', ' yr') in col or maturity.replace('m', ' mo') in col:
+                        elif maturity.replace("y", " yr") in col or maturity.replace("m", " mo") in col:
                             yield_col = i
 
                     if date_col is None or yield_col is None:
@@ -560,39 +546,32 @@ class TreasuryApiClient:
                         if not line.strip():
                             continue
 
-                        cols = line.split(',')
+                        cols = line.split(",")
                         cols = [c.strip().strip('"') for c in cols]
 
                         if len(cols) <= max(date_col, yield_col):
                             continue
 
                         try:
-                            row_date = datetime.strptime(cols[date_col], '%m/%d/%Y').date()
+                            row_date = datetime.strptime(cols[date_col], "%m/%d/%Y").date()
                             if row_date < cutoff_date:
                                 continue
 
                             yield_val = cols[yield_col]
-                            if yield_val and yield_val.lower() != 'n/a':
-                                history.append({
-                                    'date': str(row_date),
-                                    'yield': float(yield_val)
-                                })
+                            if yield_val and yield_val.lower() != "n/a":
+                                history.append({"date": str(row_date), "yield": float(yield_val)})
                         except (ValueError, IndexError):
                             continue
 
             # Sort by date
-            history.sort(key=lambda x: x['date'], reverse=True)
+            history.sort(key=lambda x: x["date"], reverse=True)
             return history
 
         except Exception as e:
             logger.error(f"Error fetching yield history: {e}")
             return []
 
-    async def get_spread_history(
-        self,
-        days: int = 365,
-        spread_type: str = "10y_2y"
-    ) -> List[Dict[str, Any]]:
+    async def get_spread_history(self, days: int = 365, spread_type: str = "10y_2y") -> List[Dict[str, Any]]:
         """Get historical spread data.
 
         Args:
@@ -622,13 +601,13 @@ class TreasuryApiClient:
             async with session.get(url) as response:
                 if response.status == 200:
                     text = await response.text()
-                    lines = text.strip().split('\n')
+                    lines = text.strip().split("\n")
 
                     if len(lines) < 2:
                         return []
 
                     # Parse header
-                    header = lines[0].split(',')
+                    header = lines[0].split(",")
                     header = [h.strip().strip('"').lower() for h in header]
 
                     # Find columns
@@ -637,7 +616,7 @@ class TreasuryApiClient:
                     short_col = None
 
                     for i, col in enumerate(header):
-                        if 'date' in col:
+                        if "date" in col:
                             date_col = i
                         elif long_term in col:
                             long_col = i
@@ -652,35 +631,32 @@ class TreasuryApiClient:
                         if not line.strip():
                             continue
 
-                        cols = line.split(',')
+                        cols = line.split(",")
                         cols = [c.strip().strip('"') for c in cols]
 
                         if len(cols) <= max(date_col, long_col, short_col):
                             continue
 
                         try:
-                            row_date = datetime.strptime(cols[date_col], '%m/%d/%Y').date()
+                            row_date = datetime.strptime(cols[date_col], "%m/%d/%Y").date()
                             if row_date < cutoff_date:
                                 continue
 
                             long_val = cols[long_col]
                             short_val = cols[short_col]
 
-                            if (long_val and long_val.lower() != 'n/a' and
-                                short_val and short_val.lower() != 'n/a'):
+                            if long_val and long_val.lower() != "n/a" and short_val and short_val.lower() != "n/a":
 
                                 spread = (float(long_val) - float(short_val)) * 100  # bps
 
-                                history.append({
-                                    'date': str(row_date),
-                                    'spread_bps': round(spread, 2),
-                                    'is_inverted': spread < 0
-                                })
+                                history.append(
+                                    {"date": str(row_date), "spread_bps": round(spread, 2), "is_inverted": spread < 0}
+                                )
                         except (ValueError, IndexError):
                             continue
 
             # Sort by date
-            history.sort(key=lambda x: x['date'], reverse=True)
+            history.sort(key=lambda x: x["date"], reverse=True)
             return history
 
         except Exception as e:
@@ -737,18 +713,20 @@ class TreasuryFetcher:
             while current >= start:
                 curve = await self.client.get_yield_curve(as_of_date=current)
                 if curve:
-                    results.append({
-                        "date": str(curve.date),
-                        "yield_1m": curve.yield_1m,
-                        "yield_3m": curve.yield_3m,
-                        "yield_6m": curve.yield_6m,
-                        "yield_1y": curve.yield_1y,
-                        "yield_2y": curve.yield_2y,
-                        "yield_5y": curve.yield_5y,
-                        "yield_10y": curve.yield_10y,
-                        "yield_20y": curve.yield_20y,
-                        "yield_30y": curve.yield_30y,
-                    })
+                    results.append(
+                        {
+                            "date": str(curve.date),
+                            "yield_1m": curve.yield_1m,
+                            "yield_3m": curve.yield_3m,
+                            "yield_6m": curve.yield_6m,
+                            "yield_1y": curve.yield_1y,
+                            "yield_2y": curve.yield_2y,
+                            "yield_5y": curve.yield_5y,
+                            "yield_10y": curve.yield_10y,
+                            "yield_20y": curve.yield_20y,
+                            "yield_30y": curve.yield_30y,
+                        }
+                    )
                     # Skip to avoid fetching same data repeatedly
                     current = curve.date - timedelta(days=1)
                 else:

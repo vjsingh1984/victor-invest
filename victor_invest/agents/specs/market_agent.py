@@ -19,15 +19,14 @@ and macro factors.
 """
 
 from victor.agents.spec import (
-    AgentSpec,
     AgentCapabilities,
     AgentConstraints,
+    AgentSpec,
     ModelPreference,
     OutputFormat,
 )
 
 from victor_invest.prompts.investment_prompts import MARKET_ANALYST_PROMPT
-
 
 MARKET_AGENT_SPEC = AgentSpec(
     name="market_analyst",

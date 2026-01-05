@@ -1,6 +1,6 @@
 import math
 
-from utils.quarterly_calculator import compute_missing_quarter, analyze_quarterly_patterns
+from utils.quarterly_calculator import analyze_quarterly_patterns, compute_missing_quarter
 
 
 def test_compute_missing_quarter_derives_free_cash_flow():

@@ -26,10 +26,9 @@ from typing import Any, Dict, Optional
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from investigator.domain.agents.base import AgentTask, AgentResult, InvestmentAgent
-from investigator.domain.models import TaskStatus
 from investigator.config import get_config
-
+from investigator.domain.agents.base import AgentResult, AgentTask, InvestmentAgent
+from investigator.domain.models import TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +115,9 @@ class SymbolUpdateAgent(InvestmentAgent):
             config = get_config()
             # Build stock database URL with separate credentials
             stock_db_password = os.environ.get("STOCK_DB_PASSWORD", "")
-            stock_db_url = f"postgresql://stockuser:{stock_db_password}@{config.database.host}:{config.database.port}/stock"
+            stock_db_url = (
+                f"postgresql://stockuser:{stock_db_password}@{config.database.host}:{config.database.port}/stock"
+            )
             self.stock_engine = create_engine(
                 stock_db_url,
                 pool_size=config.database.pool_size,

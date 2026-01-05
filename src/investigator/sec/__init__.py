@@ -8,17 +8,22 @@ SEC Pattern Implementations
 SEC data fetching and analysis patterns
 """
 
+from .sec_adapters import *
 from .sec_facade import *
 from .sec_strategies import *
-from .sec_adapters import *
 
 __all__ = [
     # Facades
-    'SECDataFacade', 'FundamentalAnalysisFacadeV2',
+    "SECDataFacade",
+    "FundamentalAnalysisFacadeV2",
     # Strategies
-    'CompanyFactsStrategy', 'SubmissionsStrategy', 
-    'CachedDataStrategy', 'HybridFetchStrategy',
+    "CompanyFactsStrategy",
+    "SubmissionsStrategy",
+    "CachedDataStrategy",
+    "HybridFetchStrategy",
     # Adapters
-    'SECToInternalAdapter', 'InternalToLLMAdapter',
-    'FilingContentAdapter', 'CompanyFactsToDetailedAdapter'
+    "SECToInternalAdapter",
+    "InternalToLLMAdapter",
+    "FilingContentAdapter",
+    "CompanyFactsToDetailedAdapter",
 ]

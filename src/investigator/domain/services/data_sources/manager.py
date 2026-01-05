@@ -9,14 +9,14 @@ Provides a single entry point for accessing all data sources with:
 """
 
 import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Set
-import logging
 
-from .base import DataSource, DataCategory, DataResult, DataQuality
-from .registry import get_registry, DataSourceRegistry
+from .base import DataCategory, DataQuality, DataResult, DataSource
+from .registry import DataSourceRegistry, get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ class ConsolidatedData:
     - Batch analysis runner
     - Valuation models
     """
+
     symbol: str
     as_of_date: date
     timestamp: datetime = field(default_factory=datetime.now)
@@ -367,32 +368,29 @@ class DataSourceManager:
         """Initialize and register all data sources"""
         # Import sources to trigger registration
         from .sources import (
-            FredMacroSource,
-            TreasuryYieldSource,
-            CBOEVolatilitySource,
             AtlantaFedSource,
+            CBOEVolatilitySource,
             ChicagoFedSource,
             ClevelandFedSource,
             DallasFedSource,
+            FredMacroSource,
+            InsiderTransactionSource,
+            InstitutionalHoldingsSource,
             KansasCityFedSource,
             NewYorkFedSource,
             PhiladelphiaFedSource,
-            RichmondFedSource,
-            InsiderTransactionSource,
-            InstitutionalHoldingsSource,
-            SECQuarterlySource,
             PriceHistorySource,
-            TechnicalIndicatorSource,
+            RichmondFedSource,
+            SECQuarterlySource,
             ShortInterestSource,
+            TechnicalIndicatorSource,
+            TreasuryYieldSource,
         )
 
         self._logger.info(f"Initialized {len(self._registry.list_sources())} data sources")
 
     def get_data(
-        self,
-        symbol: str,
-        as_of_date: Optional[date] = None,
-        categories: Optional[List[DataCategory]] = None
+        self, symbol: str, as_of_date: Optional[date] = None, categories: Optional[List[DataCategory]] = None
     ) -> ConsolidatedData:
         """
         Get consolidated data from all sources for a symbol.
@@ -424,10 +422,7 @@ class DataSourceManager:
 
         # Filter by categories if specified
         if categories:
-            source_mapping = {
-                k: v for k, v in source_mapping.items()
-                if v[1] in categories
-            }
+            source_mapping = {k: v for k, v in source_mapping.items() if v[1] in categories}
 
         # Fetch data from each source
         for source_name, (attr_name, category) in source_mapping.items():
@@ -483,11 +478,7 @@ class DataSourceManager:
 
         return data
 
-    def get_sentiment_data(
-        self,
-        symbol: str,
-        as_of_date: Optional[date] = None
-    ) -> Dict[str, Any]:
+    def get_sentiment_data(self, symbol: str, as_of_date: Optional[date] = None) -> Dict[str, Any]:
         """Get sentiment data for a symbol"""
         target_date = as_of_date or date.today()
         data = {}
@@ -508,10 +499,7 @@ class DataSourceManager:
         return data
 
     def get_batch_data(
-        self,
-        symbols: List[str],
-        as_of_date: Optional[date] = None,
-        parallel: bool = True
+        self, symbols: List[str], as_of_date: Optional[date] = None, parallel: bool = True
     ) -> Dict[str, ConsolidatedData]:
         """
         Get data for multiple symbols.
@@ -528,28 +516,15 @@ class DataSourceManager:
 
         if parallel:
             # Parallel fetch using thread pool
-            futures = {
-                symbol: self._executor.submit(self.get_data, symbol, target_date)
-                for symbol in symbols
-            }
-            results = {
-                symbol: future.result()
-                for symbol, future in futures.items()
-            }
+            futures = {symbol: self._executor.submit(self.get_data, symbol, target_date) for symbol in symbols}
+            results = {symbol: future.result() for symbol, future in futures.items()}
         else:
             # Sequential fetch
-            results = {
-                symbol: self.get_data(symbol, target_date)
-                for symbol in symbols
-            }
+            results = {symbol: self.get_data(symbol, target_date) for symbol in symbols}
 
         return results
 
-    def get_rl_context(
-        self,
-        symbol: str,
-        as_of_date: Optional[date] = None
-    ) -> Dict[str, float]:
+    def get_rl_context(self, symbol: str, as_of_date: Optional[date] = None) -> Dict[str, float]:
         """
         Get features for RL model.
 
@@ -577,6 +552,7 @@ class DataSourceManager:
     def health_check(self) -> Dict[str, Any]:
         """Check health of all sources"""
         from .registry import check_all_sources_health
+
         return {
             "sources": check_all_sources_health(),
             "total": len(self._registry.list_sources()),
@@ -598,10 +574,7 @@ def get_data_source_manager() -> DataSourceManager:
     return _manager
 
 
-def get_consolidated_data(
-    symbol: str,
-    as_of_date: Optional[date] = None
-) -> ConsolidatedData:
+def get_consolidated_data(symbol: str, as_of_date: Optional[date] = None) -> ConsolidatedData:
     """Convenience function to get consolidated data"""
     return get_data_source_manager().get_data(symbol, as_of_date)
 
@@ -611,9 +584,6 @@ def get_macro_indicators(as_of_date: Optional[date] = None) -> Dict[str, Any]:
     return get_data_source_manager().get_macro_data(as_of_date)
 
 
-def get_rl_features(
-    symbol: str,
-    as_of_date: Optional[date] = None
-) -> Dict[str, float]:
+def get_rl_features(symbol: str, as_of_date: Optional[date] = None) -> Dict[str, float]:
     """Convenience function to get RL features"""
     return get_data_source_manager().get_rl_context(symbol, as_of_date)

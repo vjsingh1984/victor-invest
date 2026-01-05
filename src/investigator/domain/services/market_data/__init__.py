@@ -89,25 +89,26 @@ def get_sec_db_url() -> str:
     database = os.environ.get("SEC_DB_NAME", "sec_database")
     return f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
-from investigator.domain.services.market_data.shares_service import (
-    SharesService,
-    SharesHistory,
+
+from investigator.domain.services.market_data.metadata_service import (
+    SymbolMetadata,
+    SymbolMetadataService,
 )
 from investigator.domain.services.market_data.price_service import (
     PriceService,
 )
-from investigator.domain.services.market_data.validation_service import (
-    DataValidationService,
-    DataQualityWarning,
-)
-from investigator.domain.services.market_data.metadata_service import (
-    SymbolMetadataService,
-    SymbolMetadata,
+from investigator.domain.services.market_data.shares_service import (
+    SharesHistory,
+    SharesService,
 )
 from investigator.domain.services.market_data.technical_analysis_service import (
     TechnicalAnalysisService,
     TechnicalFeatures,
     get_technical_analysis_service,
+)
+from investigator.domain.services.market_data.validation_service import (
+    DataQualityWarning,
+    DataValidationService,
 )
 
 __all__ = [

@@ -5,14 +5,11 @@ Provides VIX, SKEW, term structure analysis and volatility regime classification
 Free data from CBOE and FRED.
 """
 
+import logging
 from datetime import date, datetime
 from typing import Any, Dict, Optional
-import logging
 
-from ..base import (
-    DataSource, DataResult, SourceMetadata,
-    DataCategory, DataFrequency, DataQuality
-)
+from ..base import DataCategory, DataFrequency, DataQuality, DataResult, DataSource, SourceMetadata
 from ..registry import register_source
 
 logger = logging.getLogger(__name__)
@@ -50,8 +47,9 @@ class CBOEVolatilitySource(DataSource):
     def _fetch_impl(self, symbol: str, as_of_date: Optional[date] = None) -> DataResult:
         """Fetch CBOE volatility data"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             target_date = as_of_date or date.today()
@@ -61,7 +59,8 @@ class CBOEVolatilitySource(DataSource):
             with engine.connect() as conn:
                 # Fetch VIX from macro_indicator_values
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT v.value, v.date
                         FROM macro_indicator_values v
                         JOIN macro_indicators i ON v.indicator_id = i.id
@@ -69,8 +68,9 @@ class CBOEVolatilitySource(DataSource):
                         AND v.date <= :target_date
                         ORDER BY v.date DESC
                         LIMIT 1
-                    """),
-                    {"target_date": target_date}
+                    """
+                    ),
+                    {"target_date": target_date},
                 )
                 row = result.fetchone()
                 if row:
@@ -79,7 +79,8 @@ class CBOEVolatilitySource(DataSource):
 
                 # Fetch from regional_fed_indicators for CBOE data
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT indicator_name,
                                (indicator_data->>'value')::float as value,
                                observation_date
@@ -87,8 +88,9 @@ class CBOEVolatilitySource(DataSource):
                         WHERE district = 'cboe'
                         AND observation_date <= :target_date
                         ORDER BY observation_date DESC
-                    """),
-                    {"target_date": target_date}
+                    """
+                    ),
+                    {"target_date": target_date},
                 )
                 for row in result:
                     indicator = row[0].lower()
@@ -211,11 +213,13 @@ class CBOEVolatilitySource(DataSource):
 
         analysis["fear_greed_score"] = max(0, min(100, fear_score))
         analysis["market_sentiment"] = (
-            "extreme_fear" if fear_score > 80 else
-            "fear" if fear_score > 60 else
-            "neutral" if fear_score > 40 else
-            "greed" if fear_score > 20 else
-            "extreme_greed"
+            "extreme_fear"
+            if fear_score > 80
+            else (
+                "fear"
+                if fear_score > 60
+                else "neutral" if fear_score > 40 else "greed" if fear_score > 20 else "extreme_greed"
+            )
         )
 
         return analysis
@@ -223,24 +227,28 @@ class CBOEVolatilitySource(DataSource):
     def get_vix_percentile(self, vix_value: float, lookback_days: int = 252) -> DataResult:
         """Calculate VIX percentile rank"""
         try:
-            from investigator.infrastructure.database.db import get_db_manager
-            from sqlalchemy import text
             from datetime import timedelta
+
+            from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
             start_date = date.today() - timedelta(days=lookback_days)
 
             with engine.connect() as conn:
                 result = conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT v.value
                         FROM macro_indicator_values v
                         JOIN macro_indicators i ON v.indicator_id = i.id
                         WHERE i.series_id = 'VIXCLS'
                         AND v.date >= :start_date
                         ORDER BY v.value
-                    """),
-                    {"start_date": start_date}
+                    """
+                    ),
+                    {"start_date": start_date},
                 )
                 values = [float(r[0]) for r in result]
 

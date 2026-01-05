@@ -22,11 +22,11 @@ Exports all agent specs for the Victor-Invest framework:
 - SYNTHESIS_AGENT_SPEC: Investment synthesis and recommendation
 """
 
-from victor_invest.agents.specs.sec_agent import SEC_AGENT_SPEC
 from victor_invest.agents.specs.fundamental_agent import FUNDAMENTAL_AGENT_SPEC
-from victor_invest.agents.specs.technical_agent import TECHNICAL_AGENT_SPEC
 from victor_invest.agents.specs.market_agent import MARKET_AGENT_SPEC
+from victor_invest.agents.specs.sec_agent import SEC_AGENT_SPEC
 from victor_invest.agents.specs.synthesis_agent import SYNTHESIS_AGENT_SPEC
+from victor_invest.agents.specs.technical_agent import TECHNICAL_AGENT_SPEC
 
 __all__ = [
     "SEC_AGENT_SPEC",

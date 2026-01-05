@@ -14,7 +14,7 @@ from .macro_indicators import (
 )
 
 __all__ = [
-    'MacroIndicatorsFetcher',
-    'format_indicator_for_display',
-    'get_stock_db_manager',
+    "MacroIndicatorsFetcher",
+    "format_indicator_for_display",
+    "get_stock_db_manager",
 ]

@@ -19,15 +19,14 @@ financial data from SEC regulatory filings.
 """
 
 from victor.agents.spec import (
-    AgentSpec,
     AgentCapabilities,
     AgentConstraints,
+    AgentSpec,
     ModelPreference,
     OutputFormat,
 )
 
 from victor_invest.prompts.investment_prompts import SEC_ANALYST_PROMPT
-
 
 SEC_AGENT_SPEC = AgentSpec(
     name="sec_analyst",

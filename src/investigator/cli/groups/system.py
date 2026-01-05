@@ -48,6 +48,7 @@ def status(ctx, verbose):
     # Check Ollama
     try:
         import requests
+
         resp = requests.get("http://localhost:11434/api/tags", timeout=5)
         if resp.status_code == 200:
             models = resp.json().get("models", [])
@@ -63,6 +64,7 @@ def status(ctx, verbose):
     # Check Database
     try:
         from investigator.infrastructure.database.db import get_database_engine
+
         engine = get_database_engine()
         with engine.connect() as conn:
             pass
@@ -73,6 +75,7 @@ def status(ctx, verbose):
     # Check Cache
     try:
         from investigator.infrastructure.cache import get_cache_manager
+
         cache = get_cache_manager()
         checks.append(("Cache", True, "Initialized"))
     except Exception as e:
@@ -81,7 +84,8 @@ def status(ctx, verbose):
     # Check Redis (optional)
     try:
         import redis
-        r = redis.Redis(host='localhost', port=6379, socket_timeout=2)
+
+        r = redis.Redis(host="localhost", port=6379, socket_timeout=2)
         r.ping()
         checks.append(("Redis", True, "Connected"))
     except Exception:
@@ -163,10 +167,7 @@ def setup(ctx, skip_deps, skip_db):
     # 2. Install dependencies
     if not skip_deps:
         click.echo("\n2. Installing dependencies...")
-        result = subprocess.run(
-            ["pip", "install", "-r", "requirements.txt"],
-            capture_output=True
-        )
+        result = subprocess.run(["pip", "install", "-r", "requirements.txt"], capture_output=True)
         if result.returncode == 0:
             click.echo("   Dependencies installed")
             steps.append(("Dependencies", True))
@@ -197,8 +198,9 @@ def setup(ctx, skip_deps, skip_db):
     if not skip_db:
         click.echo("\n4. Setting up database...")
         try:
-            from investigator.infrastructure.database.db import get_engine
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_engine
 
             engine = get_engine()
 
@@ -231,6 +233,7 @@ def setup(ctx, skip_deps, skip_db):
     click.echo("\n5. Checking Ollama...")
     try:
         import requests
+
         resp = requests.get("http://localhost:11434/api/tags", timeout=5)
         if resp.status_code == 200:
             click.echo("   Ollama is running")
@@ -282,7 +285,9 @@ def info(ctx):
     click.echo(f"  CPU Usage:    {psutil.cpu_percent()}%")
 
     memory = psutil.virtual_memory()
-    click.echo(f"  Memory:       {memory.used / (1024**3):.1f}GB / {memory.total / (1024**3):.1f}GB ({memory.percent}%)")
+    click.echo(
+        f"  Memory:       {memory.used / (1024**3):.1f}GB / {memory.total / (1024**3):.1f}GB ({memory.percent}%)"
+    )
 
     disk = psutil.disk_usage(".")
     click.echo(f"  Disk:         {disk.used / (1024**3):.1f}GB / {disk.total / (1024**3):.1f}GB ({disk.percent}%)")
@@ -293,6 +298,7 @@ def info(ctx):
     for pkg in packages:
         try:
             import importlib.metadata
+
             version = importlib.metadata.version(pkg)
             click.echo(f"  {pkg:15s}: {version}")
         except Exception:
@@ -302,6 +308,7 @@ def info(ctx):
     click.echo("\nInvestiGator:")
     try:
         import importlib.metadata
+
         version = importlib.metadata.version("investigator")
         click.echo(f"  Version:      {version}")
     except Exception:
@@ -326,6 +333,7 @@ def config(ctx, edit, validate):
 
     if edit:
         import os
+
         editor = os.environ.get("EDITOR", "vim")
         subprocess.run([editor, str(config_path)])
         return
@@ -413,8 +421,8 @@ def metrics(ctx, days):
 
     Displays performance metrics and statistics.
     """
-    import json
     import glob
+    import json
     from datetime import datetime, timedelta
 
     click.echo(f"System Metrics (last {days} days)")
@@ -444,12 +452,12 @@ def metrics(ctx, days):
         sm = latest["system_metrics"]
         click.echo("\nSystem Metrics:")
         click.echo(f"  Total Analyses:    {sm.get('total_analyses', 0)}")
-        total = sm.get('total_analyses', 1) or 1
-        success = sm.get('successful_analyses', 0)
+        total = sm.get("total_analyses", 1) or 1
+        success = sm.get("successful_analyses", 0)
         click.echo(f"  Success Rate:      {(success / total * 100):.1f}%")
 
-        hits = sm.get('cache_hits', 0)
-        misses = sm.get('cache_misses', 0)
+        hits = sm.get("cache_hits", 0)
+        misses = sm.get("cache_misses", 0)
         total_cache = hits + misses
         if total_cache > 0:
             click.echo(f"  Cache Hit Rate:    {(hits / total_cache * 100):.1f}%")
@@ -457,9 +465,9 @@ def metrics(ctx, days):
     if "agent_metrics" in latest:
         click.echo("\nAgent Performance:")
         for agent, metrics in latest["agent_metrics"].items():
-            execs = metrics.get('executions', 0)
-            avg_dur = metrics.get('average_duration', 0)
-            fails = metrics.get('failures', 0)
+            execs = metrics.get("executions", 0)
+            avg_dur = metrics.get("average_duration", 0)
+            fails = metrics.get("failures", 0)
             success_rate = ((execs - fails) / execs * 100) if execs > 0 else 0
             click.echo(f"  {agent}:")
             click.echo(f"    Executions: {execs}, Avg: {avg_dur:.1f}s, Success: {success_rate:.0f}%")

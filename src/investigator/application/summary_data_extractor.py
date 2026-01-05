@@ -21,11 +21,11 @@ Usage:
     summary = extractor.extract_all()
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
 from enum import Enum
-import logging
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
 
 logger = logging.getLogger(__name__)
 

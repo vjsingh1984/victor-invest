@@ -34,8 +34,9 @@ Multi-period data stored in per_model_rewards JSONB:
 
 import logging
 from datetime import date, timedelta
-from dateutil.relativedelta import relativedelta
 from typing import Any, Dict, List, Optional
+
+from dateutil.relativedelta import relativedelta
 
 from victor_invest.tools.base import BaseTool, ToolResult
 
@@ -108,25 +109,24 @@ class RLBacktestTool(BaseTool):
         """Initialize shared services."""
         try:
             # Shared market data services
+            # Data source manager for consolidated data access
+            from investigator.domain.services.data_sources.manager import DataSourceManager
             from investigator.domain.services.market_data import (
-                SharesService,
                 PriceService,
+                SharesService,
                 SymbolMetadataService,
                 get_technical_analysis_service,
-            )
-
-            # Shared valuation config services
-            from investigator.domain.services.valuation_shared import (
-                ValuationConfigService,
-                SectorMultiplesService,
             )
 
             # RL infrastructure
             from investigator.domain.services.rl.outcome_tracker import OutcomeTracker
             from investigator.domain.services.rl.reward_calculator import get_reward_calculator
 
-            # Data source manager for consolidated data access
-            from investigator.domain.services.data_sources.manager import DataSourceManager
+            # Shared valuation config services
+            from investigator.domain.services.valuation_shared import (
+                SectorMultiplesService,
+                ValuationConfigService,
+            )
 
             # Database
             from investigator.infrastructure.database.db import get_db_manager
@@ -261,12 +261,14 @@ class RLBacktestTool(BaseTool):
                     symbol, analysis_date, price, metadata.get("beta", 1.0)
                 )
 
-                results["predictions"].append({
-                    "lookback_months": months_back,
-                    "analysis_date": analysis_date.isoformat(),
-                    "price_at_prediction": price,
-                    "multi_period": multi_period_data,
-                })
+                results["predictions"].append(
+                    {
+                        "lookback_months": months_back,
+                        "analysis_date": analysis_date.isoformat(),
+                        "price_at_prediction": price,
+                        "multi_period": multi_period_data,
+                    }
+                )
 
             except Exception as e:
                 results["errors"].append(f"{months_back}m: {str(e)}")
@@ -277,7 +279,7 @@ class RLBacktestTool(BaseTool):
                 "tool": "rl_backtest",
                 "action": "run_backtest",
                 "lookback_periods": lookback_months,
-            }
+            },
         )
 
     async def _calculate_rewards(
@@ -290,9 +292,7 @@ class RLBacktestTool(BaseTool):
         metadata = await self._get_metadata(symbol)
         beta = metadata.get("beta", 1.0)
 
-        multi_period_data = await self._get_multi_period_data(
-            symbol, analysis_date, current_price, beta
-        )
+        multi_period_data = await self._get_multi_period_data(symbol, analysis_date, current_price, beta)
 
         return ToolResult.success_result(
             data={
@@ -305,7 +305,7 @@ class RLBacktestTool(BaseTool):
             metadata={
                 "tool": "rl_backtest",
                 "action": "calculate_rewards",
-            }
+            },
         )
 
     async def _record_prediction(
@@ -331,17 +331,12 @@ class RLBacktestTool(BaseTool):
             # Calculate multi-period data
             metadata = await self._get_metadata(symbol)
             beta = metadata.get("beta", 1.0)
-            multi_period_data = await self._get_multi_period_data(
-                symbol, analysis_date, current_price, beta
-            )
+            multi_period_data = await self._get_multi_period_data(symbol, analysis_date, current_price, beta)
 
             # If context_features not provided, use DataSourceManager
             if not context_features and self._data_source_manager:
                 try:
-                    consolidated = self._data_source_manager.get_data(
-                        symbol=symbol,
-                        as_of_date=analysis_date
-                    )
+                    consolidated = self._data_source_manager.get_data(symbol=symbol, as_of_date=analysis_date)
                     context_features = consolidated.get_rl_features()
                     logger.debug(f"Auto-fetched {len(context_features)} RL features for {symbol}")
                 except Exception as e:
@@ -376,7 +371,7 @@ class RLBacktestTool(BaseTool):
                 metadata={
                     "tool": "rl_backtest",
                     "action": "record_prediction",
-                }
+                },
             )
         except Exception as e:
             return ToolResult.error_result(f"Failed to record prediction: {e}")
@@ -402,7 +397,7 @@ class RLBacktestTool(BaseTool):
             metadata={
                 "tool": "rl_backtest",
                 "action": "get_historical_data",
-            }
+            },
         )
 
     async def _get_context_features(
@@ -425,10 +420,7 @@ class RLBacktestTool(BaseTool):
             return ToolResult.error_result("DataSourceManager not initialized")
 
         try:
-            consolidated = self._data_source_manager.get_data(
-                symbol=symbol,
-                as_of_date=analysis_date
-            )
+            consolidated = self._data_source_manager.get_data(symbol=symbol, as_of_date=analysis_date)
 
             features = consolidated.get_rl_features()
 
@@ -445,7 +437,7 @@ class RLBacktestTool(BaseTool):
                 metadata={
                     "tool": "rl_backtest",
                     "action": "get_context_features",
-                }
+                },
             )
         except Exception as e:
             return ToolResult.error_result(f"Failed to get context features: {e}")
@@ -536,7 +528,13 @@ class RLBacktestTool(BaseTool):
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["run_backtest", "calculate_rewards", "record_prediction", "get_historical_data", "get_context_features"],
+                    "enum": [
+                        "run_backtest",
+                        "calculate_rewards",
+                        "record_prediction",
+                        "get_historical_data",
+                        "get_context_features",
+                    ],
                     "description": "Action to perform",
                     "default": "run_backtest",
                 },

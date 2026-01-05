@@ -65,6 +65,7 @@ class CreditCyclePhase(Enum):
     - CREDIT_STRESS: Elevated risk, widening spreads, defensive positioning needed
     - CREDIT_CRISIS: Severe stress, extremely wide spreads, maximum defensive
     """
+
     EARLY_EXPANSION = "early_expansion"
     MID_CYCLE = "mid_cycle"
     LATE_CYCLE = "late_cycle"
@@ -79,11 +80,12 @@ class RecessionProbability(Enum):
     Uses yield curve, credit spreads, unemployment trends, and other factors
     to estimate recession probability within 12 months.
     """
-    VERY_LOW = "very_low"        # <10%
-    LOW = "low"                   # 10-25%
-    ELEVATED = "elevated"         # 25-50%
-    HIGH = "high"                 # 50-75%
-    IMMINENT = "imminent"         # >75%
+
+    VERY_LOW = "very_low"  # <10%
+    LOW = "low"  # 10-25%
+    ELEVATED = "elevated"  # 25-50%
+    HIGH = "high"  # 50-75%
+    IMMINENT = "imminent"  # >75%
     UNKNOWN = "unknown"
 
 
@@ -93,12 +95,13 @@ class VolatilityRegime(Enum):
     Different volatility regimes require different valuation approaches
     and risk management strategies.
     """
-    VERY_LOW = "very_low"         # VIX < 12
-    LOW = "low"                    # VIX 12-16
-    NORMAL = "normal"              # VIX 16-20
-    ELEVATED = "elevated"          # VIX 20-25
-    HIGH = "high"                  # VIX 25-35
-    EXTREME = "extreme"            # VIX > 35
+
+    VERY_LOW = "very_low"  # VIX < 12
+    LOW = "low"  # VIX 12-16
+    NORMAL = "normal"  # VIX 16-20
+    ELEVATED = "elevated"  # VIX 20-25
+    HIGH = "high"  # VIX 25-35
+    EXTREME = "extreme"  # VIX > 35
     UNKNOWN = "unknown"
 
 
@@ -107,10 +110,11 @@ class FedPolicyStance(Enum):
 
     Derived from Fed funds rate trajectory and forward guidance.
     """
-    VERY_DOVISH = "very_dovish"   # Aggressive easing
-    DOVISH = "dovish"              # Easing bias
-    NEUTRAL = "neutral"            # Data dependent
-    HAWKISH = "hawkish"            # Tightening bias
+
+    VERY_DOVISH = "very_dovish"  # Aggressive easing
+    DOVISH = "dovish"  # Easing bias
+    NEUTRAL = "neutral"  # Data dependent
+    HAWKISH = "hawkish"  # Tightening bias
     VERY_HAWKISH = "very_hawkish"  # Aggressive tightening
     UNKNOWN = "unknown"
 
@@ -198,6 +202,7 @@ class MarketContext:
             ... }
             >>> context = MarketContext.from_dict(data)
         """
+
         # Helper to safely get enum value
         def get_enum(enum_cls, key, default):
             val = data.get(key)

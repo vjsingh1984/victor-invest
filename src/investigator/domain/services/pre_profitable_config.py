@@ -24,7 +24,6 @@ Usage:
 
 from typing import Dict, Optional
 
-
 # Industry-specific growth assumptions for pre-profitable companies
 PRE_PROFITABLE_GROWTH_ASSUMPTIONS = {
     # Technology - Software & Services

@@ -5,10 +5,11 @@ Tests multi-indicator profitability classification.
 """
 
 import pytest
+
 from investigator.domain.services.profitability_classifier import (
+    ProfitabilityClassification,
     ProfitabilityClassifier,
     ProfitabilityStage,
-    ProfitabilityClassification,
     get_profitability_classifier,
 )
 
@@ -36,10 +37,10 @@ class TestProfitabilityClassification:
             indicators_checked=[],
             indicators_positive=2,
             indicators_total=2,
-            primary_indicator='net_income',
-            applicable_models=['dcf', 'pe'],
-            model_adjustments={'dcf': 1.0, 'pe': 1.0},
-            notes=[]
+            primary_indicator="net_income",
+            applicable_models=["dcf", "pe"],
+            model_adjustments={"dcf": 1.0, "pe": 1.0},
+            notes=[],
         )
         assert classification.stage == ProfitabilityStage.PROFITABLE
         assert classification.confidence == 0.90
@@ -56,16 +57,16 @@ class TestProfitabilityClassifier:
     def test_profitable_company(self, classifier):
         """Test classification of clearly profitable company."""
         financials = {
-            'net_income': 1_000_000_000,
-            'operating_income': 1_200_000_000,
-            'ebitda': 1_500_000_000,
-            'free_cash_flow': 800_000_000,
-            'total_revenue': 10_000_000_000,
+            "net_income": 1_000_000_000,
+            "operating_income": 1_200_000_000,
+            "ebitda": 1_500_000_000,
+            "free_cash_flow": 800_000_000,
+            "total_revenue": 10_000_000_000,
         }
         ratios = {
-            'net_margin': 10.0,  # 10% margin (as percentage, not decimal)
-            'operating_margin': 12.0,
-            'fcf_margin': 8.0,
+            "net_margin": 10.0,  # 10% margin (as percentage, not decimal)
+            "operating_margin": 12.0,
+            "fcf_margin": 8.0,
         }
 
         result = classifier.classify(financials, ratios)
@@ -76,16 +77,16 @@ class TestProfitabilityClassifier:
     def test_pre_profit_company(self, classifier):
         """Test classification of pre-profit company."""
         financials = {
-            'net_income': -500_000_000,
-            'operating_income': -400_000_000,
-            'ebitda': -200_000_000,
-            'free_cash_flow': -600_000_000,
-            'total_revenue': 1_000_000_000,
+            "net_income": -500_000_000,
+            "operating_income": -400_000_000,
+            "ebitda": -200_000_000,
+            "free_cash_flow": -600_000_000,
+            "total_revenue": 1_000_000_000,
         }
         ratios = {
-            'net_margin': -0.50,
-            'operating_margin': -0.40,
-            'fcf_margin': -0.60,
+            "net_margin": -0.50,
+            "operating_margin": -0.40,
+            "fcf_margin": -0.60,
         }
 
         result = classifier.classify(financials, ratios)
@@ -95,50 +96,44 @@ class TestProfitabilityClassifier:
     def test_marginally_profitable(self, classifier):
         """Test classification of marginally profitable company."""
         financials = {
-            'net_income': 10_000_000,  # Small positive
-            'operating_income': 15_000_000,
-            'total_revenue': 1_000_000_000,
+            "net_income": 10_000_000,  # Small positive
+            "operating_income": 15_000_000,
+            "total_revenue": 1_000_000_000,
         }
         ratios = {
-            'net_margin': 0.01,  # 1% margin - marginal
-            'operating_margin': 0.015,
+            "net_margin": 0.01,  # 1% margin - marginal
+            "operating_margin": 0.015,
         }
 
         result = classifier.classify(financials, ratios)
 
-        assert result.stage in [
-            ProfitabilityStage.MARGINALLY_PROFITABLE,
-            ProfitabilityStage.PROFITABLE
-        ]
+        assert result.stage in [ProfitabilityStage.MARGINALLY_PROFITABLE, ProfitabilityStage.PROFITABLE]
 
     def test_transitioning_company(self, classifier):
         """Test classification of transitioning company (mixed signals)."""
         financials = {
-            'net_income': -100_000_000,  # Still negative
-            'operating_income': 50_000_000,  # But operating income positive
-            'ebitda': 200_000_000,  # Strong EBITDA
-            'free_cash_flow': 100_000_000,  # Positive FCF
-            'total_revenue': 2_000_000_000,
+            "net_income": -100_000_000,  # Still negative
+            "operating_income": 50_000_000,  # But operating income positive
+            "ebitda": 200_000_000,  # Strong EBITDA
+            "free_cash_flow": 100_000_000,  # Positive FCF
+            "total_revenue": 2_000_000_000,
         }
         ratios = {
-            'net_margin': -0.05,
-            'operating_margin': 0.025,
-            'fcf_margin': 0.05,
+            "net_margin": -0.05,
+            "operating_margin": 0.025,
+            "fcf_margin": 0.05,
         }
 
         result = classifier.classify(financials, ratios)
 
         # Should recognize positive signals despite net loss
-        assert result.stage in [
-            ProfitabilityStage.TRANSITIONING,
-            ProfitabilityStage.MARGINALLY_PROFITABLE
-        ]
+        assert result.stage in [ProfitabilityStage.TRANSITIONING, ProfitabilityStage.MARGINALLY_PROFITABLE]
         assert len(result.notes) > 0  # Should have notes about mixed signals
 
     def test_missing_data(self, classifier):
         """Test classification with missing financial data."""
         financials = {
-            'total_revenue': 1_000_000_000,
+            "total_revenue": 1_000_000_000,
             # All profit indicators missing
         }
         ratios = {}
@@ -151,8 +146,8 @@ class TestProfitabilityClassifier:
     def test_only_ebitda_available(self, classifier):
         """Test classification when only EBITDA is available."""
         financials = {
-            'ebitda': 500_000_000,
-            'total_revenue': 2_000_000_000,
+            "ebitda": 500_000_000,
+            "total_revenue": 2_000_000_000,
         }
         ratios = {}
 
@@ -160,16 +155,16 @@ class TestProfitabilityClassifier:
 
         # Should still classify based on EBITDA
         assert result.stage != ProfitabilityStage.UNKNOWN
-        assert any(i.name == 'ebitda' and i.is_positive for i in result.indicators_checked)
+        assert any(i.name == "ebitda" and i.is_positive for i in result.indicators_checked)
 
     def test_only_fcf_available(self, classifier):
         """Test classification when only FCF is available."""
         financials = {
-            'free_cash_flow': 300_000_000,
-            'total_revenue': 3_000_000_000,
+            "free_cash_flow": 300_000_000,
+            "total_revenue": 3_000_000_000,
         }
         ratios = {
-            'fcf_margin': 10.0,  # 10% margin as percentage
+            "fcf_margin": 10.0,  # 10% margin as percentage
         }
 
         result = classifier.classify(financials, ratios)
@@ -179,20 +174,20 @@ class TestProfitabilityClassifier:
         assert result.stage in [
             ProfitabilityStage.PROFITABLE,
             ProfitabilityStage.MARGINALLY_PROFITABLE,
-            ProfitabilityStage.TRANSITIONING
+            ProfitabilityStage.TRANSITIONING,
         ]
 
     def test_none_values_handled(self, classifier):
         """Test that None values are handled gracefully."""
         financials = {
-            'net_income': None,
-            'operating_income': None,
-            'ebitda': 100_000_000,
-            'total_revenue': 1_000_000_000,
+            "net_income": None,
+            "operating_income": None,
+            "ebitda": 100_000_000,
+            "total_revenue": 1_000_000_000,
         }
         ratios = {
-            'net_margin': None,
-            'operating_margin': None,
+            "net_margin": None,
+            "operating_margin": None,
         }
 
         result = classifier.classify(financials, ratios)
@@ -204,9 +199,9 @@ class TestProfitabilityClassifier:
     def test_zero_revenue(self, classifier):
         """Test classification with zero revenue."""
         financials = {
-            'net_income': -1_000_000,
-            'total_revenue': 0,
-            'revenue': 0,
+            "net_income": -1_000_000,
+            "total_revenue": 0,
+            "revenue": 0,
         }
         ratios = {}
 
@@ -218,13 +213,13 @@ class TestProfitabilityClassifier:
     def test_negative_ebitda_positive_fcf(self, classifier):
         """Test case where EBITDA negative but FCF positive."""
         financials = {
-            'net_income': -50_000_000,
-            'ebitda': -20_000_000,
-            'free_cash_flow': 30_000_000,  # Positive due to working capital
-            'total_revenue': 500_000_000,
+            "net_income": -50_000_000,
+            "ebitda": -20_000_000,
+            "free_cash_flow": 30_000_000,  # Positive due to working capital
+            "total_revenue": 500_000_000,
         }
         ratios = {
-            'fcf_margin': 0.06,
+            "fcf_margin": 0.06,
         }
 
         result = classifier.classify(financials, ratios)
@@ -241,16 +236,16 @@ class TestProfitabilityClassifier:
     def test_high_confidence_for_clear_signals(self, classifier):
         """Test confidence is high when all indicators agree."""
         financials = {
-            'net_income': 500_000_000,
-            'operating_income': 600_000_000,
-            'ebitda': 800_000_000,
-            'free_cash_flow': 400_000_000,
-            'total_revenue': 5_000_000_000,
+            "net_income": 500_000_000,
+            "operating_income": 600_000_000,
+            "ebitda": 800_000_000,
+            "free_cash_flow": 400_000_000,
+            "total_revenue": 5_000_000_000,
         }
         ratios = {
-            'net_margin': 0.10,
-            'operating_margin': 0.12,
-            'fcf_margin': 0.08,
+            "net_margin": 0.10,
+            "operating_margin": 0.12,
+            "fcf_margin": 0.08,
         }
 
         result = classifier.classify(financials, ratios)

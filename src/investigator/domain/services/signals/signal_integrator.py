@@ -7,7 +7,7 @@ Validates LLM signals and provides standardized output for PDF reports.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -16,10 +16,10 @@ from investigator.domain.services.signals.entry_exit_engine import (
     EntrySignal,
     ExitSignal,
     OptimalEntryZone,
-    SignalType,
+    ScalingStrategy,
     SignalConfidence,
     SignalTiming,
-    ScalingStrategy,
+    SignalType,
     get_entry_exit_engine,
 )
 
@@ -254,13 +254,21 @@ class SignalIntegrator:
         if llm_entry and prog_entry:
             # Check if entry signal directions agree
             llm_buy_signals = sum(1 for s in llm_entry if self._is_buy_signal(s))
-            prog_buy_signals = len([s for s in prog_entry if s.signal_type in [
-                SignalType.OVERSOLD_REVERSAL, SignalType.SUPPORT_BOUNCE,
-                SignalType.GOLDEN_CROSS, SignalType.MOMENTUM
-            ]])
+            prog_buy_signals = len(
+                [
+                    s
+                    for s in prog_entry
+                    if s.signal_type
+                    in [
+                        SignalType.OVERSOLD_REVERSAL,
+                        SignalType.SUPPORT_BOUNCE,
+                        SignalType.GOLDEN_CROSS,
+                        SignalType.MOMENTUM,
+                    ]
+                ]
+            )
 
-            if (llm_buy_signals > 0 and prog_buy_signals > 0) or \
-               (llm_buy_signals == 0 and prog_buy_signals == 0):
+            if (llm_buy_signals > 0 and prog_buy_signals > 0) or (llm_buy_signals == 0 and prog_buy_signals == 0):
                 agreements += 1
             total_checks += 1
 
@@ -345,9 +353,16 @@ class SignalIntegrator:
         """Check if LLM signal is a buy signal."""
         signal_type = llm_signal.get("signal_type", "").upper()
         buy_types = [
-            "OVERSOLD", "SUPPORT", "MACD_CROSSOVER", "GOLDEN_CROSS",
-            "BOLLINGER_BOUNCE", "BREAKOUT", "VALUATION", "MOMENTUM",
-            "BUY", "LONG"
+            "OVERSOLD",
+            "SUPPORT",
+            "MACD_CROSSOVER",
+            "GOLDEN_CROSS",
+            "BOLLINGER_BOUNCE",
+            "BREAKOUT",
+            "VALUATION",
+            "MOMENTUM",
+            "BUY",
+            "LONG",
         ]
         return any(bt in signal_type for bt in buy_types)
 
@@ -476,6 +491,7 @@ class SignalIntegrator:
         Returns:
             Dict suitable for report_payload_builder.py
         """
+
         def signal_to_dict(sig: EntrySignal) -> Dict:
             return {
                 "signal_type": sig.signal_type.value,

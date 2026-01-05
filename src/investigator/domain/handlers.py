@@ -57,33 +57,37 @@ logger = logging.getLogger(__name__)
 # Lazy service imports to avoid circular dependencies
 def _get_price_service():
     from investigator.domain.services.market_data import PriceService
+
     return PriceService()
 
 
 def _get_shares_service():
     from investigator.domain.services.market_data import SharesService
+
     return SharesService()
 
 
 def _get_metadata_service():
     from investigator.domain.services.market_data import SymbolMetadataService
+
     return SymbolMetadataService()
 
 
 def _get_technical_service():
     from investigator.domain.services.market_data import get_technical_analysis_service
+
     return get_technical_analysis_service()
 
 
 def _get_financial_data_service():
     from investigator.domain.services.valuation_shared import FinancialDataService
+
     return FinancialDataService()
 
 
 def _get_sector_multiples_service():
-    from investigator.domain.services.valuation_shared import (
-        ValuationConfigService, SectorMultiplesService
-    )
+    from investigator.domain.services.valuation_shared import SectorMultiplesService, ValuationConfigService
+
     config = ValuationConfigService()
     return SectorMultiplesService(config)
 
@@ -91,9 +95,7 @@ def _get_sector_multiples_service():
 class HandlerBase:
     """Base class for investment handlers with common input extraction."""
 
-    def _get_input(
-        self, node: "ComputeNode", context: "WorkflowContext", key: str, default: Any = None
-    ) -> Any:
+    def _get_input(self, node: "ComputeNode", context: "WorkflowContext", key: str, default: Any = None) -> Any:
         """Get input value from node mapping or context."""
         value = node.input_mapping.get(key)
         if isinstance(value, str) and value.startswith("$ctx."):
@@ -145,11 +147,11 @@ class ValuationComputeHandler(HandlerBase):
             )
 
         try:
-            from investigator.domain.services.parallel_valuation_orchestrator import (
-                ParallelValuationOrchestrator,
-            )
             from investigator.domain.services.dynamic_model_weighting import (
                 DynamicModelWeightingService,
+            )
+            from investigator.domain.services.parallel_valuation_orchestrator import (
+                ParallelValuationOrchestrator,
             )
 
             # Get metadata for sector-specific routing
@@ -165,6 +167,7 @@ class ValuationComputeHandler(HandlerBase):
 
             # Get dynamic weights for model blending
             import yaml
+
             with open("config.yaml", "r") as f:
                 config = yaml.safe_load(f)
             valuation_config = config.get("valuation", {})
@@ -255,18 +258,14 @@ class RLWeightDecisionHandler(HandlerBase):
         # Dual policy paths (preferred)
         use_dual_policy = self._get_input(node, context, "use_dual_policy", True)
         technical_policy_path = self._get_input(
-            node, context, "technical_policy_path",
-            "data/rl_models/active_technical_policy.pkl"
+            node, context, "technical_policy_path", "data/rl_models/active_technical_policy.pkl"
         )
         fundamental_policy_path = self._get_input(
-            node, context, "fundamental_policy_path",
-            "data/rl_models/active_fundamental_policy.pkl"
+            node, context, "fundamental_policy_path", "data/rl_models/active_fundamental_policy.pkl"
         )
 
         # Legacy single policy path (fallback)
-        policy_path = self._get_input(
-            node, context, "policy_path", "data/rl_models/active_policy.pkl"
-        )
+        policy_path = self._get_input(node, context, "policy_path", "data/rl_models/active_policy.pkl")
 
         if not symbol:
             return NodeResult(
@@ -277,15 +276,16 @@ class RLWeightDecisionHandler(HandlerBase):
             )
 
         try:
-            from investigator.domain.services.rl.rl_model_weighting import (
-                RLModelWeightingService,
-            )
+            # Load config for fallback service
+            import yaml
+
             from investigator.domain.services.dynamic_model_weighting import (
                 DynamicModelWeightingService,
             )
+            from investigator.domain.services.rl.rl_model_weighting import (
+                RLModelWeightingService,
+            )
 
-            # Load config for fallback service
-            import yaml
             with open("config.yaml", "r") as f:
                 config = yaml.safe_load(f)
             valuation_config = config.get("valuation", {})
@@ -311,14 +311,14 @@ class RLWeightDecisionHandler(HandlerBase):
 
             # Check which policy was used
             dual_active = rl_service.is_dual_policy_active()
-            single_active = hasattr(rl_service, 'policy') and rl_service.policy and rl_service.policy.is_ready()
+            single_active = hasattr(rl_service, "policy") and rl_service.policy and rl_service.policy.is_ready()
 
             # Extract additional metadata from audit trail
             position = None
             position_confidence = None
             holding_period = None
             industry_category = None
-            if weight_audit and hasattr(weight_audit, 'metadata') and weight_audit.metadata:
+            if weight_audit and hasattr(weight_audit, "metadata") and weight_audit.metadata:
                 position = weight_audit.metadata.get("position")
                 position_confidence = weight_audit.metadata.get("position_confidence")
                 holding_period = weight_audit.metadata.get("holding_period")
@@ -328,11 +328,7 @@ class RLWeightDecisionHandler(HandlerBase):
                 "symbol": symbol,
                 "weights": weights,
                 "tier": tier,
-                "policy_used": (
-                    "dual_rl" if dual_active else
-                    "single_rl" if single_active else
-                    "fallback_rule_based"
-                ),
+                "policy_used": ("dual_rl" if dual_active else "single_rl" if single_active else "fallback_rule_based"),
                 "rl_active": dual_active or single_active,
                 "dual_policy_active": dual_active,
                 "position_signal": position,  # -1=short, 0=skip, 1=long
@@ -521,6 +517,7 @@ class SectorValuationHandler(HandlerBase):
             # Route to sector-specific valuation
             if sector == "Financials" and "bank" in industry.lower():
                 from investigator.domain.services.valuation.bank_valuation import value_bank
+
                 bank_result = value_bank(symbol, financials, current_price, shares)
                 if bank_result and bank_result.fair_value:
                     result["model_used"] = "bank_pb"
@@ -528,6 +525,7 @@ class SectorValuationHandler(HandlerBase):
 
             elif sector == "Real Estate":
                 from investigator.domain.services.valuation.reit_valuation import value_reit
+
                 reit_result = value_reit(symbol, financials, current_price, shares)
                 if reit_result and reit_result.fair_value:
                     result["model_used"] = "reit_ffo"
@@ -535,6 +533,7 @@ class SectorValuationHandler(HandlerBase):
 
             elif "insurance" in industry.lower():
                 from investigator.domain.services.valuation.insurance_valuation import value_insurance_company
+
                 ins_result = value_insurance_company(symbol, financials, current_price, shares)
                 if ins_result:
                     result["model_used"] = "insurance_combined_ratio"
@@ -542,6 +541,7 @@ class SectorValuationHandler(HandlerBase):
 
             elif "semiconductor" in industry.lower():
                 from investigator.domain.services.valuation.semiconductor_valuation import value_semiconductor
+
                 semi_result = value_semiconductor(symbol, financials, current_price, shares)
                 if semi_result and semi_result.fair_value:
                     result["model_used"] = "semiconductor_cycle"
@@ -631,6 +631,7 @@ class PriceDataFetchHandler(HandlerBase):
 
             # Get price history
             from datetime import timedelta
+
             start_date = target_date - timedelta(days=lookback_days)
             price_history = price_service.get_price_history(symbol, start_date, target_date)
 

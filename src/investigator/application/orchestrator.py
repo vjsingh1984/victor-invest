@@ -36,14 +36,14 @@ from investigator.domain.agents.base import TaskStatus as AgentStatus
 from investigator.domain.agents.fundamental import FundamentalAnalysisAgent
 from investigator.domain.agents.market_context import ETFMarketContextAgent
 from investigator.domain.agents.sec import SECAnalysisAgent
-from investigator.domain.agents.synthesis import SynthesisAgent
 from investigator.domain.agents.symbol_update import SymbolUpdateAgent
+from investigator.domain.agents.synthesis import SynthesisAgent
 from investigator.domain.agents.technical import TechnicalAnalysisAgent
 from investigator.infrastructure.cache.cache_manager import CacheManager
 from investigator.infrastructure.database.market_data import get_market_data_fetcher
+from investigator.infrastructure.events import EventBus
 from investigator.infrastructure.llm.ollama import OllamaClient
 from investigator.infrastructure.llm.pool import create_resource_aware_pool
-from investigator.infrastructure.events import EventBus
 from investigator.infrastructure.monitoring import MetricsCollector
 
 
@@ -136,6 +136,7 @@ class AgentOrchestrator:
         # Initialize DataSourceManager for unified data access (Phase 1)
         try:
             from investigator.domain.services.data_sources.manager import DataSourceManager
+
             self.data_source_manager = DataSourceManager()
             self._logger.info("DataSourceManager initialized for unified data access")
         except Exception as e:

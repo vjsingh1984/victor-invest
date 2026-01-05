@@ -49,11 +49,12 @@ TRIMMED_PCE_URL = "https://www.dallasfed.org/-/media/Documents/research/pce/pce_
 
 class RegionalOutlook(Enum):
     """Classification of regional activity."""
+
     STRONG_CONTRACTION = "strong_contraction"  # < -15
-    CONTRACTION = "contraction"                # -15 to 0
-    WEAK_EXPANSION = "weak_expansion"          # 0 to 10
+    CONTRACTION = "contraction"  # -15 to 0
+    WEAK_EXPANSION = "weak_expansion"  # 0 to 10
     MODERATE_EXPANSION = "moderate_expansion"  # 10 to 20
-    STRONG_EXPANSION = "strong_expansion"      # > 20
+    STRONG_EXPANSION = "strong_expansion"  # > 20
 
 
 @dataclass
@@ -80,6 +81,7 @@ class TexasManufacturing:
         future_employment: 6-month employment expectations
         outlook: Classified activity level
     """
+
     date: date
     production_index: float
     new_orders_index: Optional[float] = None
@@ -139,6 +141,7 @@ class TexasServices:
         future_revenue: 6-month revenue expectations
         outlook: Classified activity level
     """
+
     date: date
     revenue_index: float
     employment_index: Optional[float] = None
@@ -179,6 +182,7 @@ class TrimmedMeanPCE:
         six_month_annualized: 6-month change (annualized)
         twelve_month: 12-month change
     """
+
     date: date
     one_month_annualized: float
     six_month_annualized: Optional[float] = None
@@ -208,6 +212,7 @@ class DallasFedClient:
         if self._session is None:
             try:
                 from investigator.infrastructure.external.http_client import create_session
+
                 self._session = await create_session()
             except ImportError:
                 self._session = aiohttp.ClientSession()
@@ -241,6 +246,7 @@ class DallasFedClient:
         """Parse Texas Manufacturing data from Excel."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -259,11 +265,11 @@ class DallasFedClient:
                         return col
                 return None
 
-            prod_col = find_col('production') or df.columns[1]
-            orders_col = find_col('new order')
-            emp_col = find_col('employment')
-            gba_col = find_col('general business')
-            future_col = find_col('future') and find_col('production')
+            prod_col = find_col("production") or df.columns[1]
+            orders_col = find_col("new order")
+            emp_col = find_col("employment")
+            gba_col = find_col("general business")
+            future_col = find_col("future") and find_col("production")
 
             return TexasManufacturing(
                 date=obs_date,
@@ -300,6 +306,7 @@ class DallasFedClient:
         """Parse Texas Services data from Excel."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -318,9 +325,9 @@ class DallasFedClient:
                         return col
                 return None
 
-            rev_col = find_col('revenue') or df.columns[1]
-            emp_col = find_col('employment')
-            gba_col = find_col('general business')
+            rev_col = find_col("revenue") or df.columns[1]
+            emp_col = find_col("employment")
+            gba_col = find_col("general business")
 
             return TexasServices(
                 date=obs_date,
@@ -355,6 +362,7 @@ class DallasFedClient:
         """Parse Trimmed Mean PCE from Excel."""
         try:
             import io
+
             import pandas as pd
 
             df = pd.read_excel(io.BytesIO(content), sheet_name=0)
@@ -373,9 +381,9 @@ class DallasFedClient:
                         return col
                 return None
 
-            one_m = find_col('1-month') or find_col('1 month')
-            six_m = find_col('6-month') or find_col('6 month')
-            twelve_m = find_col('12-month') or find_col('12 month') or find_col('year')
+            one_m = find_col("1-month") or find_col("1 month")
+            six_m = find_col("6-month") or find_col("6 month")
+            twelve_m = find_col("12-month") or find_col("12 month") or find_col("year")
 
             return TrimmedMeanPCE(
                 date=obs_date,

@@ -39,22 +39,24 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class ValidationSeverity(Enum):
     """Severity level for validation issues."""
-    ERROR = "error"        # Invalid, cannot proceed
-    WARNING = "warning"    # Unusual but allowed
-    INFO = "info"          # Notable but normal
+
+    ERROR = "error"  # Invalid, cannot proceed
+    WARNING = "warning"  # Unusual but allowed
+    INFO = "info"  # Notable but normal
 
 
 @dataclass
 class ValidationIssue:
     """A single validation issue."""
+
     field: str
     value: Any
     severity: ValidationSeverity
@@ -65,6 +67,7 @@ class ValidationIssue:
 @dataclass
 class BoundsValidationResult:
     """Result of bounds validation."""
+
     is_valid: bool
     issues: List[ValidationIssue] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -116,63 +119,63 @@ class BoundsChecker:
 
     # Default bounds for model inputs
     INPUT_BOUNDS = {
-        'dcf': {
-            'growth_rate': (-0.50, 1.00),           # -50% to +100%
-            'discount_rate': (0.05, 0.25),          # 5% to 25%
-            'terminal_growth': (-0.02, 0.05),       # -2% to 5%
-            'fcf': (-1e12, 1e12),                   # Reasonable FCF range
-            'revenue': (0, 1e13),                   # Up to $10T
-            'shares_outstanding': (1, 1e11),        # At least 1 share
+        "dcf": {
+            "growth_rate": (-0.50, 1.00),  # -50% to +100%
+            "discount_rate": (0.05, 0.25),  # 5% to 25%
+            "terminal_growth": (-0.02, 0.05),  # -2% to 5%
+            "fcf": (-1e12, 1e12),  # Reasonable FCF range
+            "revenue": (0, 1e13),  # Up to $10T
+            "shares_outstanding": (1, 1e11),  # At least 1 share
         },
-        'pe': {
-            'eps': (-1000, 1000),                   # EPS range
-            'pe_ratio': (1, 500),                   # P/E 1x to 500x
-            'growth_rate': (-0.50, 1.00),
+        "pe": {
+            "eps": (-1000, 1000),  # EPS range
+            "pe_ratio": (1, 500),  # P/E 1x to 500x
+            "growth_rate": (-0.50, 1.00),
         },
-        'ps': {
-            'revenue': (0, 1e13),
-            'ps_ratio': (0.1, 50),                  # P/S 0.1x to 50x
-            'growth_rate': (-0.50, 2.00),           # Higher for growth
+        "ps": {
+            "revenue": (0, 1e13),
+            "ps_ratio": (0.1, 50),  # P/S 0.1x to 50x
+            "growth_rate": (-0.50, 2.00),  # Higher for growth
         },
-        'ggm': {
-            'dividend': (0, 1e12),
-            'growth_rate': (-0.10, 0.15),           # Conservative for dividends
-            'required_return': (0.05, 0.20),
+        "ggm": {
+            "dividend": (0, 1e12),
+            "growth_rate": (-0.10, 0.15),  # Conservative for dividends
+            "required_return": (0.05, 0.20),
         },
-        'ev_ebitda': {
-            'ebitda': (-1e12, 1e12),
-            'ev_ebitda_multiple': (1, 50),
-            'net_debt': (-1e12, 1e12),
+        "ev_ebitda": {
+            "ebitda": (-1e12, 1e12),
+            "ev_ebitda_multiple": (1, 50),
+            "net_debt": (-1e12, 1e12),
         },
-        'rule_of_40': {
-            'revenue_growth': (-0.50, 2.00),
-            'fcf_margin': (-1.00, 0.50),
-            'score': (-50, 100),
+        "rule_of_40": {
+            "revenue_growth": (-0.50, 2.00),
+            "fcf_margin": (-1.00, 0.50),
+            "score": (-50, 100),
         },
     }
 
     # Warning thresholds (unusual but allowed)
     WARNING_THRESHOLDS = {
-        'growth_rate': (0.50, 'Growth rate > 50% is unusual'),
-        'discount_rate': (0.20, 'Discount rate > 20% is very high'),
-        'pe_ratio': (100, 'P/E > 100x is extreme'),
-        'ps_ratio': (20, 'P/S > 20x is extreme'),
+        "growth_rate": (0.50, "Growth rate > 50% is unusual"),
+        "discount_rate": (0.20, "Discount rate > 20% is very high"),
+        "pe_ratio": (100, "P/E > 100x is extreme"),
+        "ps_ratio": (20, "P/S > 20x is extreme"),
     }
 
     # Fair value ratio bounds (fair value / current price)
     FAIR_VALUE_RATIO_BOUNDS = {
-        'default': (0.10, 10.0),      # 0.1x to 10x current price
-        'dcf': (0.20, 5.0),           # DCF typically more conservative
-        'pe': (0.25, 4.0),
-        'ps': (0.10, 10.0),           # P/S can have wider range
-        'ggm': (0.50, 3.0),           # GGM is conservative
+        "default": (0.10, 10.0),  # 0.1x to 10x current price
+        "dcf": (0.20, 5.0),  # DCF typically more conservative
+        "pe": (0.25, 4.0),
+        "ps": (0.10, 10.0),  # P/S can have wider range
+        "ggm": (0.50, 3.0),  # GGM is conservative
     }
 
     def __init__(
         self,
         input_bounds: Optional[Dict[str, Dict[str, Tuple[float, float]]]] = None,
         fair_value_ratio_bounds: Optional[Dict[str, Tuple[float, float]]] = None,
-        strict_mode: bool = False
+        strict_mode: bool = False,
     ):
         """
         Initialize bounds checker.
@@ -197,10 +200,7 @@ class BoundsChecker:
             self.fair_value_ratio_bounds.update(fair_value_ratio_bounds)
 
     def validate_inputs(
-        self,
-        model_type: str,
-        inputs: Dict[str, Any],
-        symbol: Optional[str] = None
+        self, model_type: str, inputs: Dict[str, Any], symbol: Optional[str] = None
     ) -> BoundsValidationResult:
         """
         Validate inputs for a valuation model.
@@ -229,35 +229,41 @@ class BoundsChecker:
 
                     # Check bounds
                     if num_value < min_val or num_value > max_val:
-                        issues.append(ValidationIssue(
-                            field=field,
-                            value=num_value,
-                            severity=ValidationSeverity.ERROR,
-                            message=f"{field}={num_value:.4f} outside bounds [{min_val}, {max_val}]",
-                            suggested_action=f"Clamp to bounds or review data source"
-                        ))
+                        issues.append(
+                            ValidationIssue(
+                                field=field,
+                                value=num_value,
+                                severity=ValidationSeverity.ERROR,
+                                message=f"{field}={num_value:.4f} outside bounds [{min_val}, {max_val}]",
+                                suggested_action=f"Clamp to bounds or review data source",
+                            )
+                        )
 
                     # Check warning thresholds
                     elif field in self.WARNING_THRESHOLDS:
                         threshold, warning_msg = self.WARNING_THRESHOLDS[field]
                         if abs(num_value) > threshold:
                             severity = ValidationSeverity.ERROR if self.strict_mode else ValidationSeverity.WARNING
-                            issues.append(ValidationIssue(
-                                field=field,
-                                value=num_value,
-                                severity=severity,
-                                message=warning_msg,
-                                suggested_action="Review assumptions"
-                            ))
+                            issues.append(
+                                ValidationIssue(
+                                    field=field,
+                                    value=num_value,
+                                    severity=severity,
+                                    message=warning_msg,
+                                    suggested_action="Review assumptions",
+                                )
+                            )
 
                 except (TypeError, ValueError) as e:
-                    issues.append(ValidationIssue(
-                        field=field,
-                        value=value,
-                        severity=ValidationSeverity.ERROR,
-                        message=f"{field} is not a valid number: {value}",
-                        suggested_action="Provide numeric value"
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            field=field,
+                            value=value,
+                            severity=ValidationSeverity.ERROR,
+                            message=f"{field} is not a valid number: {value}",
+                            suggested_action="Provide numeric value",
+                        )
+                    )
 
         # Check for required fields that are missing or zero
         self._check_required_fields(model_type, inputs, issues)
@@ -273,39 +279,32 @@ class BoundsChecker:
 
         return BoundsValidationResult(is_valid=is_valid, issues=issues)
 
-    def _check_required_fields(
-        self,
-        model_type: str,
-        inputs: Dict[str, Any],
-        issues: List[ValidationIssue]
-    ) -> None:
+    def _check_required_fields(self, model_type: str, inputs: Dict[str, Any], issues: List[ValidationIssue]) -> None:
         """Check for required fields by model type."""
         required_fields = {
-            'dcf': ['discount_rate', 'shares_outstanding'],
-            'pe': ['eps', 'pe_ratio'],
-            'ps': ['revenue', 'ps_ratio'],
-            'ggm': ['dividend', 'growth_rate', 'required_return'],
-            'ev_ebitda': ['ebitda', 'ev_ebitda_multiple'],
+            "dcf": ["discount_rate", "shares_outstanding"],
+            "pe": ["eps", "pe_ratio"],
+            "ps": ["revenue", "ps_ratio"],
+            "ggm": ["dividend", "growth_rate", "required_return"],
+            "ev_ebitda": ["ebitda", "ev_ebitda_multiple"],
         }
 
         if model_type in required_fields:
             for field in required_fields[model_type]:
                 value = inputs.get(field)
                 if value is None:
-                    issues.append(ValidationIssue(
-                        field=field,
-                        value=None,
-                        severity=ValidationSeverity.ERROR,
-                        message=f"Required field '{field}' is missing for {model_type}",
-                        suggested_action="Provide required input"
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            field=field,
+                            value=None,
+                            severity=ValidationSeverity.ERROR,
+                            message=f"Required field '{field}' is missing for {model_type}",
+                            suggested_action="Provide required input",
+                        )
+                    )
 
     def validate_output(
-        self,
-        fair_value: float,
-        current_price: float,
-        model_type: str = 'default',
-        symbol: Optional[str] = None
+        self, fair_value: float, current_price: float, model_type: str = "default", symbol: Optional[str] = None
     ) -> BoundsValidationResult:
         """
         Validate output fair value against reasonable bounds.
@@ -323,66 +322,73 @@ class BoundsChecker:
 
         # Check for invalid values
         if fair_value is None or current_price is None:
-            issues.append(ValidationIssue(
-                field='fair_value',
-                value=fair_value,
-                severity=ValidationSeverity.ERROR,
-                message="Fair value or current price is None",
-                suggested_action="Check model calculation"
-            ))
+            issues.append(
+                ValidationIssue(
+                    field="fair_value",
+                    value=fair_value,
+                    severity=ValidationSeverity.ERROR,
+                    message="Fair value or current price is None",
+                    suggested_action="Check model calculation",
+                )
+            )
             return BoundsValidationResult(is_valid=False, issues=issues)
 
         if fair_value <= 0:
-            issues.append(ValidationIssue(
-                field='fair_value',
-                value=fair_value,
-                severity=ValidationSeverity.ERROR,
-                message=f"Fair value {fair_value:.2f} is non-positive",
-                suggested_action="Review model inputs - may indicate negative FCF or other issues"
-            ))
+            issues.append(
+                ValidationIssue(
+                    field="fair_value",
+                    value=fair_value,
+                    severity=ValidationSeverity.ERROR,
+                    message=f"Fair value {fair_value:.2f} is non-positive",
+                    suggested_action="Review model inputs - may indicate negative FCF or other issues",
+                )
+            )
             return BoundsValidationResult(is_valid=False, issues=issues)
 
         if current_price <= 0:
-            issues.append(ValidationIssue(
-                field='current_price',
-                value=current_price,
-                severity=ValidationSeverity.ERROR,
-                message=f"Current price {current_price:.2f} is non-positive",
-                suggested_action="Verify market data"
-            ))
+            issues.append(
+                ValidationIssue(
+                    field="current_price",
+                    value=current_price,
+                    severity=ValidationSeverity.ERROR,
+                    message=f"Current price {current_price:.2f} is non-positive",
+                    suggested_action="Verify market data",
+                )
+            )
             return BoundsValidationResult(is_valid=False, issues=issues)
 
         # Calculate fair value ratio
         fv_ratio = fair_value / current_price
 
         # Get bounds for this model type
-        bounds = self.fair_value_ratio_bounds.get(
-            model_type,
-            self.fair_value_ratio_bounds['default']
-        )
+        bounds = self.fair_value_ratio_bounds.get(model_type, self.fair_value_ratio_bounds["default"])
         min_ratio, max_ratio = bounds
 
         if fv_ratio < min_ratio:
             severity = ValidationSeverity.ERROR if self.strict_mode else ValidationSeverity.WARNING
-            issues.append(ValidationIssue(
-                field='fair_value_ratio',
-                value=fv_ratio,
-                severity=severity,
-                message=f"Fair value {fair_value:.2f} is only {fv_ratio:.2f}x current price "
-                        f"(below {min_ratio}x threshold)",
-                suggested_action="Review model inputs - fair value may be too conservative"
-            ))
+            issues.append(
+                ValidationIssue(
+                    field="fair_value_ratio",
+                    value=fv_ratio,
+                    severity=severity,
+                    message=f"Fair value {fair_value:.2f} is only {fv_ratio:.2f}x current price "
+                    f"(below {min_ratio}x threshold)",
+                    suggested_action="Review model inputs - fair value may be too conservative",
+                )
+            )
 
         elif fv_ratio > max_ratio:
             severity = ValidationSeverity.ERROR if self.strict_mode else ValidationSeverity.WARNING
-            issues.append(ValidationIssue(
-                field='fair_value_ratio',
-                value=fv_ratio,
-                severity=severity,
-                message=f"Fair value {fair_value:.2f} is {fv_ratio:.2f}x current price "
-                        f"(above {max_ratio}x threshold)",
-                suggested_action="Review model inputs - fair value may be too aggressive"
-            ))
+            issues.append(
+                ValidationIssue(
+                    field="fair_value_ratio",
+                    value=fv_ratio,
+                    severity=severity,
+                    message=f"Fair value {fair_value:.2f} is {fv_ratio:.2f}x current price "
+                    f"(above {max_ratio}x threshold)",
+                    suggested_action="Review model inputs - fair value may be too aggressive",
+                )
+            )
 
         is_valid = not any(i.severity == ValidationSeverity.ERROR for i in issues)
 
@@ -394,12 +400,7 @@ class BoundsChecker:
 
         return BoundsValidationResult(is_valid=is_valid, issues=issues)
 
-    def clamp_to_bounds(
-        self,
-        model_type: str,
-        field: str,
-        value: float
-    ) -> Tuple[float, bool]:
+    def clamp_to_bounds(self, model_type: str, field: str, value: float) -> Tuple[float, bool]:
         """
         Clamp a value to its defined bounds.
 
@@ -427,11 +428,7 @@ class BoundsChecker:
 
         return (value, False)
 
-    def get_bounds(
-        self,
-        model_type: str,
-        field: str
-    ) -> Optional[Tuple[float, float]]:
+    def get_bounds(self, model_type: str, field: str) -> Optional[Tuple[float, float]]:
         """
         Get bounds for a specific model/field combination.
 

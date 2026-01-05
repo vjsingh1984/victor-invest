@@ -58,10 +58,10 @@ DESIGN PRINCIPLE: Tools are mode-agnostic. The orchestration layer
 See: docs/ARCHITECTURE_DECISION_DATA_ACCESS.md for full rationale.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,7 @@ class ToolResult:
             warnings=["Attempted cache lookup"]
         )
     """
+
     success: bool
     output: Optional[Any] = None  # Named 'output' for Victor framework compatibility
     error: Optional[str] = None
@@ -127,33 +128,19 @@ class ToolResult:
 
     @classmethod
     def success_result(
-        cls,
-        data: Dict[str, Any],
-        warnings: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        cls, data: Dict[str, Any], warnings: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None
     ) -> "ToolResult":
         """Factory method for successful results."""
         return cls(
-            success=True,
-            output=data,  # Map data arg to output field
-            warnings=warnings or [],
-            metadata=metadata or {}
+            success=True, output=data, warnings=warnings or [], metadata=metadata or {}  # Map data arg to output field
         )
 
     @classmethod
     def error_result(
-        cls,
-        error: str,
-        warnings: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        cls, error: str, warnings: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None
     ) -> "ToolResult":
         """Factory method for error results."""
-        return cls(
-            success=False,
-            error=error,
-            warnings=warnings or [],
-            metadata=metadata or {}
-        )
+        return cls(success=False, error=error, warnings=warnings or [], metadata=metadata or {})
 
 
 class BaseTool(ABC):
@@ -239,11 +226,7 @@ class BaseTool(ABC):
         Returns:
             JSON Schema dict describing tool parameters
         """
-        return {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        return {"type": "object", "properties": {}, "required": []}
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name='{self.name}'>"

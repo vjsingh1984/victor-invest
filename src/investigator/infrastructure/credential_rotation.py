@@ -28,19 +28,20 @@ Usage:
     pending = scheduler.get_pending_rotations()
 """
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-import json
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class RotationStatus(Enum):
     """Status of a credential rotation."""
+
     SCHEDULED = "scheduled"
     PENDING = "pending"  # Due soon
     OVERDUE = "overdue"
@@ -61,6 +62,7 @@ class RotationPolicy:
         rotation_callback: Optional callback for custom rotation logic
         require_approval: Whether rotation requires human approval
     """
+
     credential_name: str
     rotation_interval_days: int = 90
     notify_before_days: int = 14
@@ -96,6 +98,7 @@ class RotationPolicy:
 @dataclass
 class RotationRecord:
     """Record of a credential rotation event."""
+
     credential_name: str
     rotation_date: datetime
     status: RotationStatus
@@ -118,6 +121,7 @@ class RotationRecord:
 @dataclass
 class RotationScheduleEntry:
     """Scheduled rotation for a credential."""
+
     credential_name: str
     policy: RotationPolicy
     last_rotation: Optional[datetime] = None
@@ -191,8 +195,9 @@ class RotationScheduler:
         )
 
         self._schedules[policy.credential_name] = entry
-        logger.info(f"Added rotation policy for {policy.credential_name}: "
-                   f"rotate every {policy.rotation_interval_days} days")
+        logger.info(
+            f"Added rotation policy for {policy.credential_name}: " f"rotate every {policy.rotation_interval_days} days"
+        )
 
     def remove_policy(self, credential_name: str) -> None:
         """Remove rotation policy for a credential."""
@@ -229,9 +234,7 @@ class RotationScheduler:
         if credential_name in self._schedules:
             entry = self._schedules[credential_name]
             entry.last_rotation = now
-            entry.next_rotation = now + timedelta(
-                days=entry.policy.rotation_interval_days
-            )
+            entry.next_rotation = now + timedelta(days=entry.policy.rotation_interval_days)
             entry.status = RotationStatus.SCHEDULED
 
         logger.info(f"Recorded rotation for {credential_name} by {rotated_by}")

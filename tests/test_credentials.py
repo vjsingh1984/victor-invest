@@ -13,10 +13,11 @@ Run with: pytest tests/test_credentials.py -v
 """
 
 import os
-import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestDatabaseCredentials:
@@ -27,13 +28,16 @@ class TestDatabaseCredentials:
         from investigator.infrastructure.credentials import get_database_credentials
 
         # Set up environment
-        with patch.dict(os.environ, {
-            "SEC_DB_HOST": "test-host",
-            "SEC_DB_PORT": "5432",
-            "SEC_DB_NAME": "test_db",
-            "SEC_DB_USER": "test_user",
-            "SEC_DB_PASSWORD": "test_pass",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "SEC_DB_HOST": "test-host",
+                "SEC_DB_PORT": "5432",
+                "SEC_DB_NAME": "test_db",
+                "SEC_DB_USER": "test_user",
+                "SEC_DB_PASSWORD": "test_pass",
+            },
+        ):
             creds = get_database_credentials("sec")
 
             assert creds.host == "test-host"
@@ -73,11 +77,12 @@ class TestNodeCredentialContext:
 
     def test_from_node_extracts_requirements(self):
         """Test credential requirement extraction from node."""
-        from investigator.infrastructure.node_credentials import (
-            NodeCredentialContext,
-            CredentialType,
-        )
         from dataclasses import dataclass
+
+        from investigator.infrastructure.node_credentials import (
+            CredentialType,
+            NodeCredentialContext,
+        )
 
         @dataclass
         class MockNode:
@@ -89,7 +94,7 @@ class TestNodeCredentialContext:
             credentials_required=[
                 {"type": "database", "name": "sec", "required": True},
                 {"type": "api_key", "name": "anthropic", "required": False},
-            ]
+            ],
         )
 
         ctx = NodeCredentialContext.from_node(node, None)
@@ -103,18 +108,21 @@ class TestNodeCredentialContext:
     def test_validate_requirements(self):
         """Test credential validation."""
         from investigator.infrastructure.node_credentials import (
-            NodeCredentialContext,
             CredentialRequirement,
             CredentialType,
+            NodeCredentialContext,
         )
 
-        with patch.dict(os.environ, {
-            "SEC_DB_HOST": "localhost",
-            "SEC_DB_PORT": "5432",
-            "SEC_DB_NAME": "sec_db",
-            "SEC_DB_USER": "user",
-            "SEC_DB_PASSWORD": "pass",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "SEC_DB_HOST": "localhost",
+                "SEC_DB_PORT": "5432",
+                "SEC_DB_NAME": "sec_db",
+                "SEC_DB_USER": "user",
+                "SEC_DB_PASSWORD": "pass",
+            },
+        ):
             ctx = NodeCredentialContext(
                 node_id="test",
                 requirements=[
@@ -123,7 +131,7 @@ class TestNodeCredentialContext:
                         name="sec",
                         required=True,
                     )
-                ]
+                ],
             )
 
             errors = ctx.validate_requirements()
@@ -234,13 +242,16 @@ class TestMCPCredentials:
             MCPServerCredentials,
         )
 
-        with patch.dict(os.environ, {
-            "SEC_DB_HOST": "localhost",
-            "SEC_DB_PORT": "5432",
-            "SEC_DB_NAME": "sec_db",
-            "SEC_DB_USER": "user",
-            "SEC_DB_PASSWORD": "pass",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "SEC_DB_HOST": "localhost",
+                "SEC_DB_PORT": "5432",
+                "SEC_DB_NAME": "sec_db",
+                "SEC_DB_USER": "user",
+                "SEC_DB_PASSWORD": "pass",
+            },
+        ):
             resolver = MCPCredentialResolver()
             db_creds = resolver.resolve_database("sec")
 
@@ -250,18 +261,21 @@ class TestMCPCredentials:
     def test_inject_mcp_credentials(self):
         """Test credential injection into MCP server config."""
         from investigator.infrastructure.mcp_credentials import (
-            MCPServerCredentials,
             MCPCredentialResolver,
+            MCPServerCredentials,
             inject_mcp_credentials,
         )
 
-        with patch.dict(os.environ, {
-            "SEC_DB_HOST": "localhost",
-            "SEC_DB_PORT": "5432",
-            "SEC_DB_NAME": "sec_db",
-            "SEC_DB_USER": "user",
-            "SEC_DB_PASSWORD": "pass",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "SEC_DB_HOST": "localhost",
+                "SEC_DB_PORT": "5432",
+                "SEC_DB_NAME": "sec_db",
+                "SEC_DB_USER": "user",
+                "SEC_DB_PASSWORD": "pass",
+            },
+        ):
             server_creds = MCPServerCredentials(
                 server_name="test",
                 required_credentials=["sec_db"],
@@ -279,8 +293,8 @@ class TestMCPCredentials:
     def test_mcp_auth_types(self):
         """Test MCP authentication type configuration."""
         from investigator.infrastructure.mcp_credentials import (
-            MCPClientAuth,
             MCPAuthType,
+            MCPClientAuth,
         )
 
         auth = MCPClientAuth(
@@ -304,8 +318,8 @@ class TestCredentialRotation:
     def test_add_rotation_policy(self):
         """Test adding rotation policy."""
         from investigator.infrastructure.credential_rotation import (
-            RotationScheduler,
             RotationPolicy,
+            RotationScheduler,
         )
 
         scheduler = RotationScheduler()
@@ -325,15 +339,17 @@ class TestCredentialRotation:
     def test_record_rotation(self):
         """Test recording a rotation event."""
         from investigator.infrastructure.credential_rotation import (
-            RotationScheduler,
             RotationPolicy,
+            RotationScheduler,
         )
 
         scheduler = RotationScheduler()
-        scheduler.add_policy(RotationPolicy(
-            credential_name="test:cred",
-            rotation_interval_days=30,
-        ))
+        scheduler.add_policy(
+            RotationPolicy(
+                credential_name="test:cred",
+                rotation_interval_days=30,
+            )
+        )
 
         scheduler.record_rotation("test:cred", rotated_by="admin")
 
@@ -347,16 +363,18 @@ class TestCredentialRotation:
     def test_get_pending_rotations(self):
         """Test getting pending rotations."""
         from investigator.infrastructure.credential_rotation import (
-            RotationScheduler,
             RotationPolicy,
+            RotationScheduler,
         )
 
         scheduler = RotationScheduler()
-        scheduler.add_policy(RotationPolicy(
-            credential_name="test:cred",
-            rotation_interval_days=30,
-            notify_before_days=14,
-        ))
+        scheduler.add_policy(
+            RotationPolicy(
+                credential_name="test:cred",
+                rotation_interval_days=30,
+                notify_before_days=14,
+            )
+        )
 
         # Force entry to be pending
         entry = scheduler.get_schedule("test:cred")
@@ -385,7 +403,7 @@ class TestCredentialSanitizer:
         """Test credential redaction."""
         from investigator.infrastructure.credential_sanitizer import redact_credentials
 
-        text = 'password=mysupersecretpassword'
+        text = "password=mysupersecretpassword"
         redacted = redact_credentials(text)
 
         assert "mysupersecretpassword" not in redacted
@@ -401,7 +419,7 @@ class TestCredentialSanitizer:
             "safe_key": "safe_value",
             "config": {
                 "database_password": "secretpassword123",
-            }
+            },
         }
 
         result = sanitizer.scan(data)
@@ -413,8 +431,8 @@ class TestCredentialSanitizer:
     def test_strict_mode_raises_exception(self):
         """Test that strict mode raises exception on credential detection."""
         from investigator.infrastructure.credential_sanitizer import (
-            CredentialSanitizer,
             CredentialLeakageError,
+            CredentialSanitizer,
         )
 
         sanitizer = CredentialSanitizer(strict_mode=True)
@@ -437,10 +455,7 @@ class TestCredentialWorkflowIntegration:
         nodes = comprehensive.get("nodes", [])
 
         # Find fetch_sec_data node
-        sec_node = next(
-            (n for n in nodes if n.get("id") == "fetch_sec_data"),
-            None
-        )
+        sec_node = next((n for n in nodes if n.get("id") == "fetch_sec_data"), None)
 
         assert sec_node is not None
         assert "credentials_required" in sec_node
@@ -451,6 +466,7 @@ class TestCredentialWorkflowIntegration:
     def test_credential_validator_with_workflow(self):
         """Test credential validation against workflow definition."""
         import yaml
+
         from investigator.infrastructure.node_credentials import CredentialValidator
 
         with open("victor_invest/workflows/comprehensive.yaml") as f:
@@ -459,18 +475,21 @@ class TestCredentialWorkflowIntegration:
         comprehensive = workflow_def["workflows"]["comprehensive"]
 
         # This should work if environment is set up
-        with patch.dict(os.environ, {
-            "SEC_DB_HOST": "localhost",
-            "SEC_DB_PORT": "5432",
-            "SEC_DB_NAME": "sec_db",
-            "SEC_DB_USER": "user",
-            "SEC_DB_PASSWORD": "pass",
-            "STOCK_DB_HOST": "localhost",
-            "STOCK_DB_PORT": "5432",
-            "STOCK_DB_NAME": "stock",
-            "STOCK_DB_USER": "user",
-            "STOCK_DB_PASSWORD": "pass",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "SEC_DB_HOST": "localhost",
+                "SEC_DB_PORT": "5432",
+                "SEC_DB_NAME": "sec_db",
+                "SEC_DB_USER": "user",
+                "SEC_DB_PASSWORD": "pass",
+                "STOCK_DB_HOST": "localhost",
+                "STOCK_DB_PORT": "5432",
+                "STOCK_DB_NAME": "stock",
+                "STOCK_DB_USER": "user",
+                "STOCK_DB_PASSWORD": "pass",
+            },
+        ):
             errors = CredentialValidator.validate_workflow(comprehensive)
 
             # Should have no errors with credentials set

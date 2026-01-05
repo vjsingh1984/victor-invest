@@ -1037,7 +1037,9 @@ class AllCompanyFactsStoreDAO:
         """Delete company facts for a given symbol"""
         try:
             with self.db_manager.get_session() as session:
-                result = session.execute(text("DELETE FROM sec_companyfacts WHERE symbol = :symbol"), {"symbol": symbol})
+                result = session.execute(
+                    text("DELETE FROM sec_companyfacts WHERE symbol = :symbol"), {"symbol": symbol}
+                )
                 session.commit()
                 deleted_count = result.rowcount
                 logger.info(f"Deleted {deleted_count} company facts entries for {symbol}")
@@ -1069,15 +1071,17 @@ def is_etf(symbol: str) -> bool:
     try:
         # Create connection to stock database
         config = get_config()
-        stock_db_url = config.database.url.replace('/sec_database', '/stock')
+        stock_db_url = config.database.url.replace("/sec_database", "/stock")
         stock_engine = create_engine(stock_db_url)
 
-        query = text("""
+        query = text(
+            """
             SELECT isetf, isstock, description
             FROM symbol
             WHERE UPPER(ticker) = UPPER(:symbol)
             LIMIT 1
-        """)
+        """
+        )
 
         with stock_engine.connect() as conn:
             result = conn.execute(query, {"symbol": symbol}).fetchone()

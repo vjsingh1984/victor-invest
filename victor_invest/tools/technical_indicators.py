@@ -107,15 +107,12 @@ Returns calculated indicators as structured data suitable for analysis.
     async def initialize(self) -> None:
         """Initialize technical analysis infrastructure."""
         try:
-            from investigator.infrastructure.indicators.technical_indicators import (
-                get_technical_calculator
-            )
-            from investigator.infrastructure.database.market_data import (
-                get_market_data_fetcher
-            )
+            from investigator.infrastructure.database.market_data import get_market_data_fetcher
+            from investigator.infrastructure.indicators.technical_indicators import get_technical_calculator
 
             if self.config is None:
                 from investigator.config import get_config
+
                 self.config = get_config()
 
             self._calculator = get_technical_calculator()
@@ -136,7 +133,7 @@ Returns calculated indicators as structured data suitable for analysis.
         days: int = 365,
         recent_days: int = 30,
         period: int = 14,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute technical indicator calculation.
 
@@ -172,8 +169,7 @@ Returns calculated indicators as structured data suitable for analysis.
             df = await self._fetch_market_data(symbol, days)
             if df is None or df.empty:
                 return ToolResult.error_result(
-                    f"No market data available for {symbol}",
-                    metadata={"symbol": symbol, "days": days}
+                    f"No market data available for {symbol}", metadata={"symbol": symbol, "days": days}
                 )
 
             # Calculate all indicators on full dataset
@@ -205,15 +201,10 @@ Returns calculated indicators as structured data suitable for analysis.
         except Exception as e:
             logger.error(f"TechnicalIndicatorsTool execute error for {symbol}: {e}")
             return ToolResult.error_result(
-                f"Technical analysis failed: {str(e)}",
-                metadata={"symbol": symbol, "action": action}
+                f"Technical analysis failed: {str(e)}", metadata={"symbol": symbol, "action": action}
             )
 
-    async def _fetch_market_data(
-        self,
-        symbol: str,
-        days: int
-    ) -> Optional[pd.DataFrame]:
+    async def _fetch_market_data(self, symbol: str, days: int) -> Optional[pd.DataFrame]:
         """Fetch market data for technical analysis.
 
         Args:
@@ -225,22 +216,13 @@ Returns calculated indicators as structured data suitable for analysis.
         """
         try:
             loop = asyncio.get_event_loop()
-            df = await loop.run_in_executor(
-                None,
-                self._market_data_fetcher.get_stock_data,
-                symbol,
-                days
-            )
+            df = await loop.run_in_executor(None, self._market_data_fetcher.get_stock_data, symbol, days)
             return df
         except Exception as e:
             logger.error(f"Error fetching market data for {symbol}: {e}")
             return None
 
-    async def _calculate_indicators(
-        self,
-        df: pd.DataFrame,
-        symbol: str
-    ) -> pd.DataFrame:
+    async def _calculate_indicators(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
         """Calculate all technical indicators.
 
         Args:
@@ -252,22 +234,13 @@ Returns calculated indicators as structured data suitable for analysis.
         """
         try:
             loop = asyncio.get_event_loop()
-            enhanced_df = await loop.run_in_executor(
-                None,
-                self._calculator.calculate_all_indicators,
-                df,
-                symbol
-            )
+            enhanced_df = await loop.run_in_executor(None, self._calculator.calculate_all_indicators, df, symbol)
             return enhanced_df
         except Exception as e:
             logger.error(f"Error calculating indicators for {symbol}: {e}")
             return df
 
-    def _format_all_indicators(
-        self,
-        symbol: str,
-        df: pd.DataFrame
-    ) -> ToolResult:
+    def _format_all_indicators(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format all indicators for response."""
         try:
             latest = df.iloc[-1].to_dict() if not df.empty else {}
@@ -331,26 +304,18 @@ Returns calculated indicators as structured data suitable for analysis.
                             "fib_38_2": latest.get("Fib_38_2"),
                             "fib_50_0": latest.get("Fib_50_0"),
                             "fib_61_8": latest.get("Fib_61_8"),
-                        }
+                        },
                     },
-                    "columns_calculated": len(df.columns)
+                    "columns_calculated": len(df.columns),
                 },
-                metadata={
-                    "source": "technical_calculator",
-                    "data_points": len(df)
-                }
+                metadata={"source": "technical_calculator", "data_points": len(df)},
             )
 
         except Exception as e:
             logger.error(f"Error formatting all indicators: {e}")
             return ToolResult.error_result(f"Failed to format indicators: {str(e)}")
 
-    def _format_momentum(
-        self,
-        symbol: str,
-        df: pd.DataFrame,
-        period: int
-    ) -> ToolResult:
+    def _format_momentum(self, symbol: str, df: pd.DataFrame, period: int) -> ToolResult:
         """Format momentum indicators."""
         try:
             latest = df.iloc[-1].to_dict() if not df.empty else {}
@@ -359,10 +324,7 @@ Returns calculated indicators as structured data suitable for analysis.
             return ToolResult.success_result(
                 data={
                     "symbol": symbol,
-                    "rsi": {
-                        f"rsi_{p}": latest.get(f"RSI_{p}")
-                        for p in [9, 14, 21]
-                    },
+                    "rsi": {f"rsi_{p}": latest.get(f"RSI_{p}") for p in [9, 14, 21]},
                     "macd": {
                         "macd": latest.get("MACD"),
                         "signal": latest.get("MACD_Signal"),
@@ -378,19 +340,15 @@ Returns calculated indicators as structured data suitable for analysis.
                         "roc_10": latest.get("ROC_10"),
                         "roc_20": latest.get("ROC_20"),
                     },
-                    "signals": self._interpret_momentum_signals(latest)
+                    "signals": self._interpret_momentum_signals(latest),
                 },
-                metadata={"indicator_type": "momentum"}
+                metadata={"indicator_type": "momentum"},
             )
 
         except Exception as e:
             return ToolResult.error_result(f"Failed to format momentum: {str(e)}")
 
-    def _format_volatility(
-        self,
-        symbol: str,
-        df: pd.DataFrame
-    ) -> ToolResult:
+    def _format_volatility(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format volatility indicators."""
         try:
             latest = df.iloc[-1].to_dict() if not df.empty else {}
@@ -408,19 +366,15 @@ Returns calculated indicators as structured data suitable for analysis.
                     },
                     "atr": latest.get("ATR_14"),
                     "volatility_20d": latest.get("Volatility_20"),
-                    "signals": self._interpret_volatility_signals(latest)
+                    "signals": self._interpret_volatility_signals(latest),
                 },
-                metadata={"indicator_type": "volatility"}
+                metadata={"indicator_type": "volatility"},
             )
 
         except Exception as e:
             return ToolResult.error_result(f"Failed to format volatility: {str(e)}")
 
-    def _format_moving_averages(
-        self,
-        symbol: str,
-        df: pd.DataFrame
-    ) -> ToolResult:
+    def _format_moving_averages(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format moving averages."""
         try:
             latest = df.iloc[-1].to_dict() if not df.empty else {}
@@ -448,17 +402,13 @@ Returns calculated indicators as structured data suitable for analysis.
                     "golden_cross": self._check_golden_cross(df),
                     "death_cross": self._check_death_cross(df),
                 },
-                metadata={"indicator_type": "moving_averages"}
+                metadata={"indicator_type": "moving_averages"},
             )
 
         except Exception as e:
             return ToolResult.error_result(f"Failed to format moving averages: {str(e)}")
 
-    def _format_volume_indicators(
-        self,
-        symbol: str,
-        df: pd.DataFrame
-    ) -> ToolResult:
+    def _format_volume_indicators(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format volume indicators."""
         try:
             latest = df.iloc[-1].to_dict() if not df.empty else {}
@@ -474,19 +424,15 @@ Returns calculated indicators as structured data suitable for analysis.
                     "vpt": latest.get("VPT"),
                     "ad_line": latest.get("AD"),
                     "vwap": latest.get("VWAP"),
-                    "signals": self._interpret_volume_signals(latest)
+                    "signals": self._interpret_volume_signals(latest),
                 },
-                metadata={"indicator_type": "volume"}
+                metadata={"indicator_type": "volume"},
             )
 
         except Exception as e:
             return ToolResult.error_result(f"Failed to format volume: {str(e)}")
 
-    def _format_support_resistance(
-        self,
-        symbol: str,
-        df: pd.DataFrame
-    ) -> ToolResult:
+    def _format_support_resistance(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format support/resistance levels."""
         try:
             latest = df.iloc[-1].to_dict() if not df.empty else {}
@@ -521,20 +467,15 @@ Returns calculated indicators as structured data suitable for analysis.
                         "61.8%": latest.get("Fib_61_8"),
                         "78.6%": latest.get("Fib_78_6"),
                         "100%": latest.get("Fib_100"),
-                    }
+                    },
                 },
-                metadata={"indicator_type": "support_resistance"}
+                metadata={"indicator_type": "support_resistance"},
             )
 
         except Exception as e:
             return ToolResult.error_result(f"Failed to format S/R levels: {str(e)}")
 
-    def _format_recent(
-        self,
-        symbol: str,
-        df: pd.DataFrame,
-        days: int
-    ) -> ToolResult:
+    def _format_recent(self, symbol: str, df: pd.DataFrame, days: int) -> ToolResult:
         """Format recent data with indicators."""
         try:
             recent_df = self._calculator.extract_recent_data_for_llm(df, days)
@@ -549,22 +490,14 @@ Returns calculated indicators as structured data suitable for analysis.
                 records.append(record)
 
             return ToolResult.success_result(
-                data={
-                    "symbol": symbol,
-                    "days": len(records),
-                    "data": records
-                },
-                metadata={"indicator_type": "recent_data", "requested_days": days}
+                data={"symbol": symbol, "days": len(records), "data": records},
+                metadata={"indicator_type": "recent_data", "requested_days": days},
             )
 
         except Exception as e:
             return ToolResult.error_result(f"Failed to format recent data: {str(e)}")
 
-    def _format_summary(
-        self,
-        symbol: str,
-        df: pd.DataFrame
-    ) -> ToolResult:
+    def _format_summary(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Generate technical analysis summary with trading signals."""
         try:
             latest = df.iloc[-1].to_dict() if not df.empty else {}
@@ -631,9 +564,9 @@ Returns calculated indicators as structured data suitable for analysis.
                         "support": latest.get("Support_1"),
                         "resistance": latest.get("Resistance_1"),
                         "pivot": latest.get("Pivot_Point"),
-                    }
+                    },
                 },
-                metadata={"indicator_type": "summary"}
+                metadata={"indicator_type": "summary"},
             )
 
         except Exception as e:
@@ -704,11 +637,7 @@ Returns calculated indicators as structured data suitable for analysis.
 
         return signals
 
-    def _interpret_ma_signals(
-        self,
-        latest: Dict,
-        current_price: Optional[float]
-    ) -> Dict[str, str]:
+    def _interpret_ma_signals(self, latest: Dict, current_price: Optional[float]) -> Dict[str, str]:
         """Interpret moving average signals."""
         signals = {}
 
@@ -766,39 +695,37 @@ Returns calculated indicators as structured data suitable for analysis.
         return {
             "type": "object",
             "properties": {
-                "symbol": {
-                    "type": "string",
-                    "description": "Stock ticker symbol"
-                },
+                "symbol": {"type": "string", "description": "Stock ticker symbol"},
                 "action": {
                     "type": "string",
                     "enum": [
-                        "calculate_all", "get_momentum", "get_volatility",
-                        "get_moving_averages", "get_volume_indicators",
-                        "get_support_resistance", "get_recent", "get_summary"
+                        "calculate_all",
+                        "get_momentum",
+                        "get_volatility",
+                        "get_moving_averages",
+                        "get_volume_indicators",
+                        "get_support_resistance",
+                        "get_recent",
+                        "get_summary",
                     ],
                     "description": "Action to perform",
-                    "default": "calculate_all"
+                    "default": "calculate_all",
                 },
                 "days": {
                     "type": "integer",
                     "description": "Days of historical data",
                     "default": 365,
                     "minimum": 30,
-                    "maximum": 1825
+                    "maximum": 1825,
                 },
                 "recent_days": {
                     "type": "integer",
                     "description": "Days to return for get_recent",
                     "default": 30,
                     "minimum": 5,
-                    "maximum": 90
+                    "maximum": 90,
                 },
-                "period": {
-                    "type": "integer",
-                    "description": "Indicator calculation period",
-                    "default": 14
-                }
+                "period": {"type": "integer", "description": "Indicator calculation period", "default": 14},
             },
-            "required": ["symbol"]
+            "required": ["symbol"],
         }

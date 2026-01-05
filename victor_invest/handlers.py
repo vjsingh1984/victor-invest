@@ -184,8 +184,9 @@ class FetchMacroDataHandler:
         start_time = time.time()
 
         try:
-            from investigator.domain.services.data_sources import get_data_source_facade
             from datetime import date
+
+            from investigator.domain.services.data_sources import get_data_source_facade
 
             symbol = context.get("symbol", "SPY")
             facade = get_data_source_facade()
@@ -253,6 +254,7 @@ class RunFundamentalAnalysisHandler:
         # Validate credentials before execution
         try:
             from investigator.infrastructure.node_credentials import NodeCredentialContext
+
             cred_ctx = NodeCredentialContext.from_node(node, context)
             cred_errors = cred_ctx.validate_requirements()
             if cred_errors:
@@ -568,12 +570,16 @@ Respond ONLY with the JSON object."""
             upside = val.get("upside_pct")
             upside_str = f"{upside:+.1f}%" if upside else "N/A"
 
-            parts.append(f"  - {symbol} ({match_type}): Market Cap {mcap_str}, P/E {pe_str}, Predicted Upside {upside_str}")
+            parts.append(
+                f"  - {symbol} ({match_type}): Market Cap {mcap_str}, P/E {pe_str}, Predicted Upside {upside_str}"
+            )
 
         if metrics:
             parts.append("\n### Peer Group Medians:")
             if "pe_ratio_median" in metrics:
-                parts.append(f"  - P/E Median: {metrics['pe_ratio_median']:.1f}x (range: {metrics.get('pe_ratio_min', 0):.1f}x - {metrics.get('pe_ratio_max', 0):.1f}x)")
+                parts.append(
+                    f"  - P/E Median: {metrics['pe_ratio_median']:.1f}x (range: {metrics.get('pe_ratio_min', 0):.1f}x - {metrics.get('pe_ratio_max', 0):.1f}x)"
+                )
             if "revenue_growth_median" in metrics:
                 parts.append(f"  - Revenue Growth Median: {metrics['revenue_growth_median']*100:.1f}%")
             if "fcf_margin_median" in metrics:
@@ -880,9 +886,13 @@ Respond ONLY with the JSON object."""
             wacc = dcf.get("assumptions", {}).get("wacc", 0)
             terminal_growth = dcf.get("assumptions", {}).get("terminal_growth_rate", 0)
 
-            parts.append(f"\n\nDiscounted Cash Flow Analysis: Our DCF model yields a fair value of ${dcf_fv:.2f} per share, implying {dcf_upside:+.1f}% from current levels.")
+            parts.append(
+                f"\n\nDiscounted Cash Flow Analysis: Our DCF model yields a fair value of ${dcf_fv:.2f} per share, implying {dcf_upside:+.1f}% from current levels."
+            )
             if wacc:
-                parts.append(f"We use a weighted average cost of capital (WACC) of {wacc*100:.1f}% and terminal growth rate of {terminal_growth*100:.1f}%.")
+                parts.append(
+                    f"We use a weighted average cost of capital (WACC) of {wacc*100:.1f}% and terminal growth rate of {terminal_growth*100:.1f}%."
+                )
 
         # Multiple-based valuations
         pe = models.get("pe", {})
@@ -892,16 +902,22 @@ Respond ONLY with the JSON object."""
             pe_fv = pe.get("fair_value_per_share")
             pe_ratio = pe.get("pe_ratio", 0)
             sector_pe = pe.get("sector_pe", 0)
-            parts.append(f"\n\nP/E Multiple Analysis: Using a target P/E of {pe_ratio:.1f}x (sector median: {sector_pe:.1f}x), we derive a fair value of ${pe_fv:.2f}.")
+            parts.append(
+                f"\n\nP/E Multiple Analysis: Using a target P/E of {pe_ratio:.1f}x (sector median: {sector_pe:.1f}x), we derive a fair value of ${pe_fv:.2f}."
+            )
 
         if ps and ps.get("fair_value_per_share"):
             ps_fv = ps.get("fair_value_per_share")
             ps_ratio = ps.get("ps_ratio", 0)
-            parts.append(f"\n\nP/S Multiple Analysis: The price-to-sales approach suggests a fair value of ${ps_fv:.2f} using a {ps_ratio:.1f}x multiple.")
+            parts.append(
+                f"\n\nP/S Multiple Analysis: The price-to-sales approach suggests a fair value of ${ps_fv:.2f} using a {ps_ratio:.1f}x multiple."
+            )
 
         # Conclusion
         if consensus_fv and current_price:
-            parts.append(f"\n\nBlended Valuation: Weighing all models, our consensus fair value is ${consensus_fv:.2f}, compared to the current price of ${current_price:.2f}.")
+            parts.append(
+                f"\n\nBlended Valuation: Weighing all models, our consensus fair value is ${consensus_fv:.2f}, compared to the current price of ${current_price:.2f}."
+            )
 
         return "".join(parts) if parts else ""
 
@@ -940,7 +956,9 @@ Respond ONLY with the JSON object."""
             resistance_1 = resistance_levels.get("resistance_1")
 
             if support_1 and resistance_1:
-                parts.append(f"\n\nKey Levels: Immediate support at ${support_1:.2f} and resistance at ${resistance_1:.2f}.")
+                parts.append(
+                    f"\n\nKey Levels: Immediate support at ${support_1:.2f} and resistance at ${resistance_1:.2f}."
+                )
 
             if w52:
                 w52_high = w52.get("high")
@@ -957,13 +975,17 @@ Respond ONLY with the JSON object."""
                 if rsi > 70:
                     parts.append(f"\n\nMomentum: RSI at {rsi:.1f} indicates overbought conditions.")
                 elif rsi < 30:
-                    parts.append(f"\n\nMomentum: RSI at {rsi:.1f} indicates oversold conditions, potentially signaling a bounce.")
+                    parts.append(
+                        f"\n\nMomentum: RSI at {rsi:.1f} indicates oversold conditions, potentially signaling a bounce."
+                    )
                 else:
                     parts.append(f"\n\nMomentum: RSI at {rsi:.1f} is in neutral territory.")
 
             if macd:
                 macd_signal = "positive" if macd > 0 else "negative"
-                parts.append(f" MACD histogram is {macd_signal}, suggesting {'bullish' if macd > 0 else 'bearish'} momentum.")
+                parts.append(
+                    f" MACD histogram is {macd_signal}, suggesting {'bullish' if macd > 0 else 'bearish'} momentum."
+                )
 
         return "".join(parts) if parts else ""
 
@@ -1026,7 +1048,11 @@ Respond ONLY with the JSON object."""
 
         # Model divergence risk
         models = fund_data.get("models", {}) if fund_data else {}
-        fair_values = [m.get("fair_value_per_share", 0) for m in models.values() if isinstance(m, dict) and m.get("fair_value_per_share")]
+        fair_values = [
+            m.get("fair_value_per_share", 0)
+            for m in models.values()
+            if isinstance(m, dict) and m.get("fair_value_per_share")
+        ]
         if len(fair_values) >= 2:
             fv_range = max(fair_values) - min(fair_values)
             fv_avg = sum(fair_values) / len(fair_values)
@@ -1077,14 +1103,19 @@ Respond ONLY with the JSON object."""
 
         # Model agreement catalyst
         models = fund_data.get("models", {}) if fund_data else {}
-        upsides = [m.get("upside_downside_pct", 0) or m.get("upside_percent", 0) for m in models.values() if isinstance(m, dict)]
+        upsides = [
+            m.get("upside_downside_pct", 0) or m.get("upside_percent", 0)
+            for m in models.values()
+            if isinstance(m, dict)
+        ]
         if upsides and all(u > 0 for u in upsides):
             catalysts.append("All valuation models indicate upside potential")
 
         return catalysts
 
-    def _generate_executive_summary(self, recommendation: str, confidence: str,
-                                     fund_data: dict, tech_data: dict, market_context: dict) -> str:
+    def _generate_executive_summary(
+        self, recommendation: str, confidence: str, fund_data: dict, tech_data: dict, market_context: dict
+    ) -> str:
         """Generate executive summary paragraph."""
         parts = []
 
@@ -1096,13 +1127,17 @@ Respond ONLY with the JSON object."""
         if recommendation == "BUY":
             parts.append(f"We rate this stock a {recommendation} with {confidence} confidence.")
         elif recommendation == "SELL":
-            parts.append(f"We rate this stock a {recommendation} with {confidence} confidence due to valuation concerns.")
+            parts.append(
+                f"We rate this stock a {recommendation} with {confidence} confidence due to valuation concerns."
+            )
         else:
             parts.append(f"We rate this stock a {recommendation} as it appears fairly valued at current levels.")
 
         # Valuation context
         if consensus_fv and current_price:
-            parts.append(f" Our blended fair value of ${consensus_fv:.2f} implies {consensus_upside:+.1f}% from the current price of ${current_price:.2f}.")
+            parts.append(
+                f" Our blended fair value of ${consensus_fv:.2f} implies {consensus_upside:+.1f}% from the current price of ${current_price:.2f}."
+            )
 
         # Technical context
         trend = tech_data.get("trend", {}) if tech_data else {}
@@ -1130,7 +1165,9 @@ Respond ONLY with the JSON object."""
 
         parts = []
         model_count = len(models)
-        parts.append(f"We applied {model_count} valuation model{'s' if model_count > 1 else ''} to derive our fair value estimate.")
+        parts.append(
+            f"We applied {model_count} valuation model{'s' if model_count > 1 else ''} to derive our fair value estimate."
+        )
 
         if consensus_fv:
             parts.append(f" The blended fair value is ${consensus_fv:.2f}")
@@ -1140,8 +1177,11 @@ Respond ONLY with the JSON object."""
                 parts.append(".")
 
         # Model range
-        fair_values = [m.get("fair_value_per_share", 0) for m in models.values()
-                       if isinstance(m, dict) and m.get("fair_value_per_share")]
+        fair_values = [
+            m.get("fair_value_per_share", 0)
+            for m in models.values()
+            if isinstance(m, dict) and m.get("fair_value_per_share")
+        ]
         if len(fair_values) >= 2:
             parts.append(f" Fair value estimates range from ${min(fair_values):.2f} to ${max(fair_values):.2f}.")
 
@@ -1196,13 +1236,17 @@ def _format_fundamental(fundamental: dict) -> str:
                         sector_pe = model_data.get("sector_pe")
                         eps = model_data.get("eps_ttm")
                         if pe_ratio and eps:
-                            parts.append(f"    TTM EPS: ${eps:.2f}, Target P/E: {pe_ratio:.1f}x (Sector Median: {sector_pe:.1f}x)")
+                            parts.append(
+                                f"    TTM EPS: ${eps:.2f}, Target P/E: {pe_ratio:.1f}x (Sector Median: {sector_pe:.1f}x)"
+                            )
                     elif model_name == "ps":
                         ps_ratio = model_data.get("ps_ratio")
                         sector_ps = model_data.get("sector_ps")
                         rps = model_data.get("revenue_per_share")
                         if ps_ratio and rps:
-                            parts.append(f"    Revenue/Share: ${rps:.2f}, Target P/S: {ps_ratio:.1f}x (Sector: {sector_ps:.1f}x)")
+                            parts.append(
+                                f"    Revenue/Share: ${rps:.2f}, Target P/S: {ps_ratio:.1f}x (Sector: {sector_ps:.1f}x)"
+                            )
 
     # Models applied
     models_applied = data.get("models_applied", [])
@@ -1297,10 +1341,9 @@ class GenerateReportHandler:
         start_time = time.time()
 
         try:
-            from investigator.infrastructure.reporting.professional_report import (
-                ProfessionalReportGenerator
-            )
             import json
+
+            from investigator.infrastructure.reporting.professional_report import ProfessionalReportGenerator
 
             synthesis = context.get("synthesis") or {}
             symbol = context.get("symbol", "UNKNOWN")
@@ -1445,8 +1488,10 @@ class GenerateReportHandler:
             }
 
             # Get output directory
-            from investigator.config import get_config
             from pathlib import Path
+
+            from investigator.config import get_config
+
             cfg = get_config()
             output_dir = cfg.reports_dir / "professional"
 
@@ -1485,9 +1530,15 @@ class GenerateReportHandler:
         valuation = fund_data.get("valuation") or {}
         if valuation:
             if "pe_ratio" in valuation:
-                metrics["pe_ratio"] = {"company": valuation.get("pe_ratio"), "sector": valuation.get("sector_pe_median")}
+                metrics["pe_ratio"] = {
+                    "company": valuation.get("pe_ratio"),
+                    "sector": valuation.get("sector_pe_median"),
+                }
             if "ev_ebitda" in valuation:
-                metrics["ev_ebitda"] = {"company": valuation.get("ev_ebitda"), "sector": valuation.get("sector_ev_ebitda_median")}
+                metrics["ev_ebitda"] = {
+                    "company": valuation.get("ev_ebitda"),
+                    "sector": valuation.get("sector_ev_ebitda_median"),
+                }
 
         # Get profitability metrics
         profitability = fund_data.get("profitability") or {}
@@ -1495,19 +1546,28 @@ class GenerateReportHandler:
             if "roe" in profitability:
                 metrics["roe"] = {"company": profitability.get("roe"), "sector": profitability.get("sector_roe_median")}
             if "fcf_margin" in profitability:
-                metrics["fcf_margin"] = {"company": profitability.get("fcf_margin"), "sector": profitability.get("sector_fcf_margin_median")}
+                metrics["fcf_margin"] = {
+                    "company": profitability.get("fcf_margin"),
+                    "sector": profitability.get("sector_fcf_margin_median"),
+                }
 
         # Get growth metrics
         growth = fund_data.get("growth") or {}
         if growth:
             if "revenue_growth" in growth:
-                metrics["revenue_growth"] = {"company": growth.get("revenue_growth"), "sector": growth.get("sector_revenue_growth_median")}
+                metrics["revenue_growth"] = {
+                    "company": growth.get("revenue_growth"),
+                    "sector": growth.get("sector_revenue_growth_median"),
+                }
 
         # Get leverage metrics
         leverage = fund_data.get("leverage") or fund_data.get("balance_sheet") or {}
         if leverage:
             if "debt_to_equity" in leverage:
-                metrics["debt_to_equity"] = {"company": leverage.get("debt_to_equity"), "sector": leverage.get("sector_debt_to_equity_median")}
+                metrics["debt_to_equity"] = {
+                    "company": leverage.get("debt_to_equity"),
+                    "sector": leverage.get("sector_debt_to_equity_median"),
+                }
 
         # Try to get from SEC filing data as fallback
         sec_data = context.get("sec_data") if context else None
@@ -1598,8 +1658,9 @@ class IdentifyPeersHandler:
         start_time = time.time()
 
         try:
-            from investigator.infrastructure.database.db import get_database_engine
             from sqlalchemy import text
+
+            from investigator.infrastructure.database.db import get_database_engine
 
             symbol = context.get("symbol", "")
             market_context = context.get("market_context") or {}
@@ -1614,7 +1675,8 @@ class IdentifyPeersHandler:
                     # First: Get peers with EXACT industry match + recent valuation metrics
                     if industry:
                         result = conn.execute(
-                            text("""
+                            text(
+                                """
                                 SELECT DISTINCT ON (s.symbol)
                                     s.symbol, s.name, s.market_cap, s.industry, s.sector,
                                     v.pe_fair_value, v.ps_fair_value, v.blended_fair_value,
@@ -1635,8 +1697,9 @@ class IdentifyPeersHandler:
                                 AND s.is_active = true
                                 ORDER BY s.symbol, v.analysis_date DESC NULLS LAST, s.market_cap DESC NULLS LAST
                                 LIMIT 5
-                            """),
-                            {"industry": industry, "target": symbol}
+                            """
+                            ),
+                            {"industry": industry, "target": symbol},
                         )
                         for row in result:
                             pe_ratio = None
@@ -1645,25 +1708,27 @@ class IdentifyPeersHandler:
                                     pe_ratio = float(row[10])
                                 except (ValueError, TypeError):
                                     pass
-                            peers.append({
-                                "symbol": row[0],
-                                "name": row[1],
-                                "market_cap": float(row[2]) if row[2] else None,
-                                "industry": row[3],
-                                "sector": row[4],
-                                "match_type": "industry",
-                                "valuation": {
-                                    "pe_fair_value": float(row[5]) if row[5] else None,
-                                    "ps_fair_value": float(row[6]) if row[6] else None,
-                                    "blended_fair_value": float(row[7]) if row[7] else None,
-                                    "current_price": float(row[8]) if row[8] else None,
-                                    "upside_pct": float(row[9]) if row[9] else None,
-                                    "pe_ratio": pe_ratio,
-                                    "revenue_growth": float(row[11]) if row[11] else None,
-                                    "fcf_margin": float(row[12]) if row[12] else None,
-                                },
-                                "analysis_date": str(row[13]) if row[13] else None,
-                            })
+                            peers.append(
+                                {
+                                    "symbol": row[0],
+                                    "name": row[1],
+                                    "market_cap": float(row[2]) if row[2] else None,
+                                    "industry": row[3],
+                                    "sector": row[4],
+                                    "match_type": "industry",
+                                    "valuation": {
+                                        "pe_fair_value": float(row[5]) if row[5] else None,
+                                        "ps_fair_value": float(row[6]) if row[6] else None,
+                                        "blended_fair_value": float(row[7]) if row[7] else None,
+                                        "current_price": float(row[8]) if row[8] else None,
+                                        "upside_pct": float(row[9]) if row[9] else None,
+                                        "pe_ratio": pe_ratio,
+                                        "revenue_growth": float(row[11]) if row[11] else None,
+                                        "fcf_margin": float(row[12]) if row[12] else None,
+                                    },
+                                    "analysis_date": str(row[13]) if row[13] else None,
+                                }
+                            )
 
                     # If <5 industry matches, add sector matches
                     if len(peers) < 5 and sector:
@@ -1671,7 +1736,8 @@ class IdentifyPeersHandler:
                         remaining_slots = 5 - len(peers)
 
                         result = conn.execute(
-                            text("""
+                            text(
+                                """
                                 SELECT DISTINCT ON (s.symbol)
                                     s.symbol, s.name, s.market_cap, s.industry, s.sector,
                                     v.pe_fair_value, v.ps_fair_value, v.blended_fair_value,
@@ -1692,8 +1758,9 @@ class IdentifyPeersHandler:
                                 AND s.is_active = true
                                 ORDER BY s.symbol, v.analysis_date DESC NULLS LAST, s.market_cap DESC NULLS LAST
                                 LIMIT :limit
-                            """),
-                            {"sector": sector, "target": symbol, "limit": remaining_slots + 10}
+                            """
+                            ),
+                            {"sector": sector, "target": symbol, "limit": remaining_slots + 10},
                         )
                         for row in result:
                             if row[0] not in existing_symbols and len(peers) < 5:
@@ -1703,25 +1770,27 @@ class IdentifyPeersHandler:
                                         pe_ratio = float(row[10])
                                     except (ValueError, TypeError):
                                         pass
-                                peers.append({
-                                    "symbol": row[0],
-                                    "name": row[1],
-                                    "market_cap": float(row[2]) if row[2] else None,
-                                    "industry": row[3],
-                                    "sector": row[4],
-                                    "match_type": "sector",
-                                    "valuation": {
-                                        "pe_fair_value": float(row[5]) if row[5] else None,
-                                        "ps_fair_value": float(row[6]) if row[6] else None,
-                                        "blended_fair_value": float(row[7]) if row[7] else None,
-                                        "current_price": float(row[8]) if row[8] else None,
-                                        "upside_pct": float(row[9]) if row[9] else None,
-                                        "pe_ratio": pe_ratio,
-                                        "revenue_growth": float(row[11]) if row[11] else None,
-                                        "fcf_margin": float(row[12]) if row[12] else None,
-                                    },
-                                    "analysis_date": str(row[13]) if row[13] else None,
-                                })
+                                peers.append(
+                                    {
+                                        "symbol": row[0],
+                                        "name": row[1],
+                                        "market_cap": float(row[2]) if row[2] else None,
+                                        "industry": row[3],
+                                        "sector": row[4],
+                                        "match_type": "sector",
+                                        "valuation": {
+                                            "pe_fair_value": float(row[5]) if row[5] else None,
+                                            "ps_fair_value": float(row[6]) if row[6] else None,
+                                            "blended_fair_value": float(row[7]) if row[7] else None,
+                                            "current_price": float(row[8]) if row[8] else None,
+                                            "upside_pct": float(row[9]) if row[9] else None,
+                                            "pe_ratio": pe_ratio,
+                                            "revenue_growth": float(row[11]) if row[11] else None,
+                                            "fcf_margin": float(row[12]) if row[12] else None,
+                                        },
+                                        "analysis_date": str(row[13]) if row[13] else None,
+                                    }
+                                )
 
             # Calculate peer group medians for comparison
             peer_metrics = self._calculate_peer_medians(peers)
@@ -1815,7 +1884,8 @@ class AnalyzePeersHandler:
 
         try:
             import asyncio
-            from victor_invest.workflows import run_analysis, AnalysisMode
+
+            from victor_invest.workflows import AnalysisMode, run_analysis
 
             async def analyze_one(peer):
                 symbol = peer.get("symbol") if isinstance(peer, dict) else peer

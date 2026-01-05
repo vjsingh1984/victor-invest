@@ -135,6 +135,7 @@ Returns cache data, operation status, or statistics.
 
             if self.config is None:
                 from investigator.config import get_config
+
                 self.config = get_config()
 
             self._cache_manager = get_cache_manager()
@@ -170,10 +171,7 @@ Returns cache data, operation status, or statistics.
             return getattr(self._cache_type_enum, cache_type_str.upper())
         except AttributeError:
             valid_types = list(self.CACHE_TYPE_MAP.keys())
-            raise ValueError(
-                f"Invalid cache type: {cache_type_str}. "
-                f"Valid types: {valid_types}"
-            )
+            raise ValueError(f"Invalid cache type: {cache_type_str}. " f"Valid types: {valid_types}")
 
     async def execute(
         self,
@@ -183,7 +181,7 @@ Returns cache data, operation status, or statistics.
         key: Optional[Union[Dict, Tuple]] = None,
         value: Optional[Dict[str, Any]] = None,
         symbol: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute cache operation.
 
@@ -247,16 +245,9 @@ Returns cache data, operation status, or statistics.
 
         except Exception as e:
             logger.error(f"CacheTool execute error: {e}")
-            return ToolResult.error_result(
-                f"Cache operation failed: {str(e)}",
-                metadata={"action": action}
-            )
+            return ToolResult.error_result(f"Cache operation failed: {str(e)}", metadata={"action": action})
 
-    async def _cache_get(
-        self,
-        cache_type: str,
-        key: Union[Dict, Tuple]
-    ) -> ToolResult:
+    async def _cache_get(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Get data from cache.
 
         Args:
@@ -279,23 +270,12 @@ Returns cache data, operation status, or statistics.
 
             if data is not None:
                 return ToolResult.success_result(
-                    data={
-                        "hit": True,
-                        "cache_type": cache_type,
-                        "key": key,
-                        "data": data
-                    },
-                    metadata={"cache_hit": True}
+                    data={"hit": True, "cache_type": cache_type, "key": key, "data": data}, metadata={"cache_hit": True}
                 )
             else:
                 return ToolResult.success_result(
-                    data={
-                        "hit": False,
-                        "cache_type": cache_type,
-                        "key": key,
-                        "data": None
-                    },
-                    metadata={"cache_hit": False}
+                    data={"hit": False, "cache_type": cache_type, "key": key, "data": None},
+                    metadata={"cache_hit": False},
                 )
 
         except ValueError as e:
@@ -304,12 +284,7 @@ Returns cache data, operation status, or statistics.
             logger.error(f"Cache get error: {e}")
             return ToolResult.error_result(f"Cache get failed: {str(e)}")
 
-    async def _cache_set(
-        self,
-        cache_type: str,
-        key: Union[Dict, Tuple],
-        value: Dict[str, Any]
-    ) -> ToolResult:
+    async def _cache_set(self, cache_type: str, key: Union[Dict, Tuple], value: Dict[str, Any]) -> ToolResult:
         """Set data in cache.
 
         Args:
@@ -331,16 +306,11 @@ Returns cache data, operation status, or statistics.
             cache_type_obj = self._get_cache_type(cache_type)
 
             # Create standardized metadata
-            metadata = self._cache_manager.create_cache_metadata(
-                cache_type_obj, key
-            )
+            metadata = self._cache_manager.create_cache_metadata(cache_type_obj, key)
 
             # Wrap value with metadata if not already present
             if "metadata" not in value:
-                value = {
-                    "data": value,
-                    "metadata": metadata
-                }
+                value = {"data": value, "metadata": metadata}
             else:
                 # Merge metadata
                 value["metadata"].update(metadata)
@@ -354,7 +324,7 @@ Returns cache data, operation status, or statistics.
                     "cache_type": cache_type,
                     "key": key,
                 },
-                metadata={"write_success": success}
+                metadata={"write_success": success},
             )
 
         except ValueError as e:
@@ -363,11 +333,7 @@ Returns cache data, operation status, or statistics.
             logger.error(f"Cache set error: {e}")
             return ToolResult.error_result(f"Cache set failed: {str(e)}")
 
-    async def _cache_exists(
-        self,
-        cache_type: str,
-        key: Union[Dict, Tuple]
-    ) -> ToolResult:
+    async def _cache_exists(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Check if cache entry exists.
 
         Args:
@@ -386,12 +352,7 @@ Returns cache data, operation status, or statistics.
             cache_type_obj = self._get_cache_type(cache_type)
 
             loop = asyncio.get_event_loop()
-            exists = await loop.run_in_executor(
-                None,
-                self._cache_manager.exists,
-                cache_type_obj,
-                key
-            )
+            exists = await loop.run_in_executor(None, self._cache_manager.exists, cache_type_obj, key)
 
             return ToolResult.success_result(
                 data={
@@ -407,11 +368,7 @@ Returns cache data, operation status, or statistics.
             logger.error(f"Cache exists error: {e}")
             return ToolResult.error_result(f"Cache exists check failed: {str(e)}")
 
-    async def _cache_delete(
-        self,
-        cache_type: str,
-        key: Union[Dict, Tuple]
-    ) -> ToolResult:
+    async def _cache_delete(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Delete cache entry.
 
         Args:
@@ -430,12 +387,7 @@ Returns cache data, operation status, or statistics.
             cache_type_obj = self._get_cache_type(cache_type)
 
             loop = asyncio.get_event_loop()
-            deleted = await loop.run_in_executor(
-                None,
-                self._cache_manager.delete,
-                cache_type_obj,
-                key
-            )
+            deleted = await loop.run_in_executor(None, self._cache_manager.delete, cache_type_obj, key)
 
             return ToolResult.success_result(
                 data={
@@ -467,20 +419,12 @@ Returns cache data, operation status, or statistics.
             symbol = symbol.upper().strip()
 
             loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
-                None,
-                self._cache_manager.delete_by_symbol,
-                symbol
-            )
+            results = await loop.run_in_executor(None, self._cache_manager.delete_by_symbol, symbol)
 
             total_deleted = sum(results.values())
 
             return ToolResult.success_result(
-                data={
-                    "symbol": symbol,
-                    "total_deleted": total_deleted,
-                    "deleted_by_type": results
-                }
+                data={"symbol": symbol, "total_deleted": total_deleted, "deleted_by_type": results}
             )
 
         except Exception as e:
@@ -503,11 +447,7 @@ Returns cache data, operation status, or statistics.
             cache_type_obj = self._get_cache_type(cache_type)
 
             loop = asyncio.get_event_loop()
-            success = await loop.run_in_executor(
-                None,
-                self._cache_manager.clear_cache_type,
-                cache_type_obj
-            )
+            success = await loop.run_in_executor(None, self._cache_manager.clear_cache_type, cache_type_obj)
 
             return ToolResult.success_result(
                 data={
@@ -532,22 +472,11 @@ Returns cache data, operation status, or statistics.
             loop = asyncio.get_event_loop()
 
             # Get both stats methods
-            performance_stats = await loop.run_in_executor(
-                None,
-                self._cache_manager.get_performance_stats
-            )
+            performance_stats = await loop.run_in_executor(None, self._cache_manager.get_performance_stats)
 
-            general_stats = await loop.run_in_executor(
-                None,
-                self._cache_manager.get_stats
-            )
+            general_stats = await loop.run_in_executor(None, self._cache_manager.get_stats)
 
-            return ToolResult.success_result(
-                data={
-                    "performance": performance_stats,
-                    "configuration": general_stats
-                }
-            )
+            return ToolResult.success_result(data={"performance": performance_stats, "configuration": general_stats})
 
         except Exception as e:
             logger.error(f"Get stats error: {e}")
@@ -564,28 +493,15 @@ Returns cache data, operation status, or statistics.
         """
         try:
             loop = asyncio.get_event_loop()
-            recent_ops = await loop.run_in_executor(
-                None,
-                self._cache_manager.get_recent_operations,
-                cache_type,
-                20
-            )
+            recent_ops = await loop.run_in_executor(None, self._cache_manager.get_recent_operations, cache_type, 20)
 
-            return ToolResult.success_result(
-                data={
-                    "recent_operations": recent_ops
-                }
-            )
+            return ToolResult.success_result(data={"recent_operations": recent_ops})
 
         except Exception as e:
             logger.error(f"Get recent ops error: {e}")
             return ToolResult.error_result(f"Get recent ops failed: {str(e)}")
 
-    async def _validate_entry(
-        self,
-        cache_type: str,
-        key: Union[Dict, Tuple]
-    ) -> ToolResult:
+    async def _validate_entry(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Validate a cache entry for integrity.
 
         Args:
@@ -607,22 +523,12 @@ Returns cache data, operation status, or statistics.
             data = await self._cache_manager.get_async(cache_type_obj, key)
 
             if data is None:
-                return ToolResult.success_result(
-                    data={
-                        "valid": False,
-                        "exists": False,
-                        "issues": ["Entry not found"]
-                    }
-                )
+                return ToolResult.success_result(data={"valid": False, "exists": False, "issues": ["Entry not found"]})
 
             # Validate the entry
             loop = asyncio.get_event_loop()
             is_valid, issues = await loop.run_in_executor(
-                None,
-                self._cache_manager.validate_cache_entry,
-                data,
-                cache_type_obj,
-                True  # strict mode
+                None, self._cache_manager.validate_cache_entry, data, cache_type_obj, True  # strict mode
             )
 
             return ToolResult.success_result(
@@ -641,12 +547,7 @@ Returns cache data, operation status, or statistics.
             logger.error(f"Validate entry error: {e}")
             return ToolResult.error_result(f"Validate entry failed: {str(e)}")
 
-    async def _invalidate_sec(
-        self,
-        symbol: str,
-        filing_date: str,
-        dry_run: bool = True
-    ) -> ToolResult:
+    async def _invalidate_sec(self, symbol: str, filing_date: str, dry_run: bool = True) -> ToolResult:
         """Invalidate SEC-related cache entries after new filing.
 
         Args:
@@ -667,17 +568,10 @@ Returns cache data, operation status, or statistics.
 
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
-                None,
-                self._cache_manager.invalidate_on_sec_update,
-                symbol,
-                filing_date,
-                dry_run
+                None, self._cache_manager.invalidate_on_sec_update, symbol, filing_date, dry_run
             )
 
-            return ToolResult.success_result(
-                data=result,
-                metadata={"dry_run": dry_run}
-            )
+            return ToolResult.success_result(data=result, metadata={"dry_run": dry_run})
 
         except Exception as e:
             logger.error(f"Invalidate SEC cache error: {e}")
@@ -693,21 +587,12 @@ Returns cache data, operation status, or statistics.
             is_healthy = await self._cache_manager.ping()
 
             return ToolResult.success_result(
-                data={
-                    "healthy": is_healthy,
-                    "status": "operational" if is_healthy else "degraded"
-                }
+                data={"healthy": is_healthy, "status": "operational" if is_healthy else "degraded"}
             )
 
         except Exception as e:
             logger.error(f"Cache ping error: {e}")
-            return ToolResult.success_result(
-                data={
-                    "healthy": False,
-                    "status": "error",
-                    "error": str(e)
-                }
-            )
+            return ToolResult.success_result(data={"healthy": False, "status": "error", "error": str(e)})
 
     def get_schema(self) -> Dict[str, Any]:
         """Get JSON schema for Cache Tool parameters."""
@@ -717,38 +602,30 @@ Returns cache data, operation status, or statistics.
                 "action": {
                     "type": "string",
                     "enum": [
-                        "get", "set", "exists", "delete", "delete_by_symbol",
-                        "clear_type", "get_stats", "get_recent_ops",
-                        "validate", "invalidate_sec", "ping"
+                        "get",
+                        "set",
+                        "exists",
+                        "delete",
+                        "delete_by_symbol",
+                        "clear_type",
+                        "get_stats",
+                        "get_recent_ops",
+                        "validate",
+                        "invalidate_sec",
+                        "ping",
                     ],
-                    "description": "Cache operation to perform"
+                    "description": "Cache operation to perform",
                 },
                 "cache_type": {
                     "type": "string",
                     "enum": list(self.CACHE_TYPE_MAP.keys()),
-                    "description": "Type of cache"
+                    "description": "Type of cache",
                 },
-                "key": {
-                    "type": "object",
-                    "description": "Cache key (dict with symbol, llm_type, etc.)"
-                },
-                "value": {
-                    "type": "object",
-                    "description": "Data to cache (for set action)"
-                },
-                "symbol": {
-                    "type": "string",
-                    "description": "Symbol for symbol-based operations"
-                },
-                "filing_date": {
-                    "type": "string",
-                    "description": "Filing date for SEC invalidation (ISO format)"
-                },
-                "dry_run": {
-                    "type": "boolean",
-                    "description": "Preview mode for invalidation",
-                    "default": True
-                }
+                "key": {"type": "object", "description": "Cache key (dict with symbol, llm_type, etc.)"},
+                "value": {"type": "object", "description": "Data to cache (for set action)"},
+                "symbol": {"type": "string", "description": "Symbol for symbol-based operations"},
+                "filing_date": {"type": "string", "description": "Filing date for SEC invalidation (ISO format)"},
+                "dry_run": {"type": "boolean", "description": "Preview mode for invalidation", "default": True},
             },
-            "required": ["action"]
+            "required": ["action"],
         }

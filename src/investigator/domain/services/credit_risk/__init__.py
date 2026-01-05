@@ -45,30 +45,30 @@ Example:
     print(f"Distress Probability: {result.composite_distress_prob}")
 """
 
-from investigator.domain.services.credit_risk.protocols import (
-    CreditScoreCalculator,
-    CreditScoreResult,
-    FinancialData,
-)
 from investigator.domain.services.credit_risk.altman_zscore import (
+    AltmanZone,
     AltmanZScoreCalculator,
     AltmanZScoreResult,
-    AltmanZone,
 )
 from investigator.domain.services.credit_risk.beneish_mscore import (
     BeneishMScoreCalculator,
     BeneishMScoreResult,
     ManipulationRisk,
 )
+from investigator.domain.services.credit_risk.composite_distress import (
+    CompositeCreditRiskResult,
+    CompositeDistressCalculator,
+    DistressTier,
+)
 from investigator.domain.services.credit_risk.piotroski_fscore import (
+    FinancialStrength,
     PiotroskiFScoreCalculator,
     PiotroskiFScoreResult,
-    FinancialStrength,
 )
-from investigator.domain.services.credit_risk.composite_distress import (
-    CompositeDistressCalculator,
-    CompositeCreditRiskResult,
-    DistressTier,
+from investigator.domain.services.credit_risk.protocols import (
+    CreditScoreCalculator,
+    CreditScoreResult,
+    FinancialData,
 )
 from investigator.domain.services.credit_risk.service import (
     CreditRiskService,

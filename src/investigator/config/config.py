@@ -9,7 +9,6 @@ Handles all configuration settings for the Investment AI system
 """
 
 import json
-import yaml
 import logging
 import os
 import re
@@ -17,6 +16,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+
+import yaml
 
 
 @dataclass

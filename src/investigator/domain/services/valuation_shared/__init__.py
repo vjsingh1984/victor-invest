@@ -33,12 +33,12 @@ Example:
     ttm = data_service.get_ttm_metrics("AAPL")
 """
 
-from .valuation_config_service import ValuationConfigService
-from .sector_multiples_service import SectorMultiplesService
-from .financial_data_service import FinancialDataService
-from .ttm_calculator import TTMCalculator
-from .ratio_calculator import RatioCalculator
 from .fair_value_service import FairValueService
+from .financial_data_service import FinancialDataService
+from .ratio_calculator import RatioCalculator
+from .sector_multiples_service import SectorMultiplesService
+from .ttm_calculator import TTMCalculator
+from .valuation_config_service import ValuationConfigService
 
 __all__ = [
     "ValuationConfigService",

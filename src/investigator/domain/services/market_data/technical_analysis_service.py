@@ -32,8 +32,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from investigator.domain.services.market_data.price_service import PriceService
 from investigator.infrastructure.indicators.technical_indicators import (
@@ -121,6 +121,7 @@ class TechnicalAnalysisService:
         """Lazy load entry/exit engine to avoid circular imports."""
         if self._entry_exit_engine is None:
             from investigator.domain.services.signals.entry_exit_engine import EntryExitEngine
+
             self._entry_exit_engine = EntryExitEngine()
         return self._entry_exit_engine
 
@@ -211,7 +212,7 @@ class TechnicalAnalysisService:
                 return {"entry_signals": [], "exit_signals": [], "optimal_entry_zone": None}
 
             df_enhanced = self._calculate_indicators(df, symbol)
-            current_price = float(df_enhanced['Close'].iloc[-1])
+            current_price = float(df_enhanced["Close"].iloc[-1])
 
             # Build indicators dict for entry/exit engine
             indicators = self._build_indicators_dict(df_enhanced)
@@ -221,8 +222,8 @@ class TechnicalAnalysisService:
 
             # Valuation info
             valuation = {
-                'fair_value': fair_value,
-                'upside': (fair_value - current_price) / current_price if current_price > 0 else 0,
+                "fair_value": fair_value,
+                "upside": (fair_value - current_price) / current_price if current_price > 0 else 0,
             }
 
             # Generate signals
@@ -236,19 +237,19 @@ class TechnicalAnalysisService:
             exit_signals = self.entry_exit_engine.generate_exit_signals(
                 price_data=df_enhanced,
                 indicators=indicators,
-                position_info={'entry_price': current_price, 'current_price': current_price, 'fair_value': fair_value},
+                position_info={"entry_price": current_price, "current_price": current_price, "fair_value": fair_value},
             )
 
             # Calculate optimal entry zone
-            support_levels = [support_resistance['support_2'], support_resistance['support_1']]
-            resistance_levels = [support_resistance['resistance_1'], support_resistance['resistance_2']]
+            support_levels = [support_resistance["support_2"], support_resistance["support_1"]]
+            resistance_levels = [support_resistance["resistance_1"], support_resistance["resistance_2"]]
             entry_zone = self.entry_exit_engine.calculate_optimal_entry_zone(
                 current_price=current_price,
                 fair_value=fair_value,
                 support_levels=support_levels,
                 resistance_levels=resistance_levels,
-                volatility=indicators.get('atr_14', 0) / current_price if current_price > 0 else 0.02,
-                atr=indicators.get('atr_14', 0),
+                volatility=indicators.get("atr_14", 0) / current_price if current_price > 0 else 0.02,
+                atr=indicators.get("atr_14", 0),
             )
 
             return {
@@ -321,19 +322,14 @@ class TechnicalAnalysisService:
         """Calculate technical indicators on price DataFrame."""
         # Convert Decimal to float if needed (database returns Decimal)
         df_calc = df.copy()
-        for col in ['open', 'high', 'low', 'close', 'volume']:
+        for col in ["open", "high", "low", "close", "volume"]:
             if col in df_calc.columns:
                 df_calc[col] = df_calc[col].astype(float)
 
         # Rename to expected format
-        df_calc = df_calc.rename(columns={
-            'date': 'Date',
-            'open': 'Open',
-            'high': 'High',
-            'low': 'Low',
-            'close': 'Close',
-            'volume': 'Volume'
-        })
+        df_calc = df_calc.rename(
+            columns={"date": "Date", "open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+        )
 
         return self.calculator.calculate_all_indicators(df_calc, symbol)
 
@@ -345,29 +341,29 @@ class TechnicalAnalysisService:
         """Extract TechnicalFeatures from enhanced DataFrame."""
         try:
             latest = df.iloc[-1]
-            current_price = float(latest['Close'])
+            current_price = float(latest["Close"])
 
             # Core momentum indicators
-            rsi_14 = float(latest.get('RSI_14', 50))
-            macd_histogram = float(latest.get('MACD_Histogram', 0))
-            adx_14 = float(latest.get('ADX_14', 25))
-            stoch_k = float(latest.get('Stoch_K', 50))
-            mfi_14 = float(latest.get('MFI_14', 50))
+            rsi_14 = float(latest.get("RSI_14", 50))
+            macd_histogram = float(latest.get("MACD_Histogram", 0))
+            adx_14 = float(latest.get("ADX_14", 25))
+            stoch_k = float(latest.get("Stoch_K", 50))
+            mfi_14 = float(latest.get("MFI_14", 50))
 
             # OBV trend (-1, 0, +1)
-            obv_trend = float(latest.get('OBV_Trend', 0))
+            obv_trend = float(latest.get("OBV_Trend", 0))
 
             # Price vs moving averages (normalized deviation)
-            sma_20 = float(latest.get('SMA_20', current_price))
-            sma_50 = float(latest.get('SMA_50', current_price))
-            sma_200 = float(latest.get('SMA_200', current_price))
+            sma_20 = float(latest.get("SMA_20", current_price))
+            sma_50 = float(latest.get("SMA_50", current_price))
+            sma_200 = float(latest.get("SMA_200", current_price))
 
             price_vs_sma_20 = (current_price - sma_20) / sma_20 if sma_20 > 0 else 0
             price_vs_sma_50 = (current_price - sma_50) / sma_50 if sma_50 > 0 else 0
             price_vs_sma_200 = (current_price - sma_200) / sma_200 if sma_200 > 0 else 0
 
             # Volatility (ATR as % of price)
-            atr = float(latest.get('ATR_14', 0))
+            atr = float(latest.get("ATR_14", 0))
             volatility = min(1.0, atr / current_price * 5) if current_price > 0 else 0.5
 
             # Entry/Exit signal features
@@ -424,8 +420,8 @@ class TechnicalAnalysisService:
             exit_strength = -signal_confluence
 
             # Days from support (based on BB position)
-            bb_upper = float(latest.get('BB_Upper', current_price * 1.1))
-            bb_lower = float(latest.get('BB_Lower', current_price * 0.9))
+            bb_upper = float(latest.get("BB_Upper", current_price * 1.1))
+            bb_lower = float(latest.get("BB_Lower", current_price * 0.9))
             if bb_upper != bb_lower:
                 days_from_support = (current_price - bb_lower) / (bb_upper - bb_lower)
             days_from_support = max(0, min(1, days_from_support))
@@ -462,59 +458,67 @@ class TechnicalAnalysisService:
     def _build_indicators_dict(self, df: pd.DataFrame) -> Dict[str, float]:
         """Build indicators dictionary for entry/exit engine."""
         latest = df.iloc[-1]
-        current_price = float(latest['Close'])
+        current_price = float(latest["Close"])
 
         return {
-            "rsi_14": float(latest.get('RSI_14', 50)),
-            "macd": float(latest.get('MACD', 0)),
-            "macd_signal": float(latest.get('MACD_Signal', 0)),
-            "sma_20": float(latest.get('SMA_20', current_price)),
-            "sma_50": float(latest.get('SMA_50', current_price)),
-            "sma_200": float(latest.get('SMA_200', current_price)),
-            "bb_upper": float(latest.get('BB_Upper', current_price * 1.1)),
-            "bb_lower": float(latest.get('BB_Lower', current_price * 0.9)),
-            "bb_middle": float(latest.get('BB_Middle', current_price)),
-            "atr_14": float(latest.get('ATR_14', 0)),
-            "obv": float(latest.get('OBV', 0)),
-            "aobv_20": float(latest.get('AOBV_20', 0)),
-            "obv_trend": "bullish" if latest.get('OBV_Trend', 0) > 0 else ("bearish" if latest.get('OBV_Trend', 0) < 0 else "neutral"),
+            "rsi_14": float(latest.get("RSI_14", 50)),
+            "macd": float(latest.get("MACD", 0)),
+            "macd_signal": float(latest.get("MACD_Signal", 0)),
+            "sma_20": float(latest.get("SMA_20", current_price)),
+            "sma_50": float(latest.get("SMA_50", current_price)),
+            "sma_200": float(latest.get("SMA_200", current_price)),
+            "bb_upper": float(latest.get("BB_Upper", current_price * 1.1)),
+            "bb_lower": float(latest.get("BB_Lower", current_price * 0.9)),
+            "bb_middle": float(latest.get("BB_Middle", current_price)),
+            "atr_14": float(latest.get("ATR_14", 0)),
+            "obv": float(latest.get("OBV", 0)),
+            "aobv_20": float(latest.get("AOBV_20", 0)),
+            "obv_trend": (
+                "bullish"
+                if latest.get("OBV_Trend", 0) > 0
+                else ("bearish" if latest.get("OBV_Trend", 0) < 0 else "neutral")
+            ),
             "obv_divergence": "none",
-            "volume_trend": "increasing" if latest.get('Volume_Trend', 0) > 0 else ("decreasing" if latest.get('Volume_Trend', 0) < 0 else "neutral"),
-            "ADX_14": float(latest.get('ADX_14', 25)),
-            "Plus_DI": float(latest.get('Plus_DI', 0)),
-            "Minus_DI": float(latest.get('Minus_DI', 0)),
-            "MFI_14": float(latest.get('MFI_14', 50)),
-            "Stoch_K": float(latest.get('Stoch_K', 50)),
-            "Stoch_D": float(latest.get('Stoch_D', 50)),
-            "Williams_R": float(latest.get('Williams_R', -50)),
-            "EMA_8": float(latest.get('EMA_8', current_price)),
-            "EMA_12": float(latest.get('EMA_12', current_price)),
-            "EMA_21": float(latest.get('EMA_21', current_price)),
-            "EMA_26": float(latest.get('EMA_26', current_price)),
-            "EMA_50": float(latest.get('EMA_50', current_price)),
-            "EMA_200": float(latest.get('EMA_200', current_price)),
+            "volume_trend": (
+                "increasing"
+                if latest.get("Volume_Trend", 0) > 0
+                else ("decreasing" if latest.get("Volume_Trend", 0) < 0 else "neutral")
+            ),
+            "ADX_14": float(latest.get("ADX_14", 25)),
+            "Plus_DI": float(latest.get("Plus_DI", 0)),
+            "Minus_DI": float(latest.get("Minus_DI", 0)),
+            "MFI_14": float(latest.get("MFI_14", 50)),
+            "Stoch_K": float(latest.get("Stoch_K", 50)),
+            "Stoch_D": float(latest.get("Stoch_D", 50)),
+            "Williams_R": float(latest.get("Williams_R", -50)),
+            "EMA_8": float(latest.get("EMA_8", current_price)),
+            "EMA_12": float(latest.get("EMA_12", current_price)),
+            "EMA_21": float(latest.get("EMA_21", current_price)),
+            "EMA_26": float(latest.get("EMA_26", current_price)),
+            "EMA_50": float(latest.get("EMA_50", current_price)),
+            "EMA_200": float(latest.get("EMA_200", current_price)),
         }
 
     def _get_support_resistance(self, df: pd.DataFrame, current_price: float) -> Dict[str, float]:
         """Get support/resistance levels from DataFrame."""
         latest = df.iloc[-1]
 
-        support_1 = latest.get('Support_1', current_price * 0.95)
-        support_2 = latest.get('Support_2', current_price * 0.90)
-        resistance_1 = latest.get('Resistance_1', current_price * 1.05)
-        resistance_2 = latest.get('Resistance_2', current_price * 1.10)
+        support_1 = latest.get("Support_1", current_price * 0.95)
+        support_2 = latest.get("Support_2", current_price * 0.90)
+        resistance_1 = latest.get("Resistance_1", current_price * 1.05)
+        resistance_2 = latest.get("Resistance_2", current_price * 1.10)
 
         # Fallback to BB if columns don't exist
         if pd.isna(support_1):
-            support_1 = latest.get('BB_Lower', current_price * 0.95)
+            support_1 = latest.get("BB_Lower", current_price * 0.95)
         if pd.isna(resistance_1):
-            resistance_1 = latest.get('BB_Upper', current_price * 1.05)
+            resistance_1 = latest.get("BB_Upper", current_price * 1.05)
 
         return {
-            'support_1': float(support_1) if not pd.isna(support_1) else current_price * 0.95,
-            'support_2': float(support_2) if not pd.isna(support_2) else current_price * 0.90,
-            'resistance_1': float(resistance_1) if not pd.isna(resistance_1) else current_price * 1.05,
-            'resistance_2': float(resistance_2) if not pd.isna(resistance_2) else current_price * 1.10,
+            "support_1": float(support_1) if not pd.isna(support_1) else current_price * 0.95,
+            "support_2": float(support_2) if not pd.isna(support_2) else current_price * 0.90,
+            "resistance_1": float(resistance_1) if not pd.isna(resistance_1) else current_price * 1.05,
+            "resistance_2": float(resistance_2) if not pd.isna(resistance_2) else current_price * 1.10,
         }
 
 

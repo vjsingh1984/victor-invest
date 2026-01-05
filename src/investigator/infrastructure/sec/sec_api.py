@@ -6,7 +6,7 @@ Handles interactions with SEC EDGAR API
 import asyncio
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import requests
 
@@ -31,7 +31,7 @@ _lazy_imports_cache = {}
 class SECApiClient:
     """
     Async-friendly client for interacting with the SEC EDGAR API.
-    
+
     This wraps the mature synchronous utilities used by the legacy pipeline so
     the new agentic orchestrator can reuse the proven filing retrieval logic.
     """
@@ -56,9 +56,9 @@ class SECApiClient:
         cache_dir = getattr(sec_config, "cache_dir", "data")
 
         # Lazy imports to avoid circular dependency
-        from utils.ticker_cik_mapper import TickerCIKMapper
-        from utils.submission_processor import get_submission_processor
         from utils.api_client import SECAPIClient as LegacySECAPIClient
+        from utils.submission_processor import get_submission_processor
+        from utils.ticker_cik_mapper import TickerCIKMapper
 
         self.ticker_mapper = TickerCIKMapper(data_dir=cache_dir, config=self.config)
         self.submission_processor = get_submission_processor()
@@ -210,6 +210,7 @@ class SECApiClient:
     @staticmethod
     def _filter_filings(filings: List["Filing"], form_type: str) -> List["Filing"]:
         from utils.submission_processor import Filing
+
         base_type = (form_type or "").upper()
         results: List[Filing] = []
         for filing in filings:
@@ -227,6 +228,7 @@ class SECApiClient:
     @staticmethod
     def _dict_to_filing(data: Dict[str, Any]) -> "Filing":
         from utils.submission_processor import Filing
+
         return Filing(
             form_type=data.get("form_type", ""),
             filing_date=data.get("filing_date", ""),

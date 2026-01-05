@@ -1,9 +1,10 @@
+import pytest
+
 from investigator.infrastructure.cache.cache_key_builder import (
     CacheKeyBuilder,
     build_cache_key,
 )
 from investigator.infrastructure.cache.cache_types import CacheType
-import pytest
 
 
 def test_build_llm_response_key() -> None:

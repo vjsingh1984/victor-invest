@@ -5,11 +5,12 @@ Tests aggregate quality scoring and model applicability.
 """
 
 import pytest
+
 from investigator.domain.services.data_quality_scorer import (
-    DataQualityScorer,
-    DataQualityLevel,
-    MetricQuality,
     AggregateQuality,
+    DataQualityLevel,
+    DataQualityScorer,
+    MetricQuality,
     get_data_quality_scorer,
 )
 
@@ -32,19 +33,15 @@ class TestMetricQuality:
     def test_creation(self):
         """Test creating metric quality."""
         quality = MetricQuality(
-            category='income',
-            completeness=80.0,
-            recency_score=90.0,
-            consistency_score=100.0,
-            issues=[]
+            category="income", completeness=80.0, recency_score=90.0, consistency_score=100.0, issues=[]
         )
-        assert quality.category == 'income'
+        assert quality.category == "income"
         assert quality.completeness == 80.0
 
     def test_overall_score(self):
         """Test overall score calculation."""
         quality = MetricQuality(
-            category='income',
+            category="income",
             completeness=100.0,
             recency_score=100.0,
             consistency_score=100.0,
@@ -55,7 +52,7 @@ class TestMetricQuality:
     def test_weighted_overall_score(self):
         """Test weighted overall score calculation."""
         quality = MetricQuality(
-            category='income',
+            category="income",
             completeness=80.0,  # 0.50 * 80 = 40
             recency_score=60.0,  # 0.30 * 60 = 18
             consistency_score=100.0,  # 0.20 * 100 = 20
@@ -72,10 +69,10 @@ class TestAggregateQuality:
         quality = AggregateQuality(
             overall_score=85.0,
             level=DataQualityLevel.GOOD,
-            model_applicability={'dcf': 0.90, 'pe': 0.85},
+            model_applicability={"dcf": 0.90, "pe": 0.85},
             valuation_confidence=0.85,
-            issues=['Missing field X'],
-            recommendations=['Consider adding field X']
+            issues=["Missing field X"],
+            recommendations=["Consider adding field X"],
         )
         assert quality.overall_score == 85.0
         assert quality.level == DataQualityLevel.GOOD
@@ -87,31 +84,31 @@ class TestAggregateQuality:
             overall_score=75.0,
             level=DataQualityLevel.GOOD,
             model_applicability={
-                'dcf': 0.90,
-                'pe': 0.60,
-                'ps': 0.40,  # Below threshold
-                'ggm': 0.30,  # Below threshold
+                "dcf": 0.90,
+                "pe": 0.60,
+                "ps": 0.40,  # Below threshold
+                "ggm": 0.30,  # Below threshold
             },
             valuation_confidence=0.75,
         )
         applicable = quality.get_applicable_models(min_confidence=0.5)
-        assert 'dcf' in applicable
-        assert 'pe' in applicable
-        assert 'ps' not in applicable
-        assert 'ggm' not in applicable
+        assert "dcf" in applicable
+        assert "pe" in applicable
+        assert "ps" not in applicable
+        assert "ggm" not in applicable
 
     def test_summary_method(self):
         """Test summary string generation."""
         quality = AggregateQuality(
             overall_score=85.0,
             level=DataQualityLevel.GOOD,
-            model_applicability={'dcf': 0.90, 'pe': 0.85, 'ps': 0.40},
+            model_applicability={"dcf": 0.90, "pe": 0.85, "ps": 0.40},
             valuation_confidence=0.85,
         )
         summary = quality.summary()
-        assert 'GOOD' in summary
-        assert '85.0' in summary
-        assert '85%' in summary
+        assert "GOOD" in summary
+        assert "85.0" in summary
+        assert "85%" in summary
 
 
 class TestDataQualityScorer:
@@ -128,7 +125,7 @@ class TestDataQualityScorer:
         assert result.level == DataQualityLevel.INSUFFICIENT
         assert result.overall_score == 0.0
         assert result.valuation_confidence == 0.0
-        assert 'No data provided' in result.issues
+        assert "No data provided" in result.issues
 
     def test_none_data(self, scorer):
         """Test scoring None data."""
@@ -139,30 +136,30 @@ class TestDataQualityScorer:
     def test_complete_data(self, scorer):
         """Test scoring complete data."""
         data = {
-            'revenue': 10_000_000_000,
-            'gross_profit': 4_000_000_000,
-            'operating_income': 2_000_000_000,
-            'net_income': 1_500_000_000,
-            'ebitda': 2_500_000_000,
-            'eps': 3.0,
-            'operating_cash_flow': 2_000_000_000,
-            'free_cash_flow': 1_500_000_000,
-            'capital_expenditures': -500_000_000,
-            'total_assets': 50_000_000_000,
-            'total_liabilities': 20_000_000_000,
-            'stockholders_equity': 30_000_000_000,
-            'shares_outstanding': 500_000_000,
-            'market_cap': 100_000_000_000,
-            'enterprise_value': 105_000_000_000,
-            'gross_margin': 40.0,
-            'operating_margin': 20.0,
-            'net_margin': 15.0,
-            'fcf_margin': 15.0,
-            'revenue_growth': 10.0,
-            'earnings_growth': 12.0,
-            'pe_ratio': 66.67,
-            'ps_ratio': 10.0,
-            'pb_ratio': 3.33,
+            "revenue": 10_000_000_000,
+            "gross_profit": 4_000_000_000,
+            "operating_income": 2_000_000_000,
+            "net_income": 1_500_000_000,
+            "ebitda": 2_500_000_000,
+            "eps": 3.0,
+            "operating_cash_flow": 2_000_000_000,
+            "free_cash_flow": 1_500_000_000,
+            "capital_expenditures": -500_000_000,
+            "total_assets": 50_000_000_000,
+            "total_liabilities": 20_000_000_000,
+            "stockholders_equity": 30_000_000_000,
+            "shares_outstanding": 500_000_000,
+            "market_cap": 100_000_000_000,
+            "enterprise_value": 105_000_000_000,
+            "gross_margin": 40.0,
+            "operating_margin": 20.0,
+            "net_margin": 15.0,
+            "fcf_margin": 15.0,
+            "revenue_growth": 10.0,
+            "earnings_growth": 12.0,
+            "pe_ratio": 66.67,
+            "ps_ratio": 10.0,
+            "pb_ratio": 3.33,
         }
         result = scorer.score_metrics(data)
         # With this data, we get FAIR level (74.8 score) due to missing some fields
@@ -173,9 +170,9 @@ class TestDataQualityScorer:
     def test_partial_data(self, scorer):
         """Test scoring partial data."""
         data = {
-            'revenue': 10_000_000_000,
-            'net_income': 1_500_000_000,
-            'shares_outstanding': 500_000_000,
+            "revenue": 10_000_000_000,
+            "net_income": 1_500_000_000,
+            "shares_outstanding": 500_000_000,
         }
         result = scorer.score_metrics(data)
         # Should be lower quality than complete data
@@ -186,80 +183,74 @@ class TestDataQualityScorer:
     def test_category_scores(self, scorer):
         """Test category-level scoring."""
         data = {
-            'revenue': 10_000_000_000,
-            'gross_profit': 4_000_000_000,
-            'operating_income': 2_000_000_000,
-            'net_income': 1_500_000_000,
-            'ebitda': 2_500_000_000,
-            'eps': 3.0,
-            'ebit': 2_200_000_000,
+            "revenue": 10_000_000_000,
+            "gross_profit": 4_000_000_000,
+            "operating_income": 2_000_000_000,
+            "net_income": 1_500_000_000,
+            "ebitda": 2_500_000_000,
+            "eps": 3.0,
+            "ebit": 2_200_000_000,
         }
         result = scorer.score_metrics(data)
         # Income category should be well populated
-        assert 'income' in result.category_scores
-        income_quality = result.category_scores['income']
+        assert "income" in result.category_scores
+        income_quality = result.category_scores["income"]
         assert income_quality.completeness == 100.0  # All 7 income fields present
 
     def test_model_applicability_dcf(self, scorer):
         """Test DCF model applicability scoring."""
         data = {
-            'free_cash_flow': 1_500_000_000,
-            'operating_cash_flow': 2_000_000_000,
-            'revenue': 10_000_000_000,
-            'net_income': 1_500_000_000,
-            'capital_expenditures': -500_000_000,
-            'ebitda': 2_500_000_000,
-            'shares_outstanding': 500_000_000,
+            "free_cash_flow": 1_500_000_000,
+            "operating_cash_flow": 2_000_000_000,
+            "revenue": 10_000_000_000,
+            "net_income": 1_500_000_000,
+            "capital_expenditures": -500_000_000,
+            "ebitda": 2_500_000_000,
+            "shares_outstanding": 500_000_000,
         }
         result = scorer.score_metrics(data)
-        assert 'dcf' in result.model_applicability
+        assert "dcf" in result.model_applicability
         # DCF should have good applicability with this data
-        assert result.model_applicability['dcf'] > 0.5
+        assert result.model_applicability["dcf"] > 0.5
 
     def test_model_applicability_pe(self, scorer):
         """Test P/E model applicability scoring."""
         data = {
-            'net_income': 1_500_000_000,
-            'shares_outstanding': 500_000_000,
-            'eps': 3.0,
-            'revenue': 10_000_000_000,
+            "net_income": 1_500_000_000,
+            "shares_outstanding": 500_000_000,
+            "eps": 3.0,
+            "revenue": 10_000_000_000,
         }
         result = scorer.score_metrics(data)
-        assert 'pe' in result.model_applicability
+        assert "pe" in result.model_applicability
         # P/E should have good applicability
-        assert result.model_applicability['pe'] >= 0.3
+        assert result.model_applicability["pe"] >= 0.3
 
     def test_model_not_applicable(self, scorer):
         """Test model with insufficient data."""
         data = {
-            'revenue': 10_000_000_000,
+            "revenue": 10_000_000_000,
             # Missing most fields needed for GGM
         }
         result = scorer.score_metrics(data)
         # GGM requires dividend data which is missing
-        assert result.model_applicability.get('ggm', 0) < result.model_applicability.get('ps', 1)
+        assert result.model_applicability.get("ggm", 0) < result.model_applicability.get("ps", 1)
 
     def test_recency_score_current(self, scorer):
         """Test recency score with current data."""
-        data = {'revenue': 10_000_000_000}
-        metadata = {'quarters_old': 0}
+        data = {"revenue": 10_000_000_000}
+        metadata = {"quarters_old": 0}
         result = scorer.score_metrics(data, metadata)
         # Current data should have high recency
-        assert any(
-            q.recency_score == 100.0
-            for q in result.category_scores.values()
-        )
+        assert any(q.recency_score == 100.0 for q in result.category_scores.values())
 
     def test_recency_score_old(self, scorer):
         """Test recency score with old data."""
-        data = {'revenue': 10_000_000_000}
-        metadata = {'quarters_old': 5}
+        data = {"revenue": 10_000_000_000}
+        metadata = {"quarters_old": 5}
         result = scorer.score_metrics(data, metadata)
         # Old data should have lower recency
-        assert any(
-            q.recency_score == 40.0
-            for q in result.category_scores.values()
-        )
+        assert any(q.recency_score == 40.0 for q in result.category_scores.values())
 
     def test_quality_level_thresholds(self, scorer):
         """Test quality level determination."""
@@ -274,7 +265,7 @@ class TestDataQualityScorer:
     def test_recommendations_generated(self, scorer):
         """Test that recommendations are generated for poor data."""
         data = {
-            'revenue': 10_000_000_000,
+            "revenue": 10_000_000_000,
             # Very sparse data
         }
         result = scorer.score_metrics(data)
@@ -285,7 +276,7 @@ class TestDataQualityScorer:
     def test_issues_collected(self, scorer):
         """Test that issues are collected from categories."""
         data = {
-            'revenue': 10_000_000_000,
+            "revenue": 10_000_000_000,
             # Many fields missing
         }
         result = scorer.score_metrics(data)
@@ -295,11 +286,11 @@ class TestDataQualityScorer:
     def test_get_applicable_models_filter(self, scorer):
         """Test filtering applicable models by confidence."""
         data = {
-            'revenue': 10_000_000_000,
-            'net_income': 1_500_000_000,
-            'shares_outstanding': 500_000_000,
-            'free_cash_flow': 1_200_000_000,
-            'operating_cash_flow': 1_500_000_000,
+            "revenue": 10_000_000_000,
+            "net_income": 1_500_000_000,
+            "shares_outstanding": 500_000_000,
+            "free_cash_flow": 1_200_000_000,
+            "operating_cash_flow": 1_500_000_000,
         }
         result = scorer.score_metrics(data)
         # Get models with high confidence
@@ -326,9 +317,9 @@ class TestQualityScorerEdgeCases:
     def test_all_none_values(self, scorer):
         """Test with all None values."""
         data = {
-            'revenue': None,
-            'net_income': None,
-            'eps': None,
+            "revenue": None,
+            "net_income": None,
+            "eps": None,
         }
         result = scorer.score_metrics(data)
         # Should detect that all values are invalid
@@ -341,10 +332,10 @@ class TestQualityScorerEdgeCases:
     def test_mixed_valid_invalid(self, scorer):
         """Test with mix of valid and invalid values."""
         data = {
-            'revenue': 10_000_000_000,
-            'net_income': None,
-            'eps': float('nan'),
-            'ebitda': 2_500_000_000,
+            "revenue": 10_000_000_000,
+            "net_income": None,
+            "eps": float("nan"),
+            "ebitda": 2_500_000_000,
         }
         result = scorer.score_metrics(data)
         # Should calculate based on valid values only
@@ -353,9 +344,9 @@ class TestQualityScorerEdgeCases:
     def test_extreme_values(self, scorer):
         """Test with extreme but valid values."""
         data = {
-            'revenue': 1e15,  # $1 quadrillion
-            'net_income': 1e14,
-            'pe_ratio': 1.0,  # Very low P/E
+            "revenue": 1e15,  # $1 quadrillion
+            "net_income": 1e14,
+            "pe_ratio": 1.0,  # Very low P/E
         }
         result = scorer.score_metrics(data)
         # Should handle extreme values
@@ -364,10 +355,10 @@ class TestQualityScorerEdgeCases:
     def test_negative_values(self, scorer):
         """Test with negative financial values."""
         data = {
-            'revenue': 10_000_000_000,
-            'net_income': -500_000_000,  # Net loss
-            'operating_income': -200_000_000,
-            'free_cash_flow': -100_000_000,
+            "revenue": 10_000_000_000,
+            "net_income": -500_000_000,  # Net loss
+            "operating_income": -200_000_000,
+            "free_cash_flow": -100_000_000,
         }
         result = scorer.score_metrics(data)
         # Negative values are valid for certain metrics

@@ -384,7 +384,6 @@ class RatioCalculator:
             "market_cap": market_cap,
             "shares_outstanding": shares,
             "enterprise_value": market_cap + total_debt - cash,
-
             # Valuation ratios
             "pe_ratio": self.calculate_pe_ratio(current_price, eps=eps),
             "ps_ratio": self.calculate_ps_ratio(market_cap=market_cap, revenue=revenue),
@@ -395,31 +394,25 @@ class RatioCalculator:
                 total_debt=total_debt,
                 cash=cash,
             ),
-
             # Dividend
             "payout_ratio": self.calculate_payout_ratio(dividends, net_income),
-
             # Margins
             "gross_margin": margins["gross_margin"],
             "operating_margin": margins["operating_margin"],
             "net_margin": margins["net_margin"],
             "fcf_margin": margins["fcf_margin"],
-
             # Returns and leverage
             "roe": self.calculate_roe(net_income, equity),
             "debt_to_equity": self.calculate_debt_to_equity(
                 total_debt=total_debt,
                 stockholders_equity=equity,
             ),
-
             # Growth metrics
             "revenue_growth_pct": revenue_growth_pct,
             "rule_of_40_score": rule_of_40,
-
             # Per-share metrics
             "ttm_eps": eps,
             "book_value_per_share": bvps,
-
             # Metadata
             "quarters_available": financials.get("quarters_included", 4),
         }

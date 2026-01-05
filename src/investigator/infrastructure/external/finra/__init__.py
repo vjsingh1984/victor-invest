@@ -23,8 +23,8 @@ Data Source: https://api.finra.org/data/
 """
 
 from investigator.infrastructure.external.finra.short_interest import (
-    ShortInterestFetcher,
     ShortInterestData,
+    ShortInterestFetcher,
     ShortVolumeData,
     get_short_interest_fetcher,
 )

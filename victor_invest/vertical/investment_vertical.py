@@ -63,7 +63,7 @@ See: docs/ARCHITECTURE_DECISION_DATA_ACCESS.md for full rationale.
 
 from typing import Any, Dict, List, Optional
 
-from victor.core.verticals import VerticalBase, VerticalConfig, StageDefinition
+from victor.core.verticals import StageDefinition, VerticalBase, VerticalConfig
 
 from victor_invest.prompts.investment_prompts import INVESTMENT_SYSTEM_PROMPT
 
@@ -294,8 +294,10 @@ class InvestmentVertical(VerticalBase):
         Returns:
             InvestmentWorkflowProvider instance (extends BaseYAMLWorkflowProvider).
         """
+
         def _create():
             from victor_invest.workflows import InvestmentWorkflowProvider
+
             return InvestmentWorkflowProvider()
 
         return cls._get_cached_extension("workflow", _create)
@@ -333,6 +335,7 @@ class InvestmentVertical(VerticalBase):
         if model is None and provider == "ollama":
             try:
                 from investigator.config import get_config
+
                 config = get_config()
                 model = config.ollama.models.get("synthesis", "gpt-oss:20b")
             except Exception:
@@ -377,8 +380,8 @@ class InvestmentVertical(VerticalBase):
             return await workflow_provider.run_workflow(mode, symbol)
 
         # Fallback to direct workflow call
-        from victor_invest.workflows import run_analysis as direct_run
         from victor_invest.workflows import AnalysisMode
+        from victor_invest.workflows import run_analysis as direct_run
 
         mode_map = {
             "quick": AnalysisMode.QUICK,

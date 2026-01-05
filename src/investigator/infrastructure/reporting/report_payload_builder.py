@@ -19,9 +19,8 @@ Date: 2025-11-02
 """
 
 import logging
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +33,7 @@ class ReportDataContract:
     This ensures both sides understand the expected structure and prevents
     future regressions when either component changes.
     """
+
     # Core identification
     symbol: str
     timestamp: str
@@ -111,7 +111,7 @@ class ReportPayloadBuilder:
         synthesis_report: Dict[str, Any],
         fundamental_data: Optional[Dict] = None,
         technical_data: Optional[Dict] = None,
-        chart_paths: Optional[List[str]] = None
+        chart_paths: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Build normalized PDF report payload from synthesis output.
@@ -154,75 +154,67 @@ class ReportPayloadBuilder:
 
         # Build normalized payload
         payload = {
-            'symbol': symbol,
-            'timestamp': synthesis_report.get('timestamp', ''),
-
+            "symbol": symbol,
+            "timestamp": synthesis_report.get("timestamp", ""),
             # Recommendation
-            'recommendation': recommendation.get('action', 'hold'),
-            'confidence': int(recommendation.get('confidence', 50)),
-
+            "recommendation": recommendation.get("action", "hold"),
+            "confidence": int(recommendation.get("confidence", 50)),
             # Scores (convert to 0-10 scale)
-            'composite_score': self._scale_score(scores.get('composite', 50)),
-            'fundamental_score': self._scale_score(scores.get('fundamental', 50)),
-            'technical_score': self._scale_score(scores.get('technical', 50)),
-            'value_score': self._scale_score(scores.get('value', 50)),
-            'growth_score': self._scale_score(scores.get('growth', 50)),
-            'business_quality_score': self._scale_score(scores.get('quality', 50)),
-
+            "composite_score": self._scale_score(scores.get("composite", 50)),
+            "fundamental_score": self._scale_score(scores.get("fundamental", 50)),
+            "technical_score": self._scale_score(scores.get("technical", 50)),
+            "value_score": self._scale_score(scores.get("value", 50)),
+            "growth_score": self._scale_score(scores.get("growth", 50)),
+            "business_quality_score": self._scale_score(scores.get("quality", 50)),
             # Financials
-            'current_price': financials.get('current_price', 0),
-            'fair_value': financials.get('fair_value', 0),
-            'price_target_12m': financials.get('price_target_12m', 0),
-            'market_cap': financials.get('market_cap', 0),
-
+            "current_price": financials.get("current_price", 0),
+            "fair_value": financials.get("fair_value", 0),
+            "price_target_12m": financials.get("price_target_12m", 0),
+            "market_cap": financials.get("market_cap", 0),
             # Investment thesis
-            'investment_thesis': thesis.get('thesis', ''),
-            'key_insights': thesis.get('insights', []),
-            'value_drivers': thesis.get('drivers', []),
-
+            "investment_thesis": thesis.get("thesis", ""),
+            "key_insights": thesis.get("insights", []),
+            "value_drivers": thesis.get("drivers", []),
             # Risk assessment
-            'risk_assessment': risks,
-            'overall_risk': int(risks.get('overall_risk', 50)),
-            'primary_risks': risks.get('primary_risks', []),
-            'risk_tier': risks.get('tier', 'MEDIUM'),
-
+            "risk_assessment": risks,
+            "overall_risk": int(risks.get("overall_risk", 50)),
+            "primary_risks": risks.get("primary_risks", []),
+            "risk_tier": risks.get("tier", "MEDIUM"),
             # Scenarios
-            'scenarios': scenarios,
-            'bull_case': scenarios.get('bull_case'),
-            'base_case': scenarios.get('base_case'),
-            'bear_case': scenarios.get('bear_case'),
-
+            "scenarios": scenarios,
+            "bull_case": scenarios.get("bull_case"),
+            "base_case": scenarios.get("base_case"),
+            "bear_case": scenarios.get("bear_case"),
             # Action plan
-            'action_plan': action_plan,
-            'specific_actions': action_plan.get('actions', []),
-
+            "action_plan": action_plan,
+            "specific_actions": action_plan.get("actions", []),
             # Trends
-            'multi_year_trends': unwrapped.get('multi_year_trends', {}),
-            'trend_analysis': unwrapped.get('trend_analysis', {}),
-
+            "multi_year_trends": unwrapped.get("multi_year_trends", {}),
+            "trend_analysis": unwrapped.get("trend_analysis", {}),
             # Conflicts
-            'conflicts': unwrapped.get('conflicts', []),
-            'reconciliation': unwrapped.get('reconciliation', ''),
-
+            "conflicts": unwrapped.get("conflicts", []),
+            "reconciliation": unwrapped.get("reconciliation", ""),
             # Charts
-            'chart_paths': chart_paths or []
+            "chart_paths": chart_paths or [],
         }
 
-        self.logger.info(f"✅ Built payload for {symbol}: {recommendation.get('action', 'hold').upper()} "
-                        f"(composite: {payload['composite_score']:.1f}/10, "
-                        f"price: ${payload['current_price']:.2f})")
+        self.logger.info(
+            f"✅ Built payload for {symbol}: {recommendation.get('action', 'hold').upper()} "
+            f"(composite: {payload['composite_score']:.1f}/10, "
+            f"price: ${payload['current_price']:.2f})"
+        )
 
         return payload
 
     def _unwrap_response(self, synthesis_report: Dict) -> Dict:
         """Unwrap LLM response wrappers to get actual data."""
         # Check for nested response wrapper
-        if 'response' in synthesis_report:
-            data = synthesis_report['response']
+        if "response" in synthesis_report:
+            data = synthesis_report["response"]
             if isinstance(data, dict):
                 # Further unwrap if there's a 'report' key
-                if 'report' in data:
-                    return data['report']
+                if "report" in data:
+                    return data["report"]
                 return data
             else:
                 self.logger.warning(f"Response is {type(data)}, not dict - returning empty")
@@ -231,13 +223,13 @@ class ReportPayloadBuilder:
 
     def _extract_recommendation(self, data: Dict) -> Dict:
         """Extract recommendation and confidence."""
-        rec = data.get('recommendation', {})
+        rec = data.get("recommendation", {})
         if isinstance(rec, dict):
             return {
-                'action': rec.get('action', rec.get('recommendation', 'hold')),
-                'confidence': rec.get('confidence', rec.get('confidence_level', 50))
+                "action": rec.get("action", rec.get("recommendation", "hold")),
+                "confidence": rec.get("confidence", rec.get("confidence_level", 50)),
             }
-        return {'action': 'hold', 'confidence': 50}
+        return {"action": "hold", "confidence": 50}
 
     def _extract_scores(self, data: Dict) -> Dict:
         """
@@ -249,40 +241,27 @@ class ReportPayloadBuilder:
         - Fallback to analysis_scores if composite_scores missing
         """
         # Try composite_scores first (current synthesis format)
-        composite = data.get('composite_scores', {})
-        analysis = data.get('analysis_scores', {})
+        composite = data.get("composite_scores", {})
+        analysis = data.get("analysis_scores", {})
 
         # Try to get assessment scores as fallback
-        assessment = data.get('fundamental_assessment', {})
+        assessment = data.get("fundamental_assessment", {})
 
         return {
-            'composite': (
-                composite.get('overall_score') or
-                composite.get('composite') or
-                analysis.get('composite', 50)
+            "composite": (
+                composite.get("overall_score") or composite.get("composite") or analysis.get("composite", 50)
             ),
-            'fundamental': (
-                composite.get('fundamental_score') or
-                analysis.get('fundamental') or
-                assessment.get('financial_health', {}).get('score', 50)
+            "fundamental": (
+                composite.get("fundamental_score")
+                or analysis.get("fundamental")
+                or assessment.get("financial_health", {}).get("score", 50)
             ),
-            'technical': (
-                composite.get('technical_score') or
-                analysis.get('technical', 50)
+            "technical": (composite.get("technical_score") or analysis.get("technical", 50)),
+            "value": (composite.get("value_score") or analysis.get("value", 50)),
+            "growth": (composite.get("growth_score") or analysis.get("growth", 50)),
+            "quality": (
+                composite.get("business_quality_score") or composite.get("quality_score") or analysis.get("quality", 50)
             ),
-            'value': (
-                composite.get('value_score') or
-                analysis.get('value', 50)
-            ),
-            'growth': (
-                composite.get('growth_score') or
-                analysis.get('growth', 50)
-            ),
-            'quality': (
-                composite.get('business_quality_score') or
-                composite.get('quality_score') or
-                analysis.get('quality', 50)
-            )
         }
 
     def _extract_financials(self, data: Dict, fundamental_data: Optional[Dict], technical_data: Optional[Dict]) -> Dict:
@@ -294,11 +273,11 @@ class ReportPayloadBuilder:
         2. Narrative report appendix (key_metrics_summary)
         3. Fundamental agent data
         """
-        valuation = data.get('valuation', {})
+        valuation = data.get("valuation", {})
 
         # Try narrative report appendix (where synthesis actually puts the data)
-        appendix = data.get('appendix', {})
-        key_metrics = appendix.get('key_metrics_summary', {})
+        appendix = data.get("appendix", {})
+        key_metrics = appendix.get("key_metrics_summary", {})
 
         # Helper to parse currency strings like "$270.37" -> 270.37
         def parse_currency(value):
@@ -306,16 +285,16 @@ class ReportPayloadBuilder:
                 return float(value)
             if isinstance(value, str):
                 # Remove $, commas, B/M/K suffixes
-                cleaned = value.replace('$', '').replace(',', '').strip()
+                cleaned = value.replace("$", "").replace(",", "").strip()
                 # Handle B/M/K suffixes
                 multiplier = 1
-                if cleaned.endswith('B'):
+                if cleaned.endswith("B"):
                     multiplier = 1_000_000_000
                     cleaned = cleaned[:-1]
-                elif cleaned.endswith('M'):
+                elif cleaned.endswith("M"):
                     multiplier = 1_000_000
                     cleaned = cleaned[:-1]
-                elif cleaned.endswith('K'):
+                elif cleaned.endswith("K"):
                     multiplier = 1_000
                     cleaned = cleaned[:-1]
                 try:
@@ -326,49 +305,39 @@ class ReportPayloadBuilder:
 
         # Extract with fallback chain
         financials = {
-            'current_price': (
-                valuation.get('current_price', 0) or
-                parse_currency(key_metrics.get('current_price', 0)) or
-                0
+            "current_price": (
+                valuation.get("current_price", 0) or parse_currency(key_metrics.get("current_price", 0)) or 0
             ),
-            'fair_value': (
-                valuation.get('fair_value', 0) or
-                parse_currency(key_metrics.get('fair_value', 0)) or
-                0
+            "fair_value": (valuation.get("fair_value", 0) or parse_currency(key_metrics.get("fair_value", 0)) or 0),
+            "price_target_12m": (
+                valuation.get("price_target_12m", 0)
+                or valuation.get("price_target", 0)
+                or parse_currency(key_metrics.get("price_target", 0))
+                or 0
             ),
-            'price_target_12m': (
-                valuation.get('price_target_12m', 0) or
-                valuation.get('price_target', 0) or
-                parse_currency(key_metrics.get('price_target', 0)) or
-                0
-            ),
-            'market_cap': (
-                data.get('market_cap', 0) or
-                parse_currency(key_metrics.get('market_cap', 0)) or
-                0
-            )
+            "market_cap": (data.get("market_cap", 0) or parse_currency(key_metrics.get("market_cap", 0)) or 0),
         }
 
         # Backfill from fundamental if still missing
         if fundamental_data:
-            fund_val = fundamental_data.get('valuation', {})
-            fund_analysis_response = fundamental_data.get('analysis', {}).get('response', {})
-            fund_ratios = fund_analysis_response.get('ratios', {})
-            fund_company_data = fundamental_data.get('analysis', {}).get('company_data', {})
+            fund_val = fundamental_data.get("valuation", {})
+            fund_analysis_response = fundamental_data.get("analysis", {}).get("response", {})
+            fund_ratios = fund_analysis_response.get("ratios", {})
+            fund_company_data = fundamental_data.get("analysis", {}).get("company_data", {})
 
-            if financials['current_price'] == 0:
-                financials['current_price'] = (
-                    fund_val.get('current_price', 0) or
-                    fund_ratios.get('current_price', 0) or
-                    fund_company_data.get('current_price', 0)
+            if financials["current_price"] == 0:
+                financials["current_price"] = (
+                    fund_val.get("current_price", 0)
+                    or fund_ratios.get("current_price", 0)
+                    or fund_company_data.get("current_price", 0)
                 )
-            if financials['fair_value'] == 0:
-                financials['fair_value'] = fund_val.get('fair_value', 0)
-            if financials['market_cap'] == 0:
-                financials['market_cap'] = (
-                    fundamental_data.get('market_cap', 0) or
-                    fund_company_data.get('market_cap', 0) or
-                    fund_ratios.get('market_cap', 0)
+            if financials["fair_value"] == 0:
+                financials["fair_value"] = fund_val.get("fair_value", 0)
+            if financials["market_cap"] == 0:
+                financials["market_cap"] = (
+                    fundamental_data.get("market_cap", 0)
+                    or fund_company_data.get("market_cap", 0)
+                    or fund_ratios.get("market_cap", 0)
                 )
 
         return financials
@@ -383,25 +352,25 @@ class ReportPayloadBuilder:
         - Nested dict with summary/thesis keys
         """
         # Try executive_summary first (current synthesis format)
-        exec_summary = data.get('executive_summary', {})
-        thesis_data = data.get('investment_thesis', {})
+        exec_summary = data.get("executive_summary", {})
+        thesis_data = data.get("investment_thesis", {})
 
         # Handle both string and dict formats
         if exec_summary and isinstance(exec_summary, dict):
             # Current format: executive_summary contains thesis
-            thesis = exec_summary.get('investment_thesis', '')
-            insights = data.get('key_insights', [])
+            thesis = exec_summary.get("investment_thesis", "")
+            insights = data.get("key_insights", [])
             drivers = []  # Not always present in executive_summary
         elif isinstance(thesis_data, str):
             # Legacy format: thesis is a direct string
             thesis = thesis_data
-            insights = data.get('key_insights', [])
+            insights = data.get("key_insights", [])
             drivers = []
         elif isinstance(thesis_data, dict):
             # Legacy format: thesis is nested dict
-            thesis = thesis_data.get('summary', thesis_data.get('thesis', ''))
-            insights = thesis_data.get('key_insights', thesis_data.get('insights', []))
-            drivers = thesis_data.get('value_drivers', thesis_data.get('drivers', []))
+            thesis = thesis_data.get("summary", thesis_data.get("thesis", ""))
+            insights = thesis_data.get("key_insights", thesis_data.get("insights", []))
+            drivers = thesis_data.get("value_drivers", thesis_data.get("drivers", []))
         else:
             thesis = ""
             insights = []
@@ -409,66 +378,66 @@ class ReportPayloadBuilder:
 
         # If still empty, try fundamental_assessment
         if not thesis:
-            fund_assessment = data.get('fundamental_assessment', {})
+            fund_assessment = data.get("fundamental_assessment", {})
             if isinstance(fund_assessment, dict):
-                thesis = fund_assessment.get('investment_thesis', '')
+                thesis = fund_assessment.get("investment_thesis", "")
 
         return {
-            'thesis': thesis,
-            'insights': insights if isinstance(insights, list) else [],
-            'drivers': drivers if isinstance(drivers, list) else []
+            "thesis": thesis,
+            "insights": insights if isinstance(insights, list) else [],
+            "drivers": drivers if isinstance(drivers, list) else [],
         }
 
     def _extract_risks(self, data: Dict) -> Dict:
         """Extract risk assessment."""
-        risk_data = data.get('risk_assessment', {})
+        risk_data = data.get("risk_assessment", {})
 
         return {
-            'overall_risk': risk_data.get('overall_risk', risk_data.get('risk_score', 50)),
-            'primary_risks': risk_data.get('primary_risks', risk_data.get('risks', [])),
-            'tier': risk_data.get('risk_tier', risk_data.get('tier', 'MEDIUM'))
+            "overall_risk": risk_data.get("overall_risk", risk_data.get("risk_score", 50)),
+            "primary_risks": risk_data.get("primary_risks", risk_data.get("risks", [])),
+            "tier": risk_data.get("risk_tier", risk_data.get("tier", "MEDIUM")),
         }
 
     def _extract_scenarios(self, data: Dict) -> Dict:
         """Extract price scenarios."""
-        scenarios = data.get('scenarios', {})
+        scenarios = data.get("scenarios", {})
 
         return {
-            'bull_case': scenarios.get('bull_case', scenarios.get('bull')),
-            'base_case': scenarios.get('base_case', scenarios.get('base')),
-            'bear_case': scenarios.get('bear_case', scenarios.get('bear'))
+            "bull_case": scenarios.get("bull_case", scenarios.get("bull")),
+            "base_case": scenarios.get("base_case", scenarios.get("base")),
+            "bear_case": scenarios.get("bear_case", scenarios.get("bear")),
         }
 
     def _extract_action_plan(self, data: Dict) -> Dict:
         """Extract action plan."""
-        action_plan = data.get('action_plan', {})
+        action_plan = data.get("action_plan", {})
 
-        actions = action_plan.get('specific_actions', action_plan.get('actions', []))
+        actions = action_plan.get("specific_actions", action_plan.get("actions", []))
 
         return {
-            'actions': actions if isinstance(actions, list) else [],
-            'timeframe': action_plan.get('timeframe', ''),
-            'monitoring': action_plan.get('monitoring', [])
+            "actions": actions if isinstance(actions, list) else [],
+            "timeframe": action_plan.get("timeframe", ""),
+            "monitoring": action_plan.get("monitoring", []),
         }
 
     def _backfill_financials(self, financials: Dict, fundamental_data: Dict) -> Dict:
         """Backfill missing financials from fundamental analysis."""
-        if financials['current_price'] == 0:
+        if financials["current_price"] == 0:
             # Try ratios
-            ratios = fundamental_data.get('analysis', {}).get('response', {}).get('ratios', {})
-            financials['current_price'] = ratios.get('current_price', 0)
+            ratios = fundamental_data.get("analysis", {}).get("response", {}).get("ratios", {})
+            financials["current_price"] = ratios.get("current_price", 0)
 
-        if financials['market_cap'] == 0:
+        if financials["market_cap"] == 0:
             # Try multiple locations including company_data
-            ratios = fundamental_data.get('analysis', {}).get('response', {}).get('ratios', {})
-            company_data = fundamental_data.get('analysis', {}).get('company_data', {})
-            financials['market_cap'] = (
-                fundamental_data.get('market_cap', 0) or
-                company_data.get('market_cap', 0) or
-                ratios.get('market_cap', 0) or
-                fundamental_data.get('analysis', {}).get('response', {}).get('market_cap', 0)
+            ratios = fundamental_data.get("analysis", {}).get("response", {}).get("ratios", {})
+            company_data = fundamental_data.get("analysis", {}).get("company_data", {})
+            financials["market_cap"] = (
+                fundamental_data.get("market_cap", 0)
+                or company_data.get("market_cap", 0)
+                or ratios.get("market_cap", 0)
+                or fundamental_data.get("analysis", {}).get("response", {}).get("market_cap", 0)
             )
-            if financials['market_cap'] > 0:
+            if financials["market_cap"] > 0:
                 self.logger.info(f"✅ Backfilled market_cap from fundamental agent: ${financials['market_cap']:,.0f}")
 
         return financials
@@ -476,11 +445,11 @@ class ReportPayloadBuilder:
     def _backfill_scores(self, scores: Dict, fundamental_data: Dict) -> Dict:
         """Backfill scores from fundamental data."""
         # If composite is still default, try to calculate from fundamentals
-        if scores['composite'] == 50:
-            quality_score = fundamental_data.get('data_quality', {}).get('data_quality_score', 0)
+        if scores["composite"] == 50:
+            quality_score = fundamental_data.get("data_quality", {}).get("data_quality_score", 0)
             if quality_score > 0:
                 # Use quality score as a proxy for composite
-                scores['composite'] = quality_score
+                scores["composite"] = quality_score
 
         return scores
 
@@ -491,19 +460,19 @@ class ReportPayloadBuilder:
         Technical agent has current_price in: technical['analysis']['response']['current_price']
         """
         # Extract from technical analysis response
-        tech_analysis = technical_data.get('analysis', {}).get('response', {})
+        tech_analysis = technical_data.get("analysis", {}).get("response", {})
 
-        if financials['current_price'] == 0:
-            current_price = tech_analysis.get('current_price', 0)
+        if financials["current_price"] == 0:
+            current_price = tech_analysis.get("current_price", 0)
             if current_price > 0:
-                financials['current_price'] = current_price
+                financials["current_price"] = current_price
                 self.logger.info(f"✅ Backfilled current_price from technical agent: ${current_price:.2f}")
 
         # Technical analysis might also have market_cap in some cases
-        if financials['market_cap'] == 0:
-            market_cap = tech_analysis.get('market_cap', 0)
+        if financials["market_cap"] == 0:
+            market_cap = tech_analysis.get("market_cap", 0)
             if market_cap > 0:
-                financials['market_cap'] = market_cap
+                financials["market_cap"] = market_cap
                 self.logger.info(f"✅ Backfilled market_cap from technical agent: ${market_cap:,.0f}")
 
         return financials
@@ -527,13 +496,13 @@ class ReportPayloadBuilder:
         """Validate critical fields and log warnings."""
         issues = []
 
-        if financials['current_price'] == 0:
+        if financials["current_price"] == 0:
             issues.append("current_price=0")
 
-        if financials['market_cap'] == 0:
+        if financials["market_cap"] == 0:
             issues.append("market_cap=0")
 
-        if scores['composite'] == 50:
+        if scores["composite"] == 50:
             issues.append("composite_score=default(50)")
 
         if issues:

@@ -19,8 +19,8 @@ Usage:
     print(creds.host, creds.port, creds.database, creds.username, creds.password)
 """
 
-import os
 import logging
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -183,6 +183,7 @@ def validate_database_connection(alias: str) -> bool:
     """
     try:
         import psycopg2
+
         creds = get_database_credentials(alias)
 
         conn = psycopg2.connect(

@@ -27,14 +27,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from investigator.domain.services.rl.models import (
-    Experience,
-    TrainingMetrics,
-    EvaluationMetrics,
-)
-from investigator.domain.services.rl.policy.base import RLPolicy
 from investigator.domain.services.rl.feature_extractor import ValuationContextExtractor
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
+from investigator.domain.services.rl.models import (
+    EvaluationMetrics,
+    Experience,
+    TrainingMetrics,
+)
+from investigator.domain.services.rl.policy.base import RLPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,8 @@ class RLTrainer:
             and ((exp.blended_fair_value > exp.current_price) == (exp.reward.reward_90d > 0))
         )
         valid_direction_samples = sum(
-            1 for exp in experiences
+            1
+            for exp in experiences
             if exp.reward.reward_90d is not None
             and exp.blended_fair_value is not None
             and exp.current_price is not None

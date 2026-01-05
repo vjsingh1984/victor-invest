@@ -94,20 +94,20 @@ from typing import Any, Callable, Dict, Optional
 
 from victor.framework.graph import END, StateGraph
 
-from victor_invest.workflows.state import AnalysisMode, AnalysisWorkflowState
-from victor_invest.tools import (
-    SECFilingTool,
-    ValuationTool,
-    TechnicalIndicatorsTool,
-    MarketDataTool,
-)
 from victor_invest.agents import (
-    SEC_AGENT_SPEC,
     FUNDAMENTAL_AGENT_SPEC,
-    TECHNICAL_AGENT_SPEC,
     MARKET_AGENT_SPEC,
+    SEC_AGENT_SPEC,
     SYNTHESIS_AGENT_SPEC,
+    TECHNICAL_AGENT_SPEC,
 )
+from victor_invest.tools import (
+    MarketDataTool,
+    SECFilingTool,
+    TechnicalIndicatorsTool,
+    ValuationTool,
+)
+from victor_invest.workflows.state import AnalysisMode, AnalysisWorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -186,16 +186,10 @@ async def fetch_sec_data(state_input) -> dict:
         sec_tool = await _get_sec_tool()
 
         # Get company facts (structured financial data from SEC CompanyFacts API)
-        facts_result = await sec_tool.execute(
-            symbol=state.symbol,
-            action="get_company_facts"
-        )
+        facts_result = await sec_tool.execute(symbol=state.symbol, action="get_company_facts")
 
         # Extract financial metrics
-        metrics_result = await sec_tool.execute(
-            symbol=state.symbol,
-            action="extract_metrics"
-        )
+        metrics_result = await sec_tool.execute(symbol=state.symbol, action="extract_metrics")
 
         if facts_result.success or metrics_result.success:
             state.sec_data = {
@@ -240,23 +234,13 @@ async def fetch_market_data(state_input) -> dict:
         market_tool = await _get_market_tool()
 
         # Get current quote
-        quote_result = await market_tool.execute(
-            symbol=state.symbol,
-            action="get_quote"
-        )
+        quote_result = await market_tool.execute(symbol=state.symbol, action="get_quote")
 
         # Get historical data (1 year for technical analysis)
-        history_result = await market_tool.execute(
-            symbol=state.symbol,
-            action="get_history",
-            days=365
-        )
+        history_result = await market_tool.execute(symbol=state.symbol, action="get_history", days=365)
 
         # Get company info
-        info_result = await market_tool.execute(
-            symbol=state.symbol,
-            action="get_info"
-        )
+        info_result = await market_tool.execute(symbol=state.symbol, action="get_info")
 
         if quote_result.success or history_result.success:
             state.market_data = {
@@ -305,10 +289,7 @@ async def run_fundamental_analysis(state_input) -> dict:
         market_tool = await _get_market_tool()
 
         # Get current price for valuation models
-        quote_result = await market_tool.execute(
-            symbol=state.symbol,
-            action="get_quote"
-        )
+        quote_result = await market_tool.execute(symbol=state.symbol, action="get_quote")
         current_price = None
         if quote_result.success and quote_result.data:
             current_price = quote_result.data.get("current_price")
@@ -330,10 +311,7 @@ async def run_fundamental_analysis(state_input) -> dict:
         )
 
         # Get archetype detection (identifies company type for model weighting)
-        archetype_result = await valuation_tool.execute(
-            symbol=state.symbol,
-            model="detect_archetype"
-        )
+        archetype_result = await valuation_tool.execute(symbol=state.symbol, model="detect_archetype")
 
         if valuation_result.success:
             state.fundamental_analysis = {
@@ -383,22 +361,13 @@ async def run_technical_analysis(state_input) -> dict:
         technical_tool = await _get_technical_tool()
 
         # Run comprehensive technical analysis
-        analysis_result = await technical_tool.execute(
-            symbol=state.symbol,
-            action="calculate_all"
-        )
+        analysis_result = await technical_tool.execute(symbol=state.symbol, action="calculate_all")
 
         # Get technical summary with signals
-        trend_result = await technical_tool.execute(
-            symbol=state.symbol,
-            action="get_summary"
-        )
+        trend_result = await technical_tool.execute(symbol=state.symbol, action="get_summary")
 
         # Get support/resistance levels
-        levels_result = await technical_tool.execute(
-            symbol=state.symbol,
-            action="get_support_resistance"
-        )
+        levels_result = await technical_tool.execute(symbol=state.symbol, action="get_support_resistance")
 
         if analysis_result.success:
             state.technical_analysis = {
@@ -454,20 +423,12 @@ async def run_market_context_analysis(state_input) -> dict:
         price_changes = {}
 
         for period in periods:
-            result = await market_tool.execute(
-                symbol=state.symbol,
-                action="get_price_change",
-                period=period
-            )
+            result = await market_tool.execute(symbol=state.symbol, action="get_price_change", period=period)
             if result.success:
                 price_changes[period] = result.data
 
         # Calculate relative performance vs market (SPY)
-        market_result = await market_tool.execute(
-            symbol="SPY",
-            action="get_price_change",
-            period="1y"
-        )
+        market_result = await market_tool.execute(symbol="SPY", action="get_price_change", period="1y")
 
         relative_performance = None
         if market_result.success and "1y" in price_changes:
@@ -634,23 +595,29 @@ async def run_synthesis(state_input) -> dict:
         scores = {}
 
         # Get weight distribution from SYNTHESIS_AGENT_SPEC
-        weights = SYNTHESIS_AGENT_SPEC.metadata.get("weight_distribution", {
-            "fundamental": 0.35,
-            "technical": 0.20,
-            "market_context": 0.15,
-            "sentiment": 0.15,
-            "sec_quality": 0.15,
-        })
+        weights = SYNTHESIS_AGENT_SPEC.metadata.get(
+            "weight_distribution",
+            {
+                "fundamental": 0.35,
+                "technical": 0.20,
+                "market_context": 0.15,
+                "sentiment": 0.15,
+                "sec_quality": 0.15,
+            },
+        )
 
         # Get decision thresholds
-        thresholds = SYNTHESIS_AGENT_SPEC.metadata.get("decision_thresholds", {
-            "strong_buy": 80,
-            "buy": 65,
-            "hold_upper": 65,
-            "hold_lower": 35,
-            "sell": 35,
-            "strong_sell": 20,
-        })
+        thresholds = SYNTHESIS_AGENT_SPEC.metadata.get(
+            "decision_thresholds",
+            {
+                "strong_buy": 80,
+                "buy": 65,
+                "hold_upper": 65,
+                "hold_lower": 35,
+                "sell": 35,
+                "strong_sell": 20,
+            },
+        )
 
         # Process fundamental analysis
         if state.fundamental_analysis and state.fundamental_analysis.get("status") == "success":
@@ -747,7 +714,9 @@ async def run_synthesis(state_input) -> dict:
 
         state.recommendation = {
             "symbol": state.symbol,
-            "action": llm_synthesis.get("recommendation", recommendation_action) if llm_synthesis else recommendation_action,
+            "action": (
+                llm_synthesis.get("recommendation", recommendation_action) if llm_synthesis else recommendation_action
+            ),
             "composite_score": round(composite_score, 2),
             "confidence": llm_synthesis.get("confidence", confidence) if llm_synthesis else confidence,
             "analyses_included": available_analyses,
@@ -855,9 +824,7 @@ async def run_analyses_parallel_comprehensive(state_input) -> dict:
     technical_task = asyncio.create_task(run_technical_analysis(state.to_dict()))
     context_task = asyncio.create_task(run_market_context_analysis(state.to_dict()))
 
-    results = await asyncio.gather(
-        fundamental_task, technical_task, context_task, return_exceptions=True
-    )
+    results = await asyncio.gather(fundamental_task, technical_task, context_task, return_exceptions=True)
 
     # Merge results back into state
     for result in results:
@@ -1043,7 +1010,7 @@ async def run_analysis(
     result = await compiled.invoke(state.to_dict())
 
     # Convert result back to state - handle various result formats
-    if hasattr(result, 'state'):
+    if hasattr(result, "state"):
         # Victor returns a result object with .state attribute
         result_data = result.state
     elif isinstance(result, dict):
@@ -1089,8 +1056,8 @@ async def run_yaml_analysis(
         result = await run_yaml_analysis("AAPL", AnalysisMode.COMPREHENSIVE)
         print(result.synthesis)  # LLM-synthesized investment narrative
     """
-    from victor_invest.workflows import InvestmentWorkflowProvider
     from victor_invest.handlers import HANDLERS
+    from victor_invest.workflows import InvestmentWorkflowProvider
 
     # Map mode to workflow name
     workflow_map = {
@@ -1132,10 +1099,12 @@ async def run_yaml_analysis(
             self.id = node_id
             self.output_key = output_key
 
-    ctx = WorkflowContext({
-        "symbol": symbol.upper(),
-        "mode": mode.value,
-    })
+    ctx = WorkflowContext(
+        {
+            "symbol": symbol.upper(),
+            "mode": mode.value,
+        }
+    )
 
     # Phase 1: Fetch data in parallel
     logger.info(f"Fetching data in parallel for {symbol}")
@@ -1145,7 +1114,7 @@ async def run_yaml_analysis(
         if handler:
             try:
                 result = await handler(MockNode(node_id, output_key), ctx, None)
-                return result.output if hasattr(result, 'output') else {}
+                return result.output if hasattr(result, "output") else {}
             except Exception as e:
                 logger.warning(f"Handler {handler_name} failed: {e}")
                 return {"status": "error", "error": str(e)}

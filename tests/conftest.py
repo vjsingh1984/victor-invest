@@ -1,9 +1,9 @@
 """Test configuration helpers and fixtures."""
 
+import json
 import sys
 from pathlib import Path
-import json
-from typing import Dict, Any
+from typing import Any, Dict
 
 import pytest
 

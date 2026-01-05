@@ -46,23 +46,23 @@ Example:
     cc_analysis = await cc_analyzer.analyze()
 """
 
-from investigator.domain.services.market_regime.yield_curve_analyzer import (
-    YieldCurveAnalyzer,
-    YieldCurveShape,
-    YieldCurveAnalysis,
-    InvestmentSignal,
-    get_yield_curve_analyzer,
+from investigator.domain.services.market_regime.credit_cycle_analyzer import (
+    CreditCycleAnalysis,
+    CreditCycleAnalyzer,
+    get_credit_cycle_analyzer,
 )
 from investigator.domain.services.market_regime.recession_indicator import (
-    RecessionIndicator,
-    RecessionAssessment,
     EconomicPhase,
+    RecessionAssessment,
+    RecessionIndicator,
     get_recession_indicator,
 )
-from investigator.domain.services.market_regime.credit_cycle_analyzer import (
-    CreditCycleAnalyzer,
-    CreditCycleAnalysis,
-    get_credit_cycle_analyzer,
+from investigator.domain.services.market_regime.yield_curve_analyzer import (
+    InvestmentSignal,
+    YieldCurveAnalysis,
+    YieldCurveAnalyzer,
+    YieldCurveShape,
+    get_yield_curve_analyzer,
 )
 
 __all__ = [

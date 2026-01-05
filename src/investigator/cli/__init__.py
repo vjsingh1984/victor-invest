@@ -12,17 +12,17 @@ Entry Points:
 
 from .main import cli, main
 from .utils import (
-    setup_logging,
-    load_config,
     MutuallyExclusiveOption,
-    validate_symbols,
-    validate_date,
+    error_exit,
     format_currency,
     format_percent,
+    load_config,
     print_table,
-    error_exit,
     require_database,
     require_ollama,
+    setup_logging,
+    validate_date,
+    validate_symbols,
 )
 
 __all__ = [

@@ -80,7 +80,7 @@ class SharesService:
             stock_db_url: Connection string for stock database.
                          If None, builds from environment variables.
         """
-        from investigator.domain.services.market_data import get_stock_db_url, get_sec_db_url
+        from investigator.domain.services.market_data import get_sec_db_url, get_stock_db_url
 
         if sec_db_url is None:
             sec_db_url = get_sec_db_url()

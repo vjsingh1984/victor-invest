@@ -25,8 +25,8 @@ Usage:
     results = ab_test.get_test_results()
 """
 
-from investigator.domain.services.rl.monitoring.metrics import RLMetrics
 from investigator.domain.services.rl.monitoring.ab_testing import ABTestingFramework
+from investigator.domain.services.rl.monitoring.metrics import RLMetrics
 
 __all__ = [
     "RLMetrics",

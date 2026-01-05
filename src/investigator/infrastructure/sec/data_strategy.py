@@ -303,8 +303,8 @@ class SECDataStrategy:
                 # Fetch from CompanyFacts API using clean architecture
                 api_quarters = []
                 try:
-                    from investigator.infrastructure.sec.companyfacts_extractor import SECCompanyFactsExtractor
                     from investigator.infrastructure.database.db import get_db_manager
+                    from investigator.infrastructure.sec.companyfacts_extractor import SECCompanyFactsExtractor
 
                     db_manager = get_db_manager()
                     extractor = SECCompanyFactsExtractor(db_engine=db_manager.engine)
@@ -319,7 +319,9 @@ class SECDataStrategy:
 
                             # Filter to SEC filings (including foreign 20-F/6-K)
                             quarterly_filings = [
-                                entry for entry in revenues_units if entry.get("form") in ["10-Q", "10-K", "20-F", "6-K"]
+                                entry
+                                for entry in revenues_units
+                                if entry.get("form") in ["10-Q", "10-K", "20-F", "6-K"]
                             ]
 
                             # Sort by filed date (newest first) and get latest N
@@ -449,9 +451,9 @@ class SECDataStrategy:
             # Detect fiscal_year_end from FY periods in results
             fiscal_year_end = None
             for row in results:
-                if row.fp == 'FY' and row.period:
+                if row.fp == "FY" and row.period:
                     try:
-                        fy_end_date = datetime.strptime(str(row.period), '%Y-%m-%d')
+                        fy_end_date = datetime.strptime(str(row.period), "%Y-%m-%d")
                         fiscal_year_end = f"-{fy_end_date.month:02d}-{fy_end_date.day:02d}"
                         logger.debug(f"[Q1 Fix] {symbol}: Detected fiscal_year_end = {fiscal_year_end} from FY period")
                         break  # Use first FY found
@@ -467,15 +469,16 @@ class SECDataStrategy:
                 # Q1/Q2/Q3/Q4 can cross calendar year boundary. If period_end is after fiscal_year_end,
                 # the quarter belongs to the NEXT fiscal year.
                 # Examples: ORCL (FY ends May 31): Q2 (Nov), Q3 (Feb) → fiscal_year = period_year + 1
-                if fiscal_period in ['Q1', 'Q2', 'Q3', 'Q4'] and fiscal_year_end and row.period:
+                if fiscal_period in ["Q1", "Q2", "Q3", "Q4"] and fiscal_year_end and row.period:
                     try:
-                        period_end_date = datetime.strptime(str(row.period), '%Y-%m-%d')
+                        period_end_date = datetime.strptime(str(row.period), "%Y-%m-%d")
                         # Extract month/day from fiscal_year_end (format: '-MM-DD')
-                        fy_end_month, fy_end_day = map(int, fiscal_year_end[1:].split('-'))
+                        fy_end_month, fy_end_day = map(int, fiscal_year_end[1:].split("-"))
 
                         # Check if period_end is after fiscal_year_end
-                        if (period_end_date.month > fy_end_month) or \
-                           (period_end_date.month == fy_end_month and period_end_date.day > fy_end_day):
+                        if (period_end_date.month > fy_end_month) or (
+                            period_end_date.month == fy_end_month and period_end_date.day > fy_end_day
+                        ):
                             original_fy = fiscal_year
                             fiscal_year += 1
                             logger.debug(
@@ -484,7 +487,9 @@ class SECDataStrategy:
                                 f"(fiscal year ends {fiscal_year_end})"
                             )
                     except Exception as e:
-                        logger.warning(f"[Fiscal Year Adjustment] {symbol}: Failed to adjust {fiscal_period} fiscal year: {e}")
+                        logger.warning(
+                            f"[Fiscal Year Adjustment] {symbol}: Failed to adjust {fiscal_period} fiscal year: {e}"
+                        )
 
                 quarters.append(
                     {
@@ -553,9 +558,9 @@ class SECDataStrategy:
             # Detect fiscal_year_end from FY period in results
             fiscal_year_end = None
             for row in results:
-                if row.fp == 'FY' and row.period:
+                if row.fp == "FY" and row.period:
                     try:
-                        fy_end_date = datetime.strptime(str(row.period), '%Y-%m-%d')
+                        fy_end_date = datetime.strptime(str(row.period), "%Y-%m-%d")
                         fiscal_year_end = f"-{fy_end_date.month:02d}-{fy_end_date.day:02d}"
                         logger.debug(f"[Q1 Fix] {symbol}: Detected fiscal_year_end = {fiscal_year_end} from FY period")
                         break  # Use first FY found
@@ -570,13 +575,14 @@ class SECDataStrategy:
                 # CRITICAL FIX: Adjust fiscal_year for ALL quarterly periods in non-calendar fiscal years
                 # Q1/Q2/Q3/Q4 can cross calendar year boundary. If period_end is after fiscal_year_end,
                 # the quarter belongs to the NEXT fiscal year.
-                if fp in ['Q1', 'Q2', 'Q3', 'Q4'] and fiscal_year_end and row.period:
+                if fp in ["Q1", "Q2", "Q3", "Q4"] and fiscal_year_end and row.period:
                     try:
-                        period_end_date = datetime.strptime(str(row.period), '%Y-%m-%d')
-                        fy_end_month, fy_end_day = map(int, fiscal_year_end[1:].split('-'))
+                        period_end_date = datetime.strptime(str(row.period), "%Y-%m-%d")
+                        fy_end_month, fy_end_day = map(int, fiscal_year_end[1:].split("-"))
 
-                        if (period_end_date.month > fy_end_month) or \
-                           (period_end_date.month == fy_end_month and period_end_date.day > fy_end_day):
+                        if (period_end_date.month > fy_end_month) or (
+                            period_end_date.month == fy_end_month and period_end_date.day > fy_end_day
+                        ):
                             original_fy = fy
                             fy += 1
                             logger.debug(

@@ -41,132 +41,108 @@ Migration History:
     2025-12-30: Bank P/B, Semiconductor Cycle-Adjusted, Growth-Adjusted Framework
 """
 
+# Bank Valuation (Workstream 4)
+from investigator.domain.services.valuation.bank_valuation import (  # Bank type classification; Target metrics; Thresholds; Dataclasses; Functions
+    EFFICIENCY_THRESHOLDS,
+    NPL_THRESHOLDS,
+    TARGET_EFFICIENCY_RATIO,
+    TARGET_NIM,
+    TARGET_TIER1,
+    TIER1_THRESHOLDS,
+    BankMetrics,
+    BankType,
+    BankValuationResult,
+    assess_bank_quality,
+    extract_bank_metrics_from_xbrl,
+    value_bank,
+)
+
+# Biotech Pre-Revenue Valuation (P2-A)
+from investigator.domain.services.valuation.biotech_valuation import (  # Phase success probabilities; Cash runway; Pipeline valuation; Industry detection; Comprehensive valuation
+    BIOTECH_INDUSTRIES,
+    BIOTECH_PRE_REVENUE_TIER,
+    PHASE_SUCCESS_PROBABILITIES,
+    PHASE_TRANSITION_RATES,
+    BiotechValuationResult,
+    CashRunwayResult,
+    CashRunwayRisk,
+    DrugCandidate,
+    DrugPhase,
+    PipelineValuationResult,
+    calculate_cash_runway,
+    calculate_pipeline_value,
+    is_biotech_company,
+    is_pre_revenue_biotech,
+    value_biotech,
+)
 from investigator.domain.services.valuation.dcf import DCFValuation
+
+# Defense Contractor Valuation (P2-B)
+from investigator.domain.services.valuation.defense_valuation import (  # Defense contractor classification; Backlog metrics; Backlog premium/adjustments; Defense contractor tier; Comprehensive valuation
+    DEFENSE_CONTRACTOR_TIER,
+    DEFENSE_INDUSTRIES,
+    KNOWN_DEFENSE_CONTRACTORS,
+    BacklogMetrics,
+    DefenseContractorClassification,
+    DefenseContractorType,
+    DefenseValuationResult,
+    calculate_backlog_premium,
+    calculate_backlog_value,
+    calculate_contract_mix_adjustment,
+    classify_defense_contractor,
+    extract_backlog_metrics_from_xbrl,
+    get_defense_tier_parameters,
+    get_defense_tier_weights,
+    is_defense_industry,
+    value_defense_contractor,
+)
 from investigator.domain.services.valuation.ggm import GordonGrowthModel
+from investigator.domain.services.valuation.insurance_valuation import (  # Core valuation function; P1-B Enhanced: Combined ratio calculation; Insurance type classification
+    COMBINED_RATIO_THRESHOLDS,
+    TARGET_COMBINED_RATIOS,
+    InsuranceType,
+    assess_combined_ratio_quality,
+    calculate_combined_ratio,
+    calculate_expense_ratio,
+    calculate_insurance_specific_metrics,
+    calculate_loss_ratio,
+    extract_insurance_metrics_from_xbrl,
+    value_insurance_company,
+)
+from investigator.domain.services.valuation.reit_valuation import (
+    REIT_FFO_MULTIPLES,
+    REITPropertyType,
+    REITPropertyTypeResult,
+    REITValuationResult,
+    adjust_ffo_multiple_for_rates,
+    detect_reit_property_type,
+    get_base_ffo_multiple,
+    get_current_treasury_yield,
+    get_ffo_multiple_range,
+    value_reit,
+)
 from investigator.domain.services.valuation.sector_valuation_router import (
     SectorValuationRouter,
     ValuationResult,
 )
-from investigator.domain.services.valuation.insurance_valuation import (
-    # Core valuation function
-    value_insurance_company,
-    calculate_insurance_specific_metrics,
-    # P1-B Enhanced: Combined ratio calculation
-    calculate_combined_ratio,
-    calculate_loss_ratio,
-    calculate_expense_ratio,
-    assess_combined_ratio_quality,
-    extract_insurance_metrics_from_xbrl,
-    # Insurance type classification
-    InsuranceType,
-    TARGET_COMBINED_RATIOS,
-    COMBINED_RATIO_THRESHOLDS,
-)
-from investigator.domain.services.valuation.reit_valuation import (
-    REITPropertyType,
-    REIT_FFO_MULTIPLES,
-    detect_reit_property_type,
-    get_ffo_multiple_range,
-    get_base_ffo_multiple,
-    adjust_ffo_multiple_for_rates,
-    get_current_treasury_yield,
-    value_reit,
-    REITValuationResult,
-    REITPropertyTypeResult,
-)
-
-# Biotech Pre-Revenue Valuation (P2-A)
-from investigator.domain.services.valuation.biotech_valuation import (
-    # Phase success probabilities
-    DrugPhase,
-    PHASE_SUCCESS_PROBABILITIES,
-    PHASE_TRANSITION_RATES,
-    # Cash runway
-    CashRunwayRisk,
-    CashRunwayResult,
-    calculate_cash_runway,
-    # Pipeline valuation
-    BIOTECH_PRE_REVENUE_TIER,
-    DrugCandidate,
-    PipelineValuationResult,
-    calculate_pipeline_value,
-    # Industry detection
-    BIOTECH_INDUSTRIES,
-    is_biotech_company,
-    is_pre_revenue_biotech,
-    # Comprehensive valuation
-    BiotechValuationResult,
-    value_biotech,
-)
-
-# Defense Contractor Valuation (P2-B)
-from investigator.domain.services.valuation.defense_valuation import (
-    # Defense contractor classification
-    DefenseContractorType,
-    DEFENSE_INDUSTRIES,
-    KNOWN_DEFENSE_CONTRACTORS,
-    classify_defense_contractor,
-    is_defense_industry,
-    DefenseContractorClassification,
-    # Backlog metrics
-    BacklogMetrics,
-    extract_backlog_metrics_from_xbrl,
-    # Backlog premium/adjustments
-    calculate_backlog_premium,
-    calculate_backlog_value,
-    calculate_contract_mix_adjustment,
-    # Defense contractor tier
-    DEFENSE_CONTRACTOR_TIER,
-    get_defense_tier_weights,
-    get_defense_tier_parameters,
-    # Comprehensive valuation
-    DefenseValuationResult,
-    value_defense_contractor,
-)
-
-# Bank Valuation (Workstream 4)
-from investigator.domain.services.valuation.bank_valuation import (
-    # Bank type classification
-    BankType,
-    # Target metrics
-    TARGET_NIM,
-    TARGET_TIER1,
-    TARGET_EFFICIENCY_RATIO,
-    # Thresholds
-    EFFICIENCY_THRESHOLDS,
-    NPL_THRESHOLDS,
-    TIER1_THRESHOLDS,
-    # Dataclasses
-    BankMetrics,
-    BankValuationResult,
-    # Functions
-    extract_bank_metrics_from_xbrl,
-    assess_bank_quality,
-    value_bank,
-)
 
 # Semiconductor Valuation (Workstream 3)
-from investigator.domain.services.valuation.semiconductor_valuation import (
-    # Chip type and cycle classification
+from investigator.domain.services.valuation.semiconductor_valuation import (  # Chip type and cycle classification; Known companies and industries; Semiconductor tier configuration; Dataclasses; Functions
+    KNOWN_SEMICONDUCTOR_COMPANIES,
+    SEMICONDUCTOR_INDUSTRIES,
+    SEMICONDUCTOR_TIER,
     ChipType,
     CyclePosition,
-    # Known companies and industries
-    SEMICONDUCTOR_INDUSTRIES,
-    KNOWN_SEMICONDUCTOR_COMPANIES,
-    # Semiconductor tier configuration
-    SEMICONDUCTOR_TIER,
-    # Dataclasses
     SemiconductorMetrics,
     SemiconductorValuationResult,
-    # Functions
-    extract_semiconductor_metrics_from_xbrl,
     calculate_cycle_adjustment,
     calculate_normalized_margin,
-    is_semiconductor_industry,
     classify_semiconductor_company,
-    value_semiconductor,
-    get_semiconductor_tier_weights,
+    extract_semiconductor_metrics_from_xbrl,
     get_semiconductor_tier_parameters,
+    get_semiconductor_tier_weights,
+    is_semiconductor_industry,
+    value_semiconductor,
 )
 
 __all__ = [

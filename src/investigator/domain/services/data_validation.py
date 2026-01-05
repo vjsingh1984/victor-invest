@@ -19,11 +19,11 @@ Usage:
         return None
 """
 
-import math
 import logging
+import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Set
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 

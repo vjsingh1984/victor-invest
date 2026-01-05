@@ -7,18 +7,20 @@ Calculates financial ratios and performs peer group analysis
 import json
 import logging
 import statistics
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-import pandas as pd
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
+import pandas as pd
 import yfinance as yf
 from scipy import stats
+
+from investigator.config import get_config
 
 # Removed cache facade - using cache manager directly
 from investigator.infrastructure.cache import get_cache_manager
 from utils.peer_metrics_dao import get_peer_metrics_dao
-from investigator.config import get_config
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import networkx as nx
 import pytest
 
-from investigator.application import AgentOrchestrator, AnalysisMode, Priority, OrchestrationTask
+from investigator.application import AgentOrchestrator, AnalysisMode, OrchestrationTask, Priority
 from investigator.application import orchestrator as orchestrator_module
 
 
@@ -51,7 +51,10 @@ class TestOrchestrationWorkflow:
         assert high < low
 
     def test_get_agents_for_modes(self, orchestrator_instance):
-        assert orchestrator_instance._get_agents_for_mode("TEST", AnalysisMode.QUICK, []) == ["technical", "market_context"]
+        assert orchestrator_instance._get_agents_for_mode("TEST", AnalysisMode.QUICK, []) == [
+            "technical",
+            "market_context",
+        ]
         standard_agents = orchestrator_instance._get_agents_for_mode("TEST", AnalysisMode.STANDARD, [])
         assert standard_agents == ["sec", "technical", "fundamental", "symbol_update", "market_context", "synthesis"]
         custom_agents = orchestrator_instance._get_agents_for_mode("TEST", AnalysisMode.CUSTOM, ["sec"])

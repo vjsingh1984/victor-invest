@@ -2,18 +2,20 @@
 Unit tests for RL models and dataclasses.
 """
 
-import pytest
 from datetime import date
+
+import pytest
+
 from investigator.domain.services.rl.models import (
-    ValuationContext,
+    ABTestGroup,
+    ABTestResults,
+    CompanySize,
+    EvaluationMetrics,
     Experience,
+    GrowthStage,
     RewardSignal,
     TrainingMetrics,
-    EvaluationMetrics,
-    ABTestResults,
-    GrowthStage,
-    CompanySize,
-    ABTestGroup,
+    ValuationContext,
 )
 
 

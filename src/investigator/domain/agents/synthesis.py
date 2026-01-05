@@ -14,10 +14,10 @@ import numpy as np
 
 from investigator.domain.agents.base import InvestmentAgent
 from investigator.domain.models.analysis import AgentResult, AgentTask, TaskStatus
-from investigator.domain.services.toon_formatter import to_toon_peers, to_toon_array, TOONFormatter
 from investigator.domain.services.deterministic_conflict_resolver import reconcile_conflicts
 from investigator.domain.services.deterministic_insight_extractor import extract_key_insights
 from investigator.domain.services.template_thesis_generator import generate_investment_thesis
+from investigator.domain.services.toon_formatter import TOONFormatter, to_toon_array, to_toon_peers
 from investigator.infrastructure.cache import CacheManager
 
 

@@ -51,31 +51,25 @@ REIT_FFO_MULTIPLES: Dict[REITPropertyType, Tuple[float, float]] = {
     REITPropertyType.INDUSTRIAL_LOGISTICS: (22.0, 25.0),
     REITPropertyType.DATA_CENTERS: (20.0, 24.0),
     REITPropertyType.CELL_TOWERS: (22.0, 26.0),
-
     # Residential (varies by geography)
     REITPropertyType.RESIDENTIAL_SUNBELT: (18.0, 20.0),
     REITPropertyType.RESIDENTIAL_COASTAL: (16.0, 18.0),
     REITPropertyType.RESIDENTIAL_GENERAL: (16.0, 19.0),
-
     # Healthcare (aging demographics but reimbursement risk)
     REITPropertyType.HEALTHCARE: (14.0, 16.0),
-
     # Office (challenged post-COVID)
     REITPropertyType.OFFICE_CLASS_A: (12.0, 14.0),
     REITPropertyType.OFFICE_CLASS_B: (8.0, 10.0),
     REITPropertyType.OFFICE_GENERAL: (10.0, 12.0),
-
     # Retail (varies significantly by format)
     REITPropertyType.REGIONAL_MALLS: (6.0, 10.0),
     REITPropertyType.STRIP_CENTERS: (12.0, 15.0),
     REITPropertyType.RETAIL_GENERAL: (10.0, 13.0),
-
     # Other property types
     REITPropertyType.NET_LEASE: (14.0, 17.0),
     REITPropertyType.SELF_STORAGE: (18.0, 21.0),
     REITPropertyType.SPECIALTY: (14.0, 18.0),
     REITPropertyType.DIVERSIFIED: (12.0, 15.0),
-
     # Fallback for unknown
     REITPropertyType.UNKNOWN: (12.0, 18.0),
 }
@@ -88,111 +82,98 @@ KNOWN_REIT_MAPPINGS: Dict[str, REITPropertyType] = {
     "PLD": REITPropertyType.INDUSTRIAL_LOGISTICS,  # Prologis
     "DRE": REITPropertyType.INDUSTRIAL_LOGISTICS,  # Duke Realty (merged with Prologis)
     "REXR": REITPropertyType.INDUSTRIAL_LOGISTICS,  # Rexford Industrial
-    "FR": REITPropertyType.INDUSTRIAL_LOGISTICS,   # First Industrial
+    "FR": REITPropertyType.INDUSTRIAL_LOGISTICS,  # First Industrial
     "STAG": REITPropertyType.INDUSTRIAL_LOGISTICS,  # STAG Industrial
-    "EGP": REITPropertyType.INDUSTRIAL_LOGISTICS,   # EastGroup Properties
+    "EGP": REITPropertyType.INDUSTRIAL_LOGISTICS,  # EastGroup Properties
     "TRNO": REITPropertyType.INDUSTRIAL_LOGISTICS,  # Terreno Realty
-
     # Data Centers
     "EQIX": REITPropertyType.DATA_CENTERS,  # Equinix
-    "DLR": REITPropertyType.DATA_CENTERS,   # Digital Realty
-    "COR": REITPropertyType.DATA_CENTERS,   # CoreSite (acquired)
-    "QTS": REITPropertyType.DATA_CENTERS,   # QTS (acquired by Blackstone)
-
+    "DLR": REITPropertyType.DATA_CENTERS,  # Digital Realty
+    "COR": REITPropertyType.DATA_CENTERS,  # CoreSite (acquired)
+    "QTS": REITPropertyType.DATA_CENTERS,  # QTS (acquired by Blackstone)
     # Cell Towers
-    "AMT": REITPropertyType.CELL_TOWERS,    # American Tower
-    "CCI": REITPropertyType.CELL_TOWERS,    # Crown Castle
-    "SBAC": REITPropertyType.CELL_TOWERS,   # SBA Communications
-
+    "AMT": REITPropertyType.CELL_TOWERS,  # American Tower
+    "CCI": REITPropertyType.CELL_TOWERS,  # Crown Castle
+    "SBAC": REITPropertyType.CELL_TOWERS,  # SBA Communications
     # Residential - Sunbelt focus
-    "MAA": REITPropertyType.RESIDENTIAL_SUNBELT,    # Mid-America Apartment
-    "CPT": REITPropertyType.RESIDENTIAL_SUNBELT,    # Camden Property Trust
-    "NNN": REITPropertyType.NET_LEASE,              # National Retail Properties
-    "INVH": REITPropertyType.RESIDENTIAL_SUNBELT,   # Invitation Homes (SFR, Sunbelt focus)
-    "AMH": REITPropertyType.RESIDENTIAL_SUNBELT,    # American Homes 4 Rent
-
+    "MAA": REITPropertyType.RESIDENTIAL_SUNBELT,  # Mid-America Apartment
+    "CPT": REITPropertyType.RESIDENTIAL_SUNBELT,  # Camden Property Trust
+    "NNN": REITPropertyType.NET_LEASE,  # National Retail Properties
+    "INVH": REITPropertyType.RESIDENTIAL_SUNBELT,  # Invitation Homes (SFR, Sunbelt focus)
+    "AMH": REITPropertyType.RESIDENTIAL_SUNBELT,  # American Homes 4 Rent
     # Residential - Coastal focus
-    "EQR": REITPropertyType.RESIDENTIAL_COASTAL,    # Equity Residential
-    "AVB": REITPropertyType.RESIDENTIAL_COASTAL,    # AvalonBay
-    "ESS": REITPropertyType.RESIDENTIAL_COASTAL,    # Essex Property Trust (West Coast)
-    "AIV": REITPropertyType.RESIDENTIAL_COASTAL,    # Apartment Investment & Mgmt
-    "UDR": REITPropertyType.RESIDENTIAL_GENERAL,    # UDR (diversified)
-
+    "EQR": REITPropertyType.RESIDENTIAL_COASTAL,  # Equity Residential
+    "AVB": REITPropertyType.RESIDENTIAL_COASTAL,  # AvalonBay
+    "ESS": REITPropertyType.RESIDENTIAL_COASTAL,  # Essex Property Trust (West Coast)
+    "AIV": REITPropertyType.RESIDENTIAL_COASTAL,  # Apartment Investment & Mgmt
+    "UDR": REITPropertyType.RESIDENTIAL_GENERAL,  # UDR (diversified)
     # Healthcare
-    "WELL": REITPropertyType.HEALTHCARE,    # Welltower
-    "VTR": REITPropertyType.HEALTHCARE,     # Ventas
-    "PEAK": REITPropertyType.HEALTHCARE,    # Healthpeak Properties
-    "OHI": REITPropertyType.HEALTHCARE,     # Omega Healthcare Investors
-    "HR": REITPropertyType.HEALTHCARE,      # Healthcare Realty
-    "DOC": REITPropertyType.HEALTHCARE,     # Physicians Realty Trust
-    "SBRA": REITPropertyType.HEALTHCARE,    # Sabra Health Care
-    "LTC": REITPropertyType.HEALTHCARE,     # LTC Properties
-    "CTRE": REITPropertyType.HEALTHCARE,    # CareTrust REIT
-    "NHI": REITPropertyType.HEALTHCARE,     # National Health Investors
-
+    "WELL": REITPropertyType.HEALTHCARE,  # Welltower
+    "VTR": REITPropertyType.HEALTHCARE,  # Ventas
+    "PEAK": REITPropertyType.HEALTHCARE,  # Healthpeak Properties
+    "OHI": REITPropertyType.HEALTHCARE,  # Omega Healthcare Investors
+    "HR": REITPropertyType.HEALTHCARE,  # Healthcare Realty
+    "DOC": REITPropertyType.HEALTHCARE,  # Physicians Realty Trust
+    "SBRA": REITPropertyType.HEALTHCARE,  # Sabra Health Care
+    "LTC": REITPropertyType.HEALTHCARE,  # LTC Properties
+    "CTRE": REITPropertyType.HEALTHCARE,  # CareTrust REIT
+    "NHI": REITPropertyType.HEALTHCARE,  # National Health Investors
     # Office - Class A
-    "BXP": REITPropertyType.OFFICE_CLASS_A,    # Boston Properties
-    "VNO": REITPropertyType.OFFICE_CLASS_A,    # Vornado (NYC trophy)
-    "SLG": REITPropertyType.OFFICE_CLASS_A,    # SL Green (NYC)
-    "KRC": REITPropertyType.OFFICE_CLASS_A,    # Kilroy Realty (West Coast)
-
+    "BXP": REITPropertyType.OFFICE_CLASS_A,  # Boston Properties
+    "VNO": REITPropertyType.OFFICE_CLASS_A,  # Vornado (NYC trophy)
+    "SLG": REITPropertyType.OFFICE_CLASS_A,  # SL Green (NYC)
+    "KRC": REITPropertyType.OFFICE_CLASS_A,  # Kilroy Realty (West Coast)
     # Office - General/Class B
-    "ARE": REITPropertyType.OFFICE_CLASS_A,    # Alexandria Real Estate (life science)
-    "DEI": REITPropertyType.OFFICE_GENERAL,    # Douglas Emmett
-    "HIW": REITPropertyType.OFFICE_GENERAL,    # Highwoods Properties
-    "CUZ": REITPropertyType.OFFICE_GENERAL,    # Cousins Properties
-    "OFC": REITPropertyType.OFFICE_GENERAL,    # Corporate Office Properties
-    "PDM": REITPropertyType.OFFICE_GENERAL,    # Piedmont Office Realty
-
+    "ARE": REITPropertyType.OFFICE_CLASS_A,  # Alexandria Real Estate (life science)
+    "DEI": REITPropertyType.OFFICE_GENERAL,  # Douglas Emmett
+    "HIW": REITPropertyType.OFFICE_GENERAL,  # Highwoods Properties
+    "CUZ": REITPropertyType.OFFICE_GENERAL,  # Cousins Properties
+    "OFC": REITPropertyType.OFFICE_GENERAL,  # Corporate Office Properties
+    "PDM": REITPropertyType.OFFICE_GENERAL,  # Piedmont Office Realty
     # Regional Malls
-    "SPG": REITPropertyType.REGIONAL_MALLS,    # Simon Property Group
-    "MAC": REITPropertyType.REGIONAL_MALLS,    # Macerich
-    "TCO": REITPropertyType.REGIONAL_MALLS,    # Taubman Centers (acquired)
-    "CBL": REITPropertyType.REGIONAL_MALLS,    # CBL & Associates
-    "PEI": REITPropertyType.REGIONAL_MALLS,    # Pennsylvania REIT
-    "WPG": REITPropertyType.REGIONAL_MALLS,    # Washington Prime Group
-
+    "SPG": REITPropertyType.REGIONAL_MALLS,  # Simon Property Group
+    "MAC": REITPropertyType.REGIONAL_MALLS,  # Macerich
+    "TCO": REITPropertyType.REGIONAL_MALLS,  # Taubman Centers (acquired)
+    "CBL": REITPropertyType.REGIONAL_MALLS,  # CBL & Associates
+    "PEI": REITPropertyType.REGIONAL_MALLS,  # Pennsylvania REIT
+    "WPG": REITPropertyType.REGIONAL_MALLS,  # Washington Prime Group
     # Strip Centers / Shopping Centers
-    "REG": REITPropertyType.STRIP_CENTERS,     # Regency Centers
-    "FRT": REITPropertyType.STRIP_CENTERS,     # Federal Realty
-    "KIM": REITPropertyType.STRIP_CENTERS,     # Kimco Realty
-    "ROIC": REITPropertyType.STRIP_CENTERS,    # Retail Opportunity Investments
-    "BRX": REITPropertyType.STRIP_CENTERS,     # Brixmor Property
-    "AKR": REITPropertyType.STRIP_CENTERS,     # Acadia Realty Trust
-    "SITE": REITPropertyType.STRIP_CENTERS,    # Site Centers
-    "UE": REITPropertyType.STRIP_CENTERS,      # Urban Edge Properties
-    "RPAI": REITPropertyType.STRIP_CENTERS,    # Retail Properties of America
-
+    "REG": REITPropertyType.STRIP_CENTERS,  # Regency Centers
+    "FRT": REITPropertyType.STRIP_CENTERS,  # Federal Realty
+    "KIM": REITPropertyType.STRIP_CENTERS,  # Kimco Realty
+    "ROIC": REITPropertyType.STRIP_CENTERS,  # Retail Opportunity Investments
+    "BRX": REITPropertyType.STRIP_CENTERS,  # Brixmor Property
+    "AKR": REITPropertyType.STRIP_CENTERS,  # Acadia Realty Trust
+    "SITE": REITPropertyType.STRIP_CENTERS,  # Site Centers
+    "UE": REITPropertyType.STRIP_CENTERS,  # Urban Edge Properties
+    "RPAI": REITPropertyType.STRIP_CENTERS,  # Retail Properties of America
     # Net Lease
-    "O": REITPropertyType.NET_LEASE,           # Realty Income
-    "WPC": REITPropertyType.NET_LEASE,         # W.P. Carey
-    "STOR": REITPropertyType.NET_LEASE,        # STORE Capital (acquired)
-    "ADC": REITPropertyType.NET_LEASE,         # Agree Realty
-    "EPRT": REITPropertyType.NET_LEASE,        # Essential Properties Realty Trust
-    "SRC": REITPropertyType.NET_LEASE,         # Spirit Realty Capital
-    "GTY": REITPropertyType.NET_LEASE,         # Getty Realty
-    "FCPT": REITPropertyType.NET_LEASE,        # Four Corners Property Trust
-
+    "O": REITPropertyType.NET_LEASE,  # Realty Income
+    "WPC": REITPropertyType.NET_LEASE,  # W.P. Carey
+    "STOR": REITPropertyType.NET_LEASE,  # STORE Capital (acquired)
+    "ADC": REITPropertyType.NET_LEASE,  # Agree Realty
+    "EPRT": REITPropertyType.NET_LEASE,  # Essential Properties Realty Trust
+    "SRC": REITPropertyType.NET_LEASE,  # Spirit Realty Capital
+    "GTY": REITPropertyType.NET_LEASE,  # Getty Realty
+    "FCPT": REITPropertyType.NET_LEASE,  # Four Corners Property Trust
     # Self Storage
-    "PSA": REITPropertyType.SELF_STORAGE,      # Public Storage
-    "EXR": REITPropertyType.SELF_STORAGE,      # Extra Space Storage
-    "CUBE": REITPropertyType.SELF_STORAGE,     # CubeSmart
-    "LSI": REITPropertyType.SELF_STORAGE,      # Life Storage (acquired by EXR)
-    "NSA": REITPropertyType.SELF_STORAGE,      # National Storage Affiliates
-
+    "PSA": REITPropertyType.SELF_STORAGE,  # Public Storage
+    "EXR": REITPropertyType.SELF_STORAGE,  # Extra Space Storage
+    "CUBE": REITPropertyType.SELF_STORAGE,  # CubeSmart
+    "LSI": REITPropertyType.SELF_STORAGE,  # Life Storage (acquired by EXR)
+    "NSA": REITPropertyType.SELF_STORAGE,  # National Storage Affiliates
     # Specialty
-    "VICI": REITPropertyType.SPECIALTY,        # VICI Properties (gaming)
-    "GLPI": REITPropertyType.SPECIALTY,        # Gaming and Leisure Properties
-    "RHP": REITPropertyType.SPECIALTY,         # Ryman Hospitality Properties
-    "EPR": REITPropertyType.SPECIALTY,         # EPR Properties (experiential)
-    "IIPR": REITPropertyType.SPECIALTY,        # Innovative Industrial Properties (cannabis)
-    "IRM": REITPropertyType.SPECIALTY,         # Iron Mountain (document storage)
-    "COLD": REITPropertyType.SPECIALTY,        # Americold Realty Trust (cold storage)
-
+    "VICI": REITPropertyType.SPECIALTY,  # VICI Properties (gaming)
+    "GLPI": REITPropertyType.SPECIALTY,  # Gaming and Leisure Properties
+    "RHP": REITPropertyType.SPECIALTY,  # Ryman Hospitality Properties
+    "EPR": REITPropertyType.SPECIALTY,  # EPR Properties (experiential)
+    "IIPR": REITPropertyType.SPECIALTY,  # Innovative Industrial Properties (cannabis)
+    "IRM": REITPropertyType.SPECIALTY,  # Iron Mountain (document storage)
+    "COLD": REITPropertyType.SPECIALTY,  # Americold Realty Trust (cold storage)
     # Diversified
-    "WY": REITPropertyType.DIVERSIFIED,        # Weyerhaeuser (timberland)
-    "RYN": REITPropertyType.DIVERSIFIED,       # Rayonier (timberland)
-    "PCH": REITPropertyType.DIVERSIFIED,       # PotlatchDeltic (timberland)
+    "WY": REITPropertyType.DIVERSIFIED,  # Weyerhaeuser (timberland)
+    "RYN": REITPropertyType.DIVERSIFIED,  # Rayonier (timberland)
+    "PCH": REITPropertyType.DIVERSIFIED,  # PotlatchDeltic (timberland)
 }
 
 
@@ -319,14 +300,12 @@ def detect_reit_property_type(
     # Priority 1: Check known symbol mappings
     if symbol_upper in KNOWN_REIT_MAPPINGS:
         property_type = KNOWN_REIT_MAPPINGS[symbol_upper]
-        logger.info(
-            f"{symbol} - REIT property type detected via symbol mapping: {property_type.value}"
-        )
+        logger.info(f"{symbol} - REIT property type detected via symbol mapping: {property_type.value}")
         return REITPropertyTypeResult(
             property_type=property_type,
             confidence="high",
             detection_method="symbol_lookup",
-            details={"matched_symbol": symbol_upper}
+            details={"matched_symbol": symbol_upper},
         )
 
     # Priority 2: Company name pattern matching
@@ -344,10 +323,7 @@ def detect_reit_property_type(
                         property_type=prop_type,
                         confidence="medium",
                         detection_method="name_pattern",
-                        details={
-                            "company_name": company_name,
-                            "matched_pattern": pattern
-                        }
+                        details={"company_name": company_name, "matched_pattern": pattern},
                     )
 
     # Priority 3: Industry classification
@@ -389,25 +365,16 @@ def detect_reit_property_type(
                     property_type=prop_type,
                     confidence="medium",
                     detection_method="industry_classification",
-                    details={
-                        "industry": industry,
-                        "matched_keyword": keyword
-                    }
+                    details={"industry": industry, "matched_keyword": keyword},
                 )
 
     # Priority 4: Default to UNKNOWN
-    logger.warning(
-        f"{symbol} - Could not detect REIT property type, defaulting to UNKNOWN"
-    )
+    logger.warning(f"{symbol} - Could not detect REIT property type, defaulting to UNKNOWN")
     return REITPropertyTypeResult(
         property_type=REITPropertyType.UNKNOWN,
         confidence="low",
         detection_method="default",
-        details={
-            "company_name": company_name,
-            "industry": industry,
-            "sic_code": sic_code
-        }
+        details={"company_name": company_name, "industry": industry, "sic_code": sic_code},
     )
 
 
@@ -421,10 +388,7 @@ def get_ffo_multiple_range(property_type: REITPropertyType) -> Tuple[float, floa
     Returns:
         Tuple of (low_multiple, high_multiple)
     """
-    return REIT_FFO_MULTIPLES.get(
-        property_type,
-        REIT_FFO_MULTIPLES[REITPropertyType.UNKNOWN]
-    )
+    return REIT_FFO_MULTIPLES.get(property_type, REIT_FFO_MULTIPLES[REITPropertyType.UNKNOWN])
 
 
 def get_base_ffo_multiple(property_type: REITPropertyType) -> float:
@@ -503,12 +467,12 @@ def get_current_treasury_yield() -> Optional[float]:
         from investigator.infrastructure.external.fred import MacroIndicatorsFetcher
 
         fetcher = MacroIndicatorsFetcher()
-        indicators = fetcher.get_latest_values(['DGS10'])
+        indicators = fetcher.get_latest_values(["DGS10"])
 
-        if 'DGS10' in indicators and indicators['DGS10'].get('value'):
+        if "DGS10" in indicators and indicators["DGS10"].get("value"):
             # FRED stores rates as percentages (e.g., 4.5 for 4.5%)
             # Convert to decimal (0.045)
-            yield_pct = indicators['DGS10']['value']
+            yield_pct = indicators["DGS10"]["value"]
             yield_decimal = yield_pct / 100.0
             logger.info(f"Current 10-year Treasury yield: {yield_pct:.2f}%")
             return yield_decimal
@@ -567,16 +531,12 @@ def value_reit(
     warnings = []
 
     # Step 1: Detect property type
-    property_result = detect_reit_property_type(
-        symbol=symbol,
-        company_name=company_name,
-        industry=industry
-    )
+    property_result = detect_reit_property_type(symbol=symbol, company_name=company_name, industry=industry)
 
     # Step 2: Calculate FFO
-    net_income = financials.get('net_income', 0)
-    depreciation = financials.get('depreciation_amortization', 0)
-    shares_outstanding = financials.get('shares_outstanding', 0)
+    net_income = financials.get("net_income", 0)
+    depreciation = financials.get("depreciation_amortization", 0)
+    shares_outstanding = financials.get("shares_outstanding", 0)
 
     if not shares_outstanding:
         raise ValueError("Missing shares_outstanding for REIT valuation")
@@ -615,9 +575,7 @@ def value_reit(
 
     # Step 6: Add confidence warnings
     if property_result.confidence == "low":
-        warnings.append(
-            f"Property type confidence is low, using generic multiple range"
-        )
+        warnings.append(f"Property type confidence is low, using generic multiple range")
 
     logger.info(
         f"{symbol} - REIT valuation: property_type={property_result.property_type.value}, "
@@ -635,5 +593,5 @@ def value_reit(
         detection_method=property_result.detection_method,
         current_10yr_yield=current_yield,
         rate_adjustment=rate_adjustment,
-        warnings=warnings
+        warnings=warnings,
     )

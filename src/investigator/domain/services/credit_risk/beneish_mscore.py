@@ -58,9 +58,10 @@ logger = logging.getLogger(__name__)
 
 class ManipulationRisk(Enum):
     """Beneish M-Score manipulation risk classification."""
-    LOW = "low"             # M < -2.22 (very unlikely)
-    MODERATE = "moderate"   # -2.22 ≤ M ≤ -1.78
-    HIGH = "high"           # M > -1.78 (likely manipulator)
+
+    LOW = "low"  # M < -2.22 (very unlikely)
+    MODERATE = "moderate"  # -2.22 ≤ M ≤ -1.78
+    HIGH = "high"  # M > -1.78 (likely manipulator)
 
 
 @dataclass
@@ -71,6 +72,7 @@ class BeneishMScoreResult(CreditScoreResult):
         risk_level: Classification of manipulation risk
         manipulation_probability: Estimated probability of manipulation
     """
+
     risk_level: Optional[ManipulationRisk] = None
     manipulation_probability: Optional[float] = None
     score_name: str = "Beneish M-Score"
@@ -78,10 +80,12 @@ class BeneishMScoreResult(CreditScoreResult):
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary."""
         result = super().to_dict()
-        result.update({
-            "risk_level": self.risk_level.value if self.risk_level else None,
-            "manipulation_probability": self.manipulation_probability,
-        })
+        result.update(
+            {
+                "risk_level": self.risk_level.value if self.risk_level else None,
+                "manipulation_probability": self.manipulation_probability,
+            }
+        )
         return result
 
 
@@ -96,13 +100,13 @@ class BeneishMScoreCalculator:
 
     # M-Score coefficients
     INTERCEPT = -4.84
-    COEF_DSRI = 0.920   # Days Sales in Receivables Index
-    COEF_GMI = 0.528    # Gross Margin Index
-    COEF_AQI = 0.404    # Asset Quality Index
-    COEF_SGI = 0.892    # Sales Growth Index
-    COEF_DEPI = 0.115   # Depreciation Index
+    COEF_DSRI = 0.920  # Days Sales in Receivables Index
+    COEF_GMI = 0.528  # Gross Margin Index
+    COEF_AQI = 0.404  # Asset Quality Index
+    COEF_SGI = 0.892  # Sales Growth Index
+    COEF_DEPI = 0.115  # Depreciation Index
     COEF_SGAI = -0.172  # SG&A Index
-    COEF_TATA = 4.679   # Total Accruals to Total Assets
+    COEF_TATA = 4.679  # Total Accruals to Total Assets
     COEF_LVGI = -0.327  # Leverage Index
 
     # Thresholds
@@ -260,10 +264,7 @@ class BeneishMScoreCalculator:
 
         # DSRI: Days Sales in Receivables Index
         # (AR_t / Sales_t) / (AR_t-1 / Sales_t-1)
-        dsri = self._safe_ratio_index(
-            curr.accounts_receivable, curr.revenue,
-            prior.accounts_receivable, prior.revenue
-        )
+        dsri = self._safe_ratio_index(curr.accounts_receivable, curr.revenue, prior.accounts_receivable, prior.revenue)
         indices["dsri_index"] = dsri
         indices["dsri_current_ratio"] = self._safe_divide(curr.accounts_receivable, curr.revenue)
         indices["dsri_prior_ratio"] = self._safe_divide(prior.accounts_receivable, prior.revenue)
@@ -302,21 +303,18 @@ class BeneishMScoreCalculator:
         # (Dep_t-1 / (Dep_t-1 + PPE_t-1)) / (Dep_t / (Dep_t + PPE_t))
         curr_dep_ratio = self._safe_divide(
             curr.depreciation_amortization,
-            self._safe_sum(curr.depreciation_amortization, curr.property_plant_equipment)
+            self._safe_sum(curr.depreciation_amortization, curr.property_plant_equipment),
         )
         prior_dep_ratio = self._safe_divide(
             prior.depreciation_amortization,
-            self._safe_sum(prior.depreciation_amortization, prior.property_plant_equipment)
+            self._safe_sum(prior.depreciation_amortization, prior.property_plant_equipment),
         )
         depi = self._safe_divide(prior_dep_ratio, curr_dep_ratio) if curr_dep_ratio and prior_dep_ratio else None
         indices["depi_index"] = depi
 
         # SGAI: SG&A Index
         # (SGA_t / Sales_t) / (SGA_t-1 / Sales_t-1)
-        sgai = self._safe_ratio_index(
-            curr.sga_expense, curr.revenue,
-            prior.sga_expense, prior.revenue
-        )
+        sgai = self._safe_ratio_index(curr.sga_expense, curr.revenue, prior.sga_expense, prior.revenue)
         indices["sgai_index"] = sgai
 
         # TATA: Total Accruals to Total Assets
@@ -335,8 +333,10 @@ class BeneishMScoreCalculator:
         # LVGI: Leverage Index
         # ((CL_t + LTD_t) / TA_t) / ((CL_t-1 + LTD_t-1) / TA_t-1)
         lvgi = self._safe_ratio_index(
-            self._safe_sum(curr.current_liabilities, curr.long_term_debt), curr.total_assets,
-            self._safe_sum(prior.current_liabilities, prior.long_term_debt), prior.total_assets
+            self._safe_sum(curr.current_liabilities, curr.long_term_debt),
+            curr.total_assets,
+            self._safe_sum(prior.current_liabilities, prior.long_term_debt),
+            prior.total_assets,
         )
         indices["lvgi_index"] = lvgi
 
@@ -358,15 +358,15 @@ class BeneishMScoreCalculator:
         lvgi = indices.get("lvgi_index") or 1.0
 
         m_score = (
-            self.INTERCEPT +
-            self.COEF_DSRI * dsri +
-            self.COEF_GMI * gmi +
-            self.COEF_AQI * aqi +
-            self.COEF_SGI * sgi +
-            self.COEF_DEPI * depi +
-            self.COEF_SGAI * sgai +
-            self.COEF_TATA * tata +
-            self.COEF_LVGI * lvgi
+            self.INTERCEPT
+            + self.COEF_DSRI * dsri
+            + self.COEF_GMI * gmi
+            + self.COEF_AQI * aqi
+            + self.COEF_SGI * sgi
+            + self.COEF_DEPI * depi
+            + self.COEF_SGAI * sgai
+            + self.COEF_TATA * tata
+            + self.COEF_LVGI * lvgi
         )
 
         return m_score
@@ -420,6 +420,7 @@ class BeneishMScoreCalculator:
             return None
 
         import math
+
         try:
             # Logistic approximation centered at threshold
             prob = 1.0 / (1.0 + math.exp(-1.5 * (m_score + 1.78)))
@@ -443,8 +444,10 @@ class BeneishMScoreCalculator:
 
     def _safe_ratio_index(
         self,
-        curr_num: Optional[float], curr_den: Optional[float],
-        prior_num: Optional[float], prior_den: Optional[float]
+        curr_num: Optional[float],
+        curr_den: Optional[float],
+        prior_num: Optional[float],
+        prior_den: Optional[float],
     ) -> Optional[float]:
         """Calculate ratio index: (curr_num/curr_den) / (prior_num/prior_den)."""
         curr_ratio = self._safe_divide(curr_num, curr_den)

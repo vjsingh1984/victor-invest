@@ -41,11 +41,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from investigator.domain.services.rl.models import (
-    ValuationContext,
-    Experience,
-    RewardSignal,
-    PerModelReward,
     ABTestGroup,
+    Experience,
+    PerModelReward,
+    RewardSignal,
+    ValuationContext,
 )
 from investigator.domain.services.rl.reward_calculator import (
     RewardCalculator,

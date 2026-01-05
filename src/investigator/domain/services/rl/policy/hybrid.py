@@ -53,9 +53,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from investigator.domain.services.rl.models import ValuationContext
-from investigator.domain.services.rl.policy.base import RLPolicy, VALUATION_MODELS
 from investigator.domain.services.rl.feature_normalizer import FeatureNormalizer
+from investigator.domain.services.rl.models import ValuationContext
+from investigator.domain.services.rl.policy.base import VALUATION_MODELS, RLPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -673,9 +673,7 @@ class HybridPolicy(RLPolicy):
         for sector, period_data in self._sector_period_rewards.items():
             sector_stats[sector] = {
                 "samples_per_period": {p: len(r) for p, r in period_data.items()},
-                "avg_reward_per_period": {
-                    p: (sum(r) / len(r) if r else 0) for p, r in period_data.items()
-                },
+                "avg_reward_per_period": {p: (sum(r) / len(r) if r else 0) for p, r in period_data.items()},
                 "optimal_period": self._sector_optimal_periods.get(sector),
             }
 

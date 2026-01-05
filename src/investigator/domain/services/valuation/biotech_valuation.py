@@ -36,8 +36,10 @@ logger = logging.getLogger(__name__)
 # P2-A1: PHASE SUCCESS PROBABILITY WEIGHTS
 # ====================
 
+
 class DrugPhase(Enum):
     """Drug development phases with associated approval probabilities."""
+
     PRECLINICAL = "preclinical"
     PHASE_1 = "phase_1"
     PHASE_2 = "phase_2"
@@ -50,22 +52,22 @@ class DrugPhase(Enum):
 # Source: Industry analysis (BIO, FDA, PhRMA data)
 # These represent probability of eventual FDA approval from each phase
 PHASE_SUCCESS_PROBABILITIES: Dict[str, float] = {
-    "preclinical": 0.05,   # 5% of preclinical candidates reach approval
-    "phase_1": 0.10,       # 10% from Phase 1
-    "phase_2": 0.15,       # 15% from Phase 2 (most drugs fail here)
-    "phase_3": 0.50,       # 50% from Phase 3 (pivotal trials)
-    "filed_nda": 0.85,     # 85% with NDA filed get approved
-    "approved": 1.00,      # 100% if already approved
+    "preclinical": 0.05,  # 5% of preclinical candidates reach approval
+    "phase_1": 0.10,  # 10% from Phase 1
+    "phase_2": 0.15,  # 15% from Phase 2 (most drugs fail here)
+    "phase_3": 0.50,  # 50% from Phase 3 (pivotal trials)
+    "filed_nda": 0.85,  # 85% with NDA filed get approved
+    "approved": 1.00,  # 100% if already approved
 }
 
 # Phase transition probabilities (for reference)
 # Not used directly but helpful for understanding the model
 PHASE_TRANSITION_RATES: Dict[str, float] = {
     "preclinical_to_phase_1": 0.50,  # 50% advance to Phase 1
-    "phase_1_to_phase_2": 0.65,      # 65% of Phase 1 advance
-    "phase_2_to_phase_3": 0.30,      # 30% of Phase 2 advance (biggest drop)
-    "phase_3_to_filed": 0.70,        # 70% of Phase 3 file NDA
-    "filed_to_approved": 0.90,       # 90% of NDAs approved
+    "phase_1_to_phase_2": 0.65,  # 65% of Phase 1 advance
+    "phase_2_to_phase_3": 0.30,  # 30% of Phase 2 advance (biggest drop)
+    "phase_3_to_filed": 0.70,  # 70% of Phase 3 file NDA
+    "filed_to_approved": 0.90,  # 90% of NDAs approved
 }
 
 
@@ -73,17 +75,20 @@ PHASE_TRANSITION_RATES: Dict[str, float] = {
 # P2-A2: CASH RUNWAY CALCULATION
 # ====================
 
+
 class CashRunwayRisk(Enum):
     """Cash runway risk classification."""
-    LOW = "low"        # > 24 months
+
+    LOW = "low"  # > 24 months
     MEDIUM = "medium"  # 18-24 months
-    HIGH = "high"      # < 18 months
+    HIGH = "high"  # < 18 months
     CRITICAL = "critical"  # < 12 months
 
 
 @dataclass
 class CashRunwayResult:
     """Result from cash runway analysis."""
+
     months: float
     risk: CashRunwayRisk
     risk_description: str
@@ -124,7 +129,7 @@ def calculate_cash_runway(
         # Company is cash flow positive or break-even
         logger.info("Cash flow positive or break-even - unlimited runway")
         return CashRunwayResult(
-            months=float('inf'),
+            months=float("inf"),
             risk=CashRunwayRisk.LOW,
             risk_description="Cash flow positive - no financing risk",
             dilution_warning=False,
@@ -132,8 +137,8 @@ def calculate_cash_runway(
                 "cash": cash,
                 "quarterly_burn": quarterly_burn,
                 "monthly_burn": 0,
-                "years_runway": float('inf'),
-            }
+                "years_runway": float("inf"),
+            },
         )
 
     # Calculate total liquidity
@@ -181,7 +186,7 @@ def calculate_cash_runway(
             "quarterly_burn": quarterly_burn,
             "monthly_burn": monthly_burn,
             "years_runway": years,
-        }
+        },
     )
 
 
@@ -194,18 +199,18 @@ def calculate_cash_runway(
 BIOTECH_PRE_REVENUE_TIER = {
     "name": "biotech_pre_revenue",
     "weights": {
-        "pipeline_value": 60,      # Probability-weighted pipeline (primary driver)
-        "cash_runway": 25,         # Cash / burn rate (financing risk)
-        "comparable_deals": 15,    # Industry benchmark comparables (implemented below)
-        "ps": 0,                   # Explicitly exclude P/S (meaningless at $0 revenue)
-        "pe": 0,                   # Explicitly exclude P/E (no earnings)
-        "dcf": 0,                  # Explicitly exclude DCF (too speculative)
+        "pipeline_value": 60,  # Probability-weighted pipeline (primary driver)
+        "cash_runway": 25,  # Cash / burn rate (financing risk)
+        "comparable_deals": 15,  # Industry benchmark comparables (implemented below)
+        "ps": 0,  # Explicitly exclude P/S (meaningless at $0 revenue)
+        "pe": 0,  # Explicitly exclude P/E (no earnings)
+        "dcf": 0,  # Explicitly exclude DCF (too speculative)
     },
     "parameters": {
-        "market_size_discount": 0.30,      # 30% discount to TAM estimates (conservative)
-        "cash_runway_min_months": 18,      # Flag if < 18 months runway
-        "peak_sales_multiple": 3.0,        # NPV multiple for approved drugs
-        "development_time_years": {        # Expected time to approval by phase
+        "market_size_discount": 0.30,  # 30% discount to TAM estimates (conservative)
+        "cash_runway_min_months": 18,  # Flag if < 18 months runway
+        "peak_sales_multiple": 3.0,  # NPV multiple for approved drugs
+        "development_time_years": {  # Expected time to approval by phase
             "preclinical": 8,
             "phase_1": 6,
             "phase_2": 4,
@@ -213,7 +218,7 @@ BIOTECH_PRE_REVENUE_TIER = {
             "filed_nda": 1,
             "approved": 0,
         },
-        "discount_rate": 0.15,             # 15% discount rate for biotech
+        "discount_rate": 0.15,  # 15% discount rate for biotech
     },
 }
 
@@ -345,6 +350,7 @@ def classify_therapeutic_area(
 @dataclass
 class ComparablesBenchmark:
     """Result from industry comparable analysis."""
+
     therapeutic_area: str
     ev_benchmark_low: float
     ev_benchmark_high: float
@@ -379,9 +385,7 @@ def calculate_comparables_benchmark(
     """
     # Classify therapeutic area
     therapeutic_area = classify_therapeutic_area(indication, company_name, pipeline)
-    benchmarks = THERAPEUTIC_AREA_BENCHMARKS.get(
-        therapeutic_area, THERAPEUTIC_AREA_BENCHMARKS["default"]
-    )
+    benchmarks = THERAPEUTIC_AREA_BENCHMARKS.get(therapeutic_area, THERAPEUTIC_AREA_BENCHMARKS["default"])
 
     # Determine most advanced phase in pipeline
     most_advanced_phase = "preclinical"
@@ -437,6 +441,7 @@ def calculate_comparables_benchmark(
 @dataclass
 class DrugCandidate:
     """Representation of a drug in the pipeline."""
+
     name: str
     phase: str  # preclinical, phase_1, phase_2, phase_3, filed_nda, approved
     indication: str
@@ -449,6 +454,7 @@ class DrugCandidate:
 @dataclass
 class PipelineValuationResult:
     """Result from pipeline probability-weighted valuation."""
+
     total_pipeline_value: float
     drug_values: List[Dict]
     probability_weighted_sales: float
@@ -513,17 +519,19 @@ def calculate_pipeline_value(
         # Calculate NPV contribution
         drug_npv = pw_sales * npv_multiple * time_discount
 
-        drug_values.append({
-            "name": drug_name,
-            "phase": phase,
-            "peak_sales": peak_sales,
-            "probability": prob,
-            "market_discount": market_discount,
-            "probability_weighted_sales": pw_sales,
-            "time_to_approval_years": time_years,
-            "time_discount": time_discount,
-            "npv_contribution": drug_npv,
-        })
+        drug_values.append(
+            {
+                "name": drug_name,
+                "phase": phase,
+                "peak_sales": peak_sales,
+                "probability": prob,
+                "market_discount": market_discount,
+                "probability_weighted_sales": pw_sales,
+                "time_to_approval_years": time_years,
+                "time_discount": time_discount,
+                "npv_contribution": drug_npv,
+            }
+        )
 
         total_probability_weighted_sales += pw_sales
         total_value += drug_npv
@@ -649,7 +657,10 @@ def is_pre_revenue_biotech(
 
     # Check revenue
     if revenue < revenue_threshold:
-        return True, f"Pre-revenue biotech ({biotech_reason}, revenue=${revenue/1e6:.1f}M < ${revenue_threshold/1e6:.0f}M threshold)"
+        return (
+            True,
+            f"Pre-revenue biotech ({biotech_reason}, revenue=${revenue/1e6:.1f}M < ${revenue_threshold/1e6:.0f}M threshold)",
+        )
 
     return False, f"Revenue-generating biotech (${revenue/1e6:.1f}M > ${revenue_threshold/1e6:.0f}M threshold)"
 
@@ -658,9 +669,11 @@ def is_pre_revenue_biotech(
 # COMPREHENSIVE BIOTECH VALUATION
 # ====================
 
+
 @dataclass
 class BiotechValuationResult:
     """Result from comprehensive biotech valuation."""
+
     fair_value_per_share: float
     total_enterprise_value: float
     pipeline_value: float
@@ -777,7 +790,7 @@ def value_biotech(
     elif cash_runway.risk == CashRunwayRisk.MEDIUM:
         cash_discount = 0.90  # 10% discount
     else:
-        cash_discount = 1.0   # No discount for adequate runway
+        cash_discount = 1.0  # No discount for adequate runway
 
     adjusted_cash = cash * cash_discount
 

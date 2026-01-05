@@ -26,9 +26,8 @@ src_dir = Path(__file__).parent.parent.parent
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
-from .utils import setup_logging, load_config
 from .groups import analyze, backtest, cache, data, macro, system
-
+from .utils import load_config, setup_logging
 
 CONTEXT_SETTINGS = dict(
     help_option_names=["-h", "--help"],
@@ -37,39 +36,19 @@ CONTEXT_SETTINGS = dict(
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
+@click.option("--config", "-c", default="config.yaml", envvar="INVESTIGATOR_CONFIG", help="Configuration file path")
 @click.option(
-    "--config", "-c",
-    default="config.yaml",
-    envvar="INVESTIGATOR_CONFIG",
-    help="Configuration file path"
-)
-@click.option(
-    "--log-level", "-l",
+    "--log-level",
+    "-l",
     type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]),
     default="INFO",
     envvar="INVESTIGATOR_LOG_LEVEL",
-    help="Logging level"
+    help="Logging level",
 )
-@click.option(
-    "--log-file",
-    type=click.Path(),
-    envvar="INVESTIGATOR_LOG_FILE",
-    help="Log file path"
-)
-@click.option(
-    "--verbose", "-v",
-    is_flag=True,
-    help="Enable verbose output (same as --log-level DEBUG)"
-)
-@click.option(
-    "--quiet", "-q",
-    is_flag=True,
-    help="Suppress non-essential output"
-)
-@click.version_option(
-    version="0.1.0",
-    prog_name="investigator"
-)
+@click.option("--log-file", type=click.Path(), envvar="INVESTIGATOR_LOG_FILE", help="Log file path")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output (same as --log-level DEBUG)")
+@click.option("--quiet", "-q", is_flag=True, help="Suppress non-essential output")
+@click.version_option(version="0.1.0", prog_name="investigator")
 @click.pass_context
 def cli(ctx, config, log_level, log_file, verbose, quiet):
     """InvestiGator - AI-Powered Investment Analysis

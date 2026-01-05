@@ -13,31 +13,30 @@ Updated: 2025-12-29 (added auto manufacturing valuation tier P1-A)
 """
 
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from investigator.domain.models.market_context import MarketContext
 from investigator.domain.services.company_metadata_service import CompanyMetadataService
 from investigator.domain.services.model_applicability import ModelApplicabilityRules
-from investigator.domain.services.weight_normalizer import WeightNormalizer
-from investigator.domain.services.weight_bounds import (
-    BoundedMultiplierApplicator,
-    BoundConfig,
-)
-from investigator.domain.services.weight_audit_trail import (
-    WeightAuditTrail,
-    WeightAdjustment,
-)
-from investigator.domain.services.threshold_registry import (
-    ThresholdRegistry,
-    get_threshold_registry,
-    PELevel,
-)
 from investigator.domain.services.profitability_classifier import (
     ProfitabilityClassifier,
-    get_profitability_classifier,
     ProfitabilityStage,
+    get_profitability_classifier,
 )
-
+from investigator.domain.services.threshold_registry import (
+    PELevel,
+    ThresholdRegistry,
+    get_threshold_registry,
+)
+from investigator.domain.services.weight_audit_trail import (
+    WeightAdjustment,
+    WeightAuditTrail,
+)
+from investigator.domain.services.weight_bounds import (
+    BoundConfig,
+    BoundedMultiplierApplicator,
+)
+from investigator.domain.services.weight_normalizer import WeightNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -1446,25 +1445,40 @@ class DynamicModelWeightingService:
         # Low-margin industries (typically <5% net margin)
         low_margin_industries = [
             # Retail (1-3% margins)
-            "department", "specialty retail", "discount stores", "warehouse clubs",
-            "food chains", "grocery", "supermarket",
+            "department",
+            "specialty retail",
+            "discount stores",
+            "warehouse clubs",
+            "food chains",
+            "grocery",
+            "supermarket",
             "consumer electronics/video chains",
             # Hardware/Manufacturing (3-8% margins for most)
-            "computer manufacturing", "computer hardware",
+            "computer manufacturing",
+            "computer hardware",
             # Contract manufacturing / EMS (2-4% margins)
             "electrical products",  # FLEX, JBL - EMS companies
             "electronic components",
             # Airlines (2-5% margins, highly cyclical)
-            "air freight", "airlines", "airline",
+            "air freight",
+            "airlines",
+            "airline",
             # Food processing (3-5% margins)
-            "meat/poultry/fish", "packaged foods", "food processing",
-            "farm products", "farming/seeds",
+            "meat/poultry/fish",
+            "packaged foods",
+            "food processing",
+            "farm products",
+            "farming/seeds",
             # Healthcare services with thin margins
-            "hospital", "nursing", "medical/nursing services",
+            "hospital",
+            "nursing",
+            "medical/nursing services",
             # Telecom/Cable (can have high capex eating into margins)
-            "cable", "pay television",
+            "cable",
+            "pay television",
             # Energy transmission
-            "oil/gas transmission", "gas distribution",
+            "oil/gas transmission",
+            "gas distribution",
             # Beverages (varies, but many are low margin)
             "beverages",
         ]
@@ -1859,8 +1873,8 @@ class DynamicModelWeightingService:
     def _is_defense_contractor(self, industry: Optional[str], symbol: Optional[str]) -> bool:
         """Check if company is a defense contractor."""
         from investigator.domain.services.valuation.defense_valuation import (
-            KNOWN_DEFENSE_CONTRACTORS,
             DEFENSE_INDUSTRIES,
+            KNOWN_DEFENSE_CONTRACTORS,
         )
 
         if symbol and symbol.upper() in KNOWN_DEFENSE_CONTRACTORS:

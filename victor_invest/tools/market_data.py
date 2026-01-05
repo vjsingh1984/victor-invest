@@ -101,12 +101,11 @@ Returns current market data, historical prices, and company metadata.
     async def initialize(self) -> None:
         """Initialize market data infrastructure."""
         try:
-            from investigator.infrastructure.database.market_data import (
-                get_market_data_fetcher
-            )
+            from investigator.infrastructure.database.market_data import get_market_data_fetcher
 
             if self.config is None:
                 from investigator.config import get_config
+
                 self.config = get_config()
 
             self._fetcher = get_market_data_fetcher(self.config)
@@ -125,7 +124,7 @@ Returns current market data, historical prices, and company metadata.
         action: str = "get_quote",
         days: int = 365,
         period: str = "1y",
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute market data retrieval operation.
 
@@ -183,8 +182,7 @@ Returns current market data, historical prices, and company metadata.
         except Exception as e:
             logger.error(f"MarketDataTool execute error: {e}")
             return ToolResult.error_result(
-                f"Market data operation failed: {str(e)}",
-                metadata={"symbol": symbol, "action": action}
+                f"Market data operation failed: {str(e)}", metadata={"symbol": symbol, "action": action}
             )
 
     async def _get_quote(self, symbol: str) -> ToolResult:
@@ -198,17 +196,10 @@ Returns current market data, historical prices, and company metadata.
         """
         try:
             loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(
-                None,
-                self._fetcher.get_stock_info,
-                symbol
-            )
+            info = await loop.run_in_executor(None, self._fetcher.get_stock_info, symbol)
 
             if not info:
-                return ToolResult.error_result(
-                    f"No quote data available for {symbol}",
-                    metadata={"symbol": symbol}
-                )
+                return ToolResult.error_result(f"No quote data available for {symbol}", metadata={"symbol": symbol})
 
             return ToolResult.success_result(
                 data={
@@ -221,18 +212,14 @@ Returns current market data, historical prices, and company metadata.
                     "52_week_low": info.get("52_week_low"),
                     "beta": info.get("beta"),
                 },
-                metadata={"source": "market_data_database"}
+                metadata={"source": "market_data_database"},
             )
 
         except Exception as e:
             logger.error(f"Error getting quote for {symbol}: {e}")
             return ToolResult.error_result(f"Failed to get quote: {str(e)}")
 
-    async def _get_history(
-        self,
-        symbol: str,
-        days: int
-    ) -> ToolResult:
+    async def _get_history(self, symbol: str, days: int) -> ToolResult:
         """Get historical OHLCV data.
 
         Args:
@@ -244,17 +231,11 @@ Returns current market data, historical prices, and company metadata.
         """
         try:
             loop = asyncio.get_event_loop()
-            df = await loop.run_in_executor(
-                None,
-                self._fetcher.get_stock_data,
-                symbol,
-                days
-            )
+            df = await loop.run_in_executor(None, self._fetcher.get_stock_data, symbol, days)
 
             if df is None or df.empty:
                 return ToolResult.error_result(
-                    f"No historical data available for {symbol}",
-                    metadata={"symbol": symbol, "days": days}
+                    f"No historical data available for {symbol}", metadata={"symbol": symbol, "days": days}
                 )
 
             # Convert to list of records
@@ -279,9 +260,7 @@ Returns current market data, historical prices, and company metadata.
                 "avg_volume": float(df["Volume"].mean()),
                 "start_price": float(df["Close"].iloc[0]),
                 "end_price": float(df["Close"].iloc[-1]),
-                "return_pct": float(
-                    ((df["Close"].iloc[-1] / df["Close"].iloc[0]) - 1) * 100
-                ),
+                "return_pct": float(((df["Close"].iloc[-1] / df["Close"].iloc[0]) - 1) * 100),
             }
 
             return ToolResult.success_result(
@@ -293,12 +272,9 @@ Returns current market data, historical prices, and company metadata.
                         "end": str(df.index[-1]),
                     },
                     "summary": summary,
-                    "data": records  # Full OHLCV data
+                    "data": records,  # Full OHLCV data
                 },
-                metadata={
-                    "source": "market_data_database",
-                    "requested_days": days
-                }
+                metadata={"source": "market_data_database", "requested_days": days},
             )
 
         except Exception as e:
@@ -316,17 +292,10 @@ Returns current market data, historical prices, and company metadata.
         """
         try:
             loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(
-                None,
-                self._fetcher.get_stock_info,
-                symbol
-            )
+            info = await loop.run_in_executor(None, self._fetcher.get_stock_info, symbol)
 
             if not info:
-                return ToolResult.error_result(
-                    f"No company info available for {symbol}",
-                    metadata={"symbol": symbol}
-                )
+                return ToolResult.error_result(f"No company info available for {symbol}", metadata={"symbol": symbol})
 
             return ToolResult.success_result(
                 data={
@@ -347,18 +316,14 @@ Returns current market data, historical prices, and company metadata.
                     "cik": info.get("cik"),
                     "sic_code": info.get("sic_code"),
                 },
-                metadata={"source": "market_data_database"}
+                metadata={"source": "market_data_database"},
             )
 
         except Exception as e:
             logger.error(f"Error getting info for {symbol}: {e}")
             return ToolResult.error_result(f"Failed to get info: {str(e)}")
 
-    async def _get_price_change(
-        self,
-        symbol: str,
-        period: str
-    ) -> ToolResult:
+    async def _get_price_change(self, symbol: str, period: str) -> ToolResult:
         """Calculate price change over a period.
 
         Args:
@@ -385,16 +350,12 @@ Returns current market data, historical prices, and company metadata.
 
             loop = asyncio.get_event_loop()
             df = await loop.run_in_executor(
-                None,
-                self._fetcher.get_stock_data,
-                symbol,
-                days + 5  # Buffer for market holidays
+                None, self._fetcher.get_stock_data, symbol, days + 5  # Buffer for market holidays
             )
 
             if df is None or len(df) < 2:
                 return ToolResult.error_result(
-                    f"Insufficient data for price change calculation",
-                    metadata={"symbol": symbol, "period": period}
+                    f"Insufficient data for price change calculation", metadata={"symbol": symbol, "period": period}
                 )
 
             # Get prices
@@ -423,9 +384,9 @@ Returns current market data, historical prices, and company metadata.
                         "start": str(df.index[0]),
                         "end": str(df.index[-1]),
                     },
-                    "trading_days": len(df)
+                    "trading_days": len(df),
                 },
-                metadata={"source": "market_data_database"}
+                metadata={"source": "market_data_database"},
             )
 
         except Exception as e:
@@ -444,10 +405,7 @@ Returns current market data, historical prices, and company metadata.
         try:
             loop = asyncio.get_event_loop()
             df = await loop.run_in_executor(
-                None,
-                self._fetcher.get_stock_data,
-                symbol,
-                5  # Just check if any data exists
+                None, self._fetcher.get_stock_data, symbol, 5  # Just check if any data exists
             )
 
             is_available = df is not None and not df.empty
@@ -460,18 +418,13 @@ Returns current market data, historical prices, and company metadata.
                     "data_points": data_points,
                     "latest_date": str(df.index[-1]) if is_available else None,
                 },
-                metadata={"source": "market_data_database"}
+                metadata={"source": "market_data_database"},
             )
 
         except Exception as e:
             logger.error(f"Error checking availability for {symbol}: {e}")
             return ToolResult.success_result(
-                data={
-                    "symbol": symbol,
-                    "available": False,
-                    "data_points": 0,
-                    "error": str(e)
-                }
+                data={"symbol": symbol, "available": False, "data_points": 0, "error": str(e)}
             )
 
     async def _list_symbols(self) -> ToolResult:
@@ -482,17 +435,10 @@ Returns current market data, historical prices, and company metadata.
         """
         try:
             loop = asyncio.get_event_loop()
-            symbols = await loop.run_in_executor(
-                None,
-                self._fetcher.get_available_symbols
-            )
+            symbols = await loop.run_in_executor(None, self._fetcher.get_available_symbols)
 
             return ToolResult.success_result(
-                data={
-                    "count": len(symbols),
-                    "symbols": symbols
-                },
-                metadata={"source": "market_data_database"}
+                data={"count": len(symbols), "symbols": symbols}, metadata={"source": "market_data_database"}
             )
 
         except Exception as e:
@@ -504,32 +450,33 @@ Returns current market data, historical prices, and company metadata.
         return {
             "type": "object",
             "properties": {
-                "symbol": {
-                    "type": "string",
-                    "description": "Stock ticker symbol"
-                },
+                "symbol": {"type": "string", "description": "Stock ticker symbol"},
                 "action": {
                     "type": "string",
                     "enum": [
-                        "get_quote", "get_history", "get_info",
-                        "get_price_change", "check_available", "list_symbols"
+                        "get_quote",
+                        "get_history",
+                        "get_info",
+                        "get_price_change",
+                        "check_available",
+                        "list_symbols",
                     ],
                     "description": "Action to perform",
-                    "default": "get_quote"
+                    "default": "get_quote",
                 },
                 "days": {
                     "type": "integer",
                     "description": "Days of historical data",
                     "default": 365,
                     "minimum": 1,
-                    "maximum": 1825
+                    "maximum": 1825,
                 },
                 "period": {
                     "type": "string",
                     "enum": ["1d", "5d", "1w", "1m", "3m", "6m", "1y", "ytd"],
                     "description": "Period for price change calculation",
-                    "default": "1y"
-                }
+                    "default": "1y",
+                },
             },
-            "required": []  # symbol required for most actions but not list_symbols
+            "required": [],  # symbol required for most actions but not list_symbols
         }

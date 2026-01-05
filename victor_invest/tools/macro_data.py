@@ -79,10 +79,7 @@ INDICATOR_CATEGORIES = {
     "inflation": ["CPIAUCSL", "PCEPI", "CORESTICKM159SFRBATL", "T10YIE"],
     "rates": ["FEDFUNDS", "DFF", "DGS10", "T10Y2Y", "MORTGAGE30US"],
     "credit": ["BAMLH0A0HYM2"],
-    "debt": [
-        "GFDEGDQ188S", "GFDGDPA188S", "HDTGPDUSQ163N", "CMDEBT",
-        "NCBDBIQ027S", "TBSDODNS", "TDSP", "FODSP"
-    ],
+    "debt": ["GFDEGDQ188S", "GFDGDPA188S", "HDTGPDUSQ163N", "CMDEBT", "NCBDBIQ027S", "TBSDODNS", "TDSP", "FODSP"],
     "market": ["SP500", "VIXCLS"],
     "sentiment": ["UMCSENT"],
     "housing": ["HOUST", "CSUSHPISA"],
@@ -91,9 +88,7 @@ INDICATOR_CATEGORIES = {
 }
 
 # Flatten all indicators for quick lookup
-ALL_INDICATORS = {
-    ind: cat for cat, inds in INDICATOR_CATEGORIES.items() for ind in inds
-}
+ALL_INDICATORS = {ind: cat for cat, inds in INDICATOR_CATEGORIES.items() for ind in inds}
 
 
 class MacroDataTool(BaseTool):
@@ -151,9 +146,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
     async def initialize(self) -> None:
         """Initialize FRED infrastructure components."""
         try:
-            from investigator.infrastructure.external.fred.macro_indicators import (
-                MacroIndicatorsFetcher
-            )
+            from investigator.infrastructure.external.fred.macro_indicators import MacroIndicatorsFetcher
 
             self._fetcher = MacroIndicatorsFetcher()
             self._initialized = True
@@ -172,7 +165,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
         indicator_id: Optional[str] = None,
         lookback_days: int = 1095,
         limit: int = 1000,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute macro data operation.
 
@@ -220,10 +213,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
 
         except Exception as e:
             logger.error(f"MacroDataTool execute error: {e}")
-            return ToolResult.error_result(
-                f"Macro data operation failed: {str(e)}",
-                metadata={"action": action}
-            )
+            return ToolResult.error_result(f"Macro data operation failed: {str(e)}", metadata={"action": action})
 
     async def _get_summary(self) -> ToolResult:
         """Get comprehensive macro summary with alerts.
@@ -233,10 +223,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
         """
         try:
             loop = asyncio.get_event_loop()
-            summary = await loop.run_in_executor(
-                None,
-                self._fetcher.get_macro_summary
-            )
+            summary = await loop.run_in_executor(None, self._fetcher.get_macro_summary)
 
             if not summary:
                 return ToolResult.error_result("Failed to retrieve macro summary")
@@ -266,7 +253,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                         "gdp_billions": bi.get("gdp"),
                         "gdp_date": str(bi.get("gdp_date")) if bi.get("gdp_date") else None,
                         "estimated_market_cap_billions": bi.get("estimated_market_cap"),
-                    }
+                    },
                 }
 
             return ToolResult.success_result(
@@ -275,18 +262,14 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                     "source": "fred",
                     "indicator_count": len(summary.get("indicators", {})),
                     "alert_count": len(summary.get("alerts", [])),
-                }
+                },
             )
 
         except Exception as e:
             logger.error(f"Error getting macro summary: {e}")
             return ToolResult.error_result(f"Failed to get macro summary: {str(e)}")
 
-    async def _get_category(
-        self,
-        category: Optional[str],
-        lookback_days: int
-    ) -> ToolResult:
+    async def _get_category(self, category: Optional[str], lookback_days: int) -> ToolResult:
         """Get indicators for a specific category.
 
         Args:
@@ -297,33 +280,23 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
             ToolResult with category indicators
         """
         if not category:
-            return ToolResult.error_result(
-                "Category is required. Use 'list_categories' to see available categories."
-            )
+            return ToolResult.error_result("Category is required. Use 'list_categories' to see available categories.")
 
         category = category.lower().strip()
         if category not in INDICATOR_CATEGORIES:
             available = list(INDICATOR_CATEGORIES.keys())
-            return ToolResult.error_result(
-                f"Unknown category: {category}. Available: {available}"
-            )
+            return ToolResult.error_result(f"Unknown category: {category}. Available: {available}")
 
         try:
             indicator_ids = INDICATOR_CATEGORIES[category]
 
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(
-                None,
-                lambda: self._fetcher.get_latest_values(
-                    indicator_ids=indicator_ids,
-                    lookback_days=lookback_days
-                )
+                None, lambda: self._fetcher.get_latest_values(indicator_ids=indicator_ids, lookback_days=lookback_days)
             )
 
             if not data:
-                return ToolResult.error_result(
-                    f"No data found for category: {category}"
-                )
+                return ToolResult.error_result(f"No data found for category: {category}")
 
             return ToolResult.success_result(
                 data={
@@ -334,18 +307,14 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                 metadata={
                     "source": "fred",
                     "lookback_days": lookback_days,
-                }
+                },
             )
 
         except Exception as e:
             logger.error(f"Error getting category {category}: {e}")
             return ToolResult.error_result(f"Failed to get category data: {str(e)}")
 
-    async def _get_indicators(
-        self,
-        indicators: Optional[List[str]],
-        lookback_days: int
-    ) -> ToolResult:
+    async def _get_indicators(self, indicators: Optional[List[str]], lookback_days: int) -> ToolResult:
         """Get specific indicators by ID.
 
         Args:
@@ -356,9 +325,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
             ToolResult with indicator data
         """
         if not indicators:
-            return ToolResult.error_result(
-                "Indicators list is required. Example: ['DGS10', 'FEDFUNDS', 'VIXCLS']"
-            )
+            return ToolResult.error_result("Indicators list is required. Example: ['DGS10', 'FEDFUNDS', 'VIXCLS']")
 
         try:
             # Normalize indicator IDs
@@ -366,17 +333,11 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
 
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(
-                None,
-                lambda: self._fetcher.get_latest_values(
-                    indicator_ids=indicator_ids,
-                    lookback_days=lookback_days
-                )
+                None, lambda: self._fetcher.get_latest_values(indicator_ids=indicator_ids, lookback_days=lookback_days)
             )
 
             if not data:
-                return ToolResult.error_result(
-                    f"No data found for indicators: {indicator_ids}"
-                )
+                return ToolResult.error_result(f"No data found for indicators: {indicator_ids}")
 
             # Note missing indicators
             found = set(data.keys())
@@ -397,18 +358,14 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                 metadata={
                     "source": "fred",
                     "lookback_days": lookback_days,
-                }
+                },
             )
 
         except Exception as e:
             logger.error(f"Error getting indicators: {e}")
             return ToolResult.error_result(f"Failed to get indicators: {str(e)}")
 
-    async def _get_time_series(
-        self,
-        indicator_id: Optional[str],
-        limit: int
-    ) -> ToolResult:
+    async def _get_time_series(self, indicator_id: Optional[str], limit: int) -> ToolResult:
         """Get historical time series for an indicator.
 
         Args:
@@ -419,34 +376,28 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
             ToolResult with time series data
         """
         if not indicator_id:
-            return ToolResult.error_result(
-                "indicator_id is required. Example: 'DGS10' for 10-Year Treasury"
-            )
+            return ToolResult.error_result("indicator_id is required. Example: 'DGS10' for 10-Year Treasury")
 
         try:
             indicator_id = indicator_id.upper().strip()
 
             loop = asyncio.get_event_loop()
             df = await loop.run_in_executor(
-                None,
-                lambda: self._fetcher.get_time_series(
-                    indicator_id=indicator_id,
-                    limit=limit
-                )
+                None, lambda: self._fetcher.get_time_series(indicator_id=indicator_id, limit=limit)
             )
 
             if df.empty:
-                return ToolResult.error_result(
-                    f"No time series data found for: {indicator_id}"
-                )
+                return ToolResult.error_result(f"No time series data found for: {indicator_id}")
 
             # Convert to list of dicts for JSON serialization
             time_series = []
             for _, row in df.iterrows():
-                time_series.append({
-                    "date": str(row["date"]),
-                    "value": row["value"],
-                })
+                time_series.append(
+                    {
+                        "date": str(row["date"]),
+                        "value": row["value"],
+                    }
+                )
 
             # Calculate summary stats
             values = df["value"].values
@@ -474,7 +425,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                 metadata={
                     "source": "fred",
                     "limit": limit,
-                }
+                },
             )
 
         except Exception as e:
@@ -489,15 +440,11 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
         """
         try:
             loop = asyncio.get_event_loop()
-            buffett = await loop.run_in_executor(
-                None,
-                self._fetcher.calculate_buffett_indicator
-            )
+            buffett = await loop.run_in_executor(None, self._fetcher.calculate_buffett_indicator)
 
             if not buffett:
                 return ToolResult.error_result(
-                    "Failed to calculate Buffett Indicator. "
-                    "Missing VTI price or GDP data."
+                    "Failed to calculate Buffett Indicator. " "Missing VTI price or GDP data."
                 )
 
             # Interpretation guide
@@ -531,7 +478,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                 metadata={
                     "source": "fred+tickerdata",
                     "calculation_method": "VTI proxy for Wilshire 5000",
-                }
+                },
             )
 
         except Exception as e:
@@ -557,7 +504,7 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                 "total_categories": len(INDICATOR_CATEGORIES),
                 "total_indicators": len(ALL_INDICATORS),
             },
-            metadata={"source": "static_mapping"}
+            metadata={"source": "static_mapping"},
         )
 
     def _format_category_data(self, data: Dict) -> Dict:
@@ -580,12 +527,16 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                 "date": str(ind_data.get("date")) if ind_data.get("date") else None,
                 "units": ind_data.get("units"),
                 "frequency": ind_data.get("frequency"),
-                "change": {
-                    "absolute": ind_data.get("change_abs"),
-                    "percent": ind_data.get("change_pct"),
-                    "previous_value": ind_data.get("prev_value"),
-                    "previous_date": str(ind_data.get("prev_date")) if ind_data.get("prev_date") else None,
-                } if ind_data.get("change_abs") is not None else None,
+                "change": (
+                    {
+                        "absolute": ind_data.get("change_abs"),
+                        "percent": ind_data.get("change_pct"),
+                        "previous_value": ind_data.get("prev_value"),
+                        "previous_date": str(ind_data.get("prev_date")) if ind_data.get("prev_date") else None,
+                    }
+                    if ind_data.get("change_abs") is not None
+                    else None
+                ),
             }
 
         return formatted
@@ -598,40 +549,41 @@ Example indicators: DGS10 (10Y Treasury), FEDFUNDS (Fed Funds Rate), VIXCLS (VIX
                 "action": {
                     "type": "string",
                     "enum": [
-                        "get_summary", "get_category", "get_indicators",
-                        "get_time_series", "buffett_indicator", "list_categories"
+                        "get_summary",
+                        "get_category",
+                        "get_indicators",
+                        "get_time_series",
+                        "buffett_indicator",
+                        "list_categories",
                     ],
                     "description": "Action to perform",
-                    "default": "get_summary"
+                    "default": "get_summary",
                 },
                 "category": {
                     "type": "string",
                     "enum": list(INDICATOR_CATEGORIES.keys()),
-                    "description": "Category for get_category action"
+                    "description": "Category for get_category action",
                 },
                 "indicators": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "List of FRED series IDs for get_indicators"
+                    "description": "List of FRED series IDs for get_indicators",
                 },
-                "indicator_id": {
-                    "type": "string",
-                    "description": "Single FRED series ID for get_time_series"
-                },
+                "indicator_id": {"type": "string", "description": "Single FRED series ID for get_time_series"},
                 "lookback_days": {
                     "type": "integer",
                     "description": "Days of historical data",
                     "default": 1095,
                     "minimum": 30,
-                    "maximum": 7300
+                    "maximum": 7300,
                 },
                 "limit": {
                     "type": "integer",
                     "description": "Max data points for time series",
                     "default": 1000,
                     "minimum": 10,
-                    "maximum": 10000
-                }
+                    "maximum": 10000,
+                },
             },
-            "required": ["action"]
+            "required": ["action"],
         }

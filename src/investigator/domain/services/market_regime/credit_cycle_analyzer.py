@@ -55,9 +55,9 @@ from typing import Any, Dict, List, Optional
 
 from investigator.domain.models.market_context import (
     CreditCyclePhase,
-    VolatilityRegime,
     FedPolicyStance,
     RecessionProbability,
+    VolatilityRegime,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,7 @@ class CreditCycleAnalysis:
         interpretation: Human-readable interpretation
         warnings: Any data quality warnings
     """
+
     date: date
     phase: CreditCyclePhase = CreditCyclePhase.UNKNOWN
     baa_spread_bps: Optional[float] = None
@@ -135,11 +136,11 @@ class CreditCycleAnalyzer:
     # Historical thresholds for BAA-10Y spread
     # Normal: ~200 bps, Stressed: >300 bps, Crisis: >500 bps
     SPREAD_THRESHOLDS = {
-        "tight": 150,      # Early expansion
-        "normal": 200,     # Mid cycle
-        "wide": 300,       # Late cycle
-        "stressed": 400,   # Credit stress
-        "crisis": 500,     # Credit crisis
+        "tight": 150,  # Early expansion
+        "normal": 200,  # Mid cycle
+        "wide": 300,  # Late cycle
+        "stressed": 400,  # Credit stress
+        "crisis": 500,  # Credit crisis
     }
 
     # VIX thresholds
@@ -168,6 +169,7 @@ class CreditCycleAnalyzer:
                 from investigator.infrastructure.external.fred.macro_indicators import (
                     get_macro_indicators_service,
                 )
+
                 self._fred_client = get_macro_indicators_service()
             except ImportError:
                 logger.warning("FRED client not available")
@@ -179,6 +181,7 @@ class CreditCycleAnalyzer:
             from investigator.domain.services.market_regime.yield_curve_analyzer import (
                 get_yield_curve_analyzer,
             )
+
             self._yield_curve_analyzer = get_yield_curve_analyzer()
         return self._yield_curve_analyzer
 
@@ -267,12 +270,11 @@ class CreditCycleAnalyzer:
         try:
             from sqlalchemy import create_engine, text
 
-            engine = create_engine(
-                "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database"
-            )
+            engine = create_engine("postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database")
 
             # Get BAA10Y spread (BAA corporate bond yield minus 10Y Treasury)
-            query = text("""
+            query = text(
+                """
                 SELECT value, series_date
                 FROM macro_indicator_values
                 WHERE indicator_id = (
@@ -280,7 +282,8 @@ class CreditCycleAnalyzer:
                 )
                 ORDER BY series_date DESC
                 LIMIT 1
-            """)
+            """
+            )
 
             with engine.connect() as conn:
                 result = conn.execute(query).fetchone()
@@ -289,7 +292,8 @@ class CreditCycleAnalyzer:
                     spread_bps = spread_pct * 100  # Convert to basis points
 
                     # Get historical percentile
-                    percentile_query = text("""
+                    percentile_query = text(
+                        """
                         SELECT
                             COUNT(*) FILTER (WHERE value < :current) * 100.0 / COUNT(*)
                         FROM macro_indicator_values
@@ -297,10 +301,9 @@ class CreditCycleAnalyzer:
                             SELECT id FROM macro_indicators WHERE series_id = 'BAA10Y'
                         )
                         AND series_date >= CURRENT_DATE - INTERVAL '10 years'
-                    """)
-                    percentile_result = conn.execute(
-                        percentile_query, {"current": spread_pct}
-                    ).fetchone()
+                    """
+                    )
+                    percentile_result = conn.execute(percentile_query, {"current": spread_pct}).fetchone()
                     percentile = float(percentile_result[0]) if percentile_result else None
 
                     return {
@@ -320,11 +323,10 @@ class CreditCycleAnalyzer:
         try:
             from sqlalchemy import create_engine, text
 
-            engine = create_engine(
-                "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database"
-            )
+            engine = create_engine("postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database")
 
-            query = text("""
+            query = text(
+                """
                 SELECT value, series_date
                 FROM macro_indicator_values
                 WHERE indicator_id = (
@@ -332,7 +334,8 @@ class CreditCycleAnalyzer:
                 )
                 ORDER BY series_date DESC
                 LIMIT 1
-            """)
+            """
+            )
 
             with engine.connect() as conn:
                 result = conn.execute(query).fetchone()
@@ -352,12 +355,11 @@ class CreditCycleAnalyzer:
         try:
             from sqlalchemy import create_engine, text
 
-            engine = create_engine(
-                "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database"
-            )
+            engine = create_engine("postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database")
 
             # Get current and historical rates
-            query = text("""
+            query = text(
+                """
                 SELECT value, series_date
                 FROM macro_indicator_values
                 WHERE indicator_id = (
@@ -365,7 +367,8 @@ class CreditCycleAnalyzer:
                 )
                 ORDER BY series_date DESC
                 LIMIT 13
-            """)
+            """
+            )
 
             with engine.connect() as conn:
                 results = conn.execute(query).fetchall()

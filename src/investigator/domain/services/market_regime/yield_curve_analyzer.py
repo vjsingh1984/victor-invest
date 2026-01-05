@@ -54,20 +54,22 @@ logger = logging.getLogger(__name__)
 
 class YieldCurveShape(Enum):
     """Classification of yield curve shapes."""
-    STEEP = "steep"                    # Spread > 150 bps
-    NORMAL = "normal"                  # Spread 50-150 bps
-    FLAT = "flat"                      # Spread 0-50 bps
-    INVERTED = "inverted"              # Spread -50 to 0 bps
+
+    STEEP = "steep"  # Spread > 150 bps
+    NORMAL = "normal"  # Spread 50-150 bps
+    FLAT = "flat"  # Spread 0-50 bps
+    INVERTED = "inverted"  # Spread -50 to 0 bps
     DEEPLY_INVERTED = "deeply_inverted"  # Spread < -50 bps
     UNKNOWN = "unknown"
 
 
 class InvestmentSignal(Enum):
     """Investment signals derived from yield curve."""
-    RISK_ON = "risk_on"              # Favor growth, cyclicals
+
+    RISK_ON = "risk_on"  # Favor growth, cyclicals
     MODERATE_RISK = "moderate_risk"  # Balanced positioning
-    CAUTIOUS = "cautious"            # Favor quality, reduce risk
-    DEFENSIVE = "defensive"          # Favor defensives, reduce equity
+    CAUTIOUS = "cautious"  # Favor quality, reduce risk
+    DEFENSIVE = "defensive"  # Favor defensives, reduce equity
     STRONGLY_DEFENSIVE = "strongly_defensive"  # Max defensive
 
 
@@ -89,6 +91,7 @@ class YieldCurveAnalysis:
         historical_context: Context vs historical averages
         warnings: Any data quality warnings
     """
+
     date: date
     shape: YieldCurveShape = YieldCurveShape.UNKNOWN
     spread_10y_2y_bps: Optional[float] = None
@@ -159,8 +162,7 @@ class YieldCurveAnalysis:
                 "Banks typically benefit from wider margins."
             ),
             YieldCurveShape.NORMAL: (
-                "Normal curve indicates balanced growth outlook. "
-                "Maintain diversified positioning across sectors."
+                "Normal curve indicates balanced growth outlook. " "Maintain diversified positioning across sectors."
             ),
             YieldCurveShape.FLAT: (
                 "Flat curve suggests economic uncertainty or late-cycle. "
@@ -184,10 +186,10 @@ class YieldCurveAnalysis:
     def equity_adjustment(self) -> float:
         """Suggested equity allocation adjustment (-20% to +10%)."""
         adjustments = {
-            YieldCurveShape.STEEP: 0.10,           # +10%
-            YieldCurveShape.NORMAL: 0.0,           # No change
-            YieldCurveShape.FLAT: -0.05,           # -5%
-            YieldCurveShape.INVERTED: -0.10,       # -10%
+            YieldCurveShape.STEEP: 0.10,  # +10%
+            YieldCurveShape.NORMAL: 0.0,  # No change
+            YieldCurveShape.FLAT: -0.05,  # -5%
+            YieldCurveShape.INVERTED: -0.10,  # -10%
             YieldCurveShape.DEEPLY_INVERTED: -0.20,  # -20%
         }
         return adjustments.get(self.shape, 0.0)
@@ -197,10 +199,10 @@ class YieldCurveAnalysis:
         """Suggested WACC spread adjustment (bps)."""
         # Add spread to risk-free rate based on curve shape
         adjustments = {
-            YieldCurveShape.STEEP: 0,              # Normal conditions
-            YieldCurveShape.NORMAL: 0,             # Normal conditions
-            YieldCurveShape.FLAT: 25,              # Add 25 bps
-            YieldCurveShape.INVERTED: 50,          # Add 50 bps
+            YieldCurveShape.STEEP: 0,  # Normal conditions
+            YieldCurveShape.NORMAL: 0,  # Normal conditions
+            YieldCurveShape.FLAT: 25,  # Add 25 bps
+            YieldCurveShape.INVERTED: 50,  # Add 50 bps
             YieldCurveShape.DEEPLY_INVERTED: 100,  # Add 100 bps
         }
         return adjustments.get(self.shape, 0)
@@ -230,6 +232,7 @@ class YieldCurveAnalyzer:
         """Lazy-load treasury client to avoid circular imports."""
         if self._treasury_client is None:
             from investigator.infrastructure.external.treasury import get_treasury_client
+
             self._treasury_client = get_treasury_client()
         return self._treasury_client
 
@@ -268,8 +271,7 @@ class YieldCurveAnalyzer:
             # Add historical context
             analysis.historical_context = {
                 "vs_historical_avg_bps": (
-                    curve.spread_10y_2y - self.HISTORICAL_AVG_SPREAD
-                    if curve.spread_10y_2y else None
+                    curve.spread_10y_2y - self.HISTORICAL_AVG_SPREAD if curve.spread_10y_2y else None
                 ),
                 "historical_avg_spread_bps": self.HISTORICAL_AVG_SPREAD,
             }
@@ -323,7 +325,7 @@ class YieldCurveAnalyzer:
             # Count consecutive inverted days from most recent
             count = 0
             for entry in history:
-                if entry.get('is_inverted', False):
+                if entry.get("is_inverted", False):
                     count += 1
                 else:
                     break
@@ -349,14 +351,16 @@ class YieldCurveAnalyzer:
 
             result = []
             for entry in history:
-                spread = entry.get('spread_bps')
+                spread = entry.get("spread_bps")
                 shape = self._classify_shape(spread)
-                result.append({
-                    'date': entry.get('date'),
-                    'shape': shape.value,
-                    'spread_bps': spread,
-                    'is_inverted': entry.get('is_inverted', False),
-                })
+                result.append(
+                    {
+                        "date": entry.get("date"),
+                        "shape": shape.value,
+                        "spread_bps": spread,
+                        "is_inverted": entry.get("is_inverted", False),
+                    }
+                )
 
             return result
 
@@ -377,8 +381,7 @@ class YieldCurveAnalyzer:
             "wacc_spread_adjustment_bps": analysis.wacc_spread_adjustment,
             "equity_allocation_adjustment": analysis.equity_adjustment,
             "discount_rate_adjustment": (
-                analysis.wacc_spread_adjustment / 100
-                if analysis.wacc_spread_adjustment else 0
+                analysis.wacc_spread_adjustment / 100 if analysis.wacc_spread_adjustment else 0
             ),
             "curve_shape": analysis.shape.value,
             "investment_signal": analysis.investment_signal.value,
