@@ -58,7 +58,7 @@ class ParquetCacheStorageHandler(CacheStorageHandler):
             self.parquet_config = config.parquet
         else:
             # Default configuration - uniform gzip compression
-            from config.config import ParquetConfig
+            from investigator.config.config import ParquetConfig
 
             self.parquet_config = ParquetConfig()
 

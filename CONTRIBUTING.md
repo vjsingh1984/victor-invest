@@ -1,233 +1,268 @@
 # Contributing to InvestiGator
 
-Thank you for your interest in contributing to InvestiGator! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to InvestiGator! This document provides guidelines for contributing to the project.
+
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [Getting Started](#getting-started)
+- [Development Setup](#development-setup)
+- [Coding Standards](#coding-standards)
+- [Testing Guidelines](#testing-guidelines)
+- [Pull Request Process](#pull-request-process)
 
 ## Code of Conduct
 
-By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
+- Be respectful and constructive
+- Welcome newcomers and help them learn
+- Focus on what is best for the community
+- Show empathy towards other community members
 
-## How to Contribute
-
-### Reporting Bugs
-
-Before creating a bug report, please check existing issues to avoid duplicates.
-
-When filing a bug report, include:
-
-1. **Description**: Clear, concise description of the bug
-2. **Steps to Reproduce**: Detailed steps to reproduce the behavior
-3. **Expected Behavior**: What you expected to happen
-4. **Actual Behavior**: What actually happened
-5. **Environment**: Python version, OS, database type
-6. **Logs**: Relevant log output (sanitize any sensitive data)
-
-### Suggesting Enhancements
-
-Enhancement suggestions are welcome! Please include:
-
-1. **Use Case**: Describe the problem you're trying to solve
-2. **Proposed Solution**: Your suggested implementation
-3. **Alternatives Considered**: Other approaches you've thought about
-4. **Additional Context**: Any other relevant information
-
-### Pull Requests
-
-1. **Fork the Repository**: Create your own fork of the project
-2. **Create a Branch**: Use a descriptive branch name
-   ```bash
-   git checkout -b feature/add-new-valuation-model
-   git checkout -b fix/sec-parsing-error
-   ```
-3. **Make Changes**: Implement your changes following our coding standards
-4. **Write Tests**: Add tests for new functionality
-5. **Update Documentation**: Update relevant documentation
-6. **Submit PR**: Create a pull request with a clear description
-
-## Development Setup
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.11+
-- PostgreSQL 14+ (or SQLite for testing)
+- Python 3.11 or higher
 - Git
+- PostgreSQL 14+ (optional, can use SQLite for development)
 
-### Setup Steps
+### Fork and Clone
+
+1. Fork the repository on GitHub
+2. Clone your fork:
+   ```bash
+   git clone https://github.com/yourusername/victor-invest.git
+   cd victor-invest
+   ```
+
+## Development Setup
+
+### Create Virtual Environment
 
 ```bash
-# Clone your fork
-git clone https://github.com/YOUR_USERNAME/victor-invest.git
-cd victor-invest
-
-# Create virtual environment
 python -m venv venv
-source venv/bin/activate
-
-# Install in development mode
-pip install -e ".[dev]"
-
-# Set up pre-commit hooks
-pre-commit install
-
-# Create test database
-python -m investigator.infrastructure.database.installer --sqlite test.db
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### Running Tests
+### Install Dependencies
 
 ```bash
-# Run all tests
-pytest
+# Install with dev dependencies
+pip install -e ".[dev,viz,jupyter]"
+```
 
-# Run with coverage
-pytest --cov=src/investigator
+### Configure Environment
 
-# Run specific test file
-pytest tests/test_valuation.py
-
-# Run tests matching pattern
-pytest -k "test_dcf"
+```bash
+cp config/.env.example .env
+# Edit .env with your configuration
 ```
 
 ## Coding Standards
 
-### Style Guide
+### Python Style Guide
 
-We follow PEP 8 with some modifications:
+- Follow **PEP 8** style guidelines
+- Use **Black** for code formatting (line length: 120)
+- Use **isort** for import sorting
+- Use **type hints** on all public functions
+- Maximum line length: 120 characters
 
-- **Line Length**: 100 characters max
-- **Imports**: Use `isort` for import ordering
-- **Formatting**: Use `black` for code formatting
-- **Type Hints**: Required for all public functions
+### Code Formatting
 
 ```bash
 # Format code
+make format
+
+# Or manually:
 black src/ tests/
 isort src/ tests/
-
-# Check types
-mypy src/
-
-# Lint
-ruff check src/
 ```
 
-### Code Organization
+### Linting
+
+```bash
+# Run linting
+make lint
+
+# Or manually:
+flake8 src/ tests/
+ruff check src/ tests/
+```
+
+### Type Checking
+
+```bash
+# Run type checker
+make type-check
+
+# Or manually:
+mypy src/investigator/
+```
+
+### Naming Conventions
+
+- **Modules/Files**: `snake_case`
+- **Classes**: `PascalCase`
+- **Functions/Methods**: `snake_case`
+- **Constants**: `UPPER_SNAKE_CASE`
+- **Private members**: `_leading_underscore`
+
+### Docstrings
+
+Use Google style docstrings:
+
+```python
+def calculate_dcf(free_cash_flow: float, growth_rate: float) -> float:
+    """Calculate Discounted Cash Flow valuation.
+
+    Args:
+        free_cash_flow: Projected free cash flow
+        growth_rate: Expected growth rate (0.0-1.0)
+
+    Returns:
+        Present value of future cash flows
+
+    Raises:
+        ValueError: If growth rate is negative
+    """
+    pass
+```
+
+## Architecture Guidelines
+
+### Clean Architecture
+
+The project follows **Clean Architecture** principles:
 
 ```
 src/investigator/
-├── cli/              # Command-line interface
-├── domain/           # Business logic
-│   ├── agents/       # Analysis agents
-│   ├── services/     # Domain services
-│   └── models/       # Domain models
-├── application/      # Application layer (orchestration)
+├── domain/           # Core business logic (no external deps)
+├── application/      # Use case orchestration
 ├── infrastructure/   # External integrations
-│   ├── database/     # Database access
-│   └── external/     # External APIs
-└── config/           # Configuration
+└── interfaces/       # CLI, API
 ```
 
-### Commit Messages
+**Rules:**
+- Domain layer MUST NOT depend on infrastructure
+- Use dependency injection for external services
+- Prefer protocols/interfaces over concrete implementations
 
-Use clear, descriptive commit messages:
-
-```
-feat: add Gordon Growth Model valuation
-
-- Implement GGM calculator with configurable growth rates
-- Add terminal value estimation
-- Include sensitivity analysis
-- Add unit tests for edge cases
-```
-
-**Prefixes**:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation only
-- `style`: Formatting, no code change
-- `refactor`: Code restructuring
-- `test`: Adding tests
-- `chore`: Maintenance tasks
-
-### Documentation
-
-- Use docstrings for all public functions and classes
-- Follow Google-style docstrings
-- Update README and relevant docs for new features
+### Import Guidelines
 
 ```python
-def calculate_fair_value(
-    symbol: str,
-    model: str = "dcf",
-    **kwargs
-) -> ValuationResult:
-    """
-    Calculate fair value for a stock using specified model.
+# ✅ GOOD - Clean architecture imports
+from investigator.domain.services import ValuationService
+from investigator.application import AnalysisService
+from investigator.infrastructure.cache import CacheManager
 
-    Args:
-        symbol: Stock ticker symbol (e.g., "AAPL")
-        model: Valuation model to use ("dcf", "pe", "ps", "ggm")
-        **kwargs: Model-specific parameters
-
-    Returns:
-        ValuationResult containing fair value and confidence metrics
-
-    Raises:
-        ValueError: If symbol is invalid or data unavailable
-        ModelError: If valuation calculation fails
-
-    Example:
-        >>> result = calculate_fair_value("AAPL", model="dcf")
-        >>> print(f"Fair value: ${result.fair_value:.2f}")
-    """
+# ❌ BAD - Old paths (being migrated)
+from agents.fundamental_agent import FundamentalAgent
+from utils.cache_manager import CacheManager
 ```
 
 ## Testing Guidelines
 
 ### Test Structure
 
-```python
-class TestDCFValuation:
-    """Tests for DCF valuation model."""
-
-    def test_basic_calculation(self):
-        """Test basic DCF with standard inputs."""
-        ...
-
-    def test_negative_fcf_handling(self):
-        """Test handling of negative free cash flow."""
-        ...
-
-    @pytest.mark.parametrize("growth_rate", [0.05, 0.10, 0.15])
-    def test_growth_rate_sensitivity(self, growth_rate):
-        """Test DCF sensitivity to growth rate changes."""
-        ...
+```
+tests/
+├── unit/             # Fast, isolated tests
+│   ├── domain/
+│   ├── application/
+│   └── infrastructure/
+└── integration/      # Slower, end-to-end tests
 ```
 
-### Test Coverage
+### Running Tests
 
-- Aim for 80%+ code coverage
-- Focus on critical business logic
-- Include edge cases and error conditions
+```bash
+# All tests
+pytest tests/
 
-## Review Process
+# Unit tests only
+pytest tests/ -m unit
 
-1. **Automated Checks**: CI must pass (tests, linting, type checking)
-2. **Code Review**: At least one maintainer approval required
-3. **Documentation Review**: Ensure docs are updated
-4. **Testing**: New features must include tests
+# With coverage
+pytest --cov=investigator tests/
+```
 
-## Getting Help
+### Test Markers
 
-- **Issues**: Use GitHub issues for bugs and feature requests
-- **Discussions**: Use GitHub Discussions for questions
-- **Documentation**: Check docs/ directory for guides
+Use pytest markers to categorize tests:
 
-## Recognition
+```python
+@pytest.mark.unit
+def test_fast_calculation():
+    pass
 
-Contributors are recognized in:
-- Release notes
-- CONTRIBUTORS.md (for significant contributions)
-- Git commit history
+@pytest.mark.integration
+def test_database_query():
+    pass
 
-Thank you for contributing to InvestiGator!
+@pytest.mark.slow
+def test_full_pipeline():
+    pass
+```
+
+## Pull Request Process
+
+### Before Submitting
+
+1. **Update tests** - Ensure all tests pass
+2. **Add tests** - Add tests for new functionality
+3. **Update docs** - Update relevant documentation
+4. **Run checks** - Run `make pre-commit` to verify
+
+### Creating a Pull Request
+
+1. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make your changes and commit:
+   ```bash
+   git add .
+   git commit -m "feat: add new valuation model"
+   ```
+
+3. Push to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+4. Create a PR from your fork to the upstream repository
+
+### Commit Message Format
+
+Use conventional commit format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+```
+
+**Types:** feat, fix, docs, style, refactor, test, chore
+
+**Examples:**
+```
+feat(valuation): add PEG ratio valuation model
+
+Fixes #123
+
+- Implement PEG ratio calculation
+- Add unit tests
+- Update documentation
+```
+
+## Questions?
+
+- Check [docs/](docs/) for detailed documentation
+- See [docs/INDEX.md](docs/INDEX.md) for documentation index
+- Open a GitHub issue for bugs or feature requests
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0.

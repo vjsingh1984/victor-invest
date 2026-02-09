@@ -51,6 +51,51 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
     logging.warning("reportlab not available - PDF report generation will be disabled")
 
+    # Create stub classes when reportlab is not available
+    class Flowable:
+        """Stub Flowable class when reportlab is not available"""
+        def __init__(self, *args, **kwargs):
+            pass
+        def draw(self):
+            pass
+
+    # Stub inch constant
+    inch = 1.0
+
+    class ScoreCard(Flowable):
+        """Stub ScoreCard"""
+        pass
+
+    class RecommendationBadge(Flowable):
+        """Stub RecommendationBadge"""
+        pass
+
+    class EntryExitZone(Flowable):
+        """Stub EntryExitZone"""
+        pass
+
+    class SignalStrengthBar(Flowable):
+        """Stub SignalStrengthBar"""
+        pass
+
+    class StopLossIndicator(Flowable):
+        """Stub StopLossIndicator"""
+        pass
+
+    class canvas:
+        """Stub canvas module"""
+        class Canvas:
+            def __init__(self, *args, **kwargs):
+                pass
+
+    class NumberedCanvas:
+        """Stub NumberedCanvas"""
+        pass
+
+    class PDFReportGenerator:
+        """Stub PDFReportGenerator"""
+        pass
+
 logger = logging.getLogger(__name__)
 
 
