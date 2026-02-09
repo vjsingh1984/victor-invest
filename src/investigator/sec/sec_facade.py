@@ -265,7 +265,7 @@ class FundamentalAnalysisFacadeV2:
         self.cache_manager = get_cache_manager()
 
         # Use existing aggregator and LLM facade with cache management
-        from patterns.llm.llm_facade import create_llm_facade
+        from investigator.infrastructure.llm.llm_facade import create_llm_facade
         from utils.financial_data_aggregator import FinancialDataAggregator
 
         self.data_aggregator = FinancialDataAggregator(config)

@@ -27,7 +27,7 @@ from investigator.config import get_config
 # Import from Clean Architecture
 from investigator.domain.models import InvestmentRecommendation
 from investigator.infrastructure.cache import CacheManager, CacheType, get_cache_manager
-from investigator.infrastructure.database.db import (  # TODO: Move to investigator.infrastructure.database
+from investigator.infrastructure.database.db import (
     DatabaseManager,
     get_llm_responses_dao,
 )
@@ -37,8 +37,8 @@ from investigator.infrastructure.reporting import (
     WeeklyReportGenerator,
 )
 from investigator.infrastructure.ui import ASCIIArt
-from patterns.analysis.peer_comparison import get_peer_comparison_analyzer  # TODO: Move to investigator.domain.services
-from patterns.llm.llm_facade import create_llm_facade  # TODO: Move to investigator.infrastructure.llm
+from investigator.domain.services.analysis.peer_comparison import get_peer_comparison_analyzer
+from investigator.infrastructure.llm.llm_facade import create_llm_facade
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

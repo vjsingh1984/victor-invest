@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from investigator.domain.agents.base import AgentResult, AgentTask, AnalysisType, InvestmentAgent, TaskStatus
 from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Uses singleton pattern
-from investigator.infrastructure.external.fred import (  # TODO: Move to infrastructure
+from investigator.infrastructure.external.fred import (
     MacroIndicatorsFetcher,
     format_indicator_for_display,
 )

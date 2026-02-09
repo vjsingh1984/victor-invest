@@ -18,7 +18,7 @@ import yaml
 from investigator.domain.agents.base import InvestmentAgent
 from investigator.domain.models.analysis import AgentResult, AgentTask, TaskStatus
 from investigator.domain.services.company_metadata_service import CompanyMetadataService
-from investigator.domain.services.data_normalizer import (  # TODO: Move to infrastructure
+from investigator.domain.services.data_normalizer import (
     DataNormalizer,
     normalize_financials,
     round_for_prompt,
@@ -72,7 +72,7 @@ from investigator.infrastructure.cache.cache_key_builder import build_cache_key
 from investigator.infrastructure.cache.cache_types import CacheType
 from investigator.infrastructure.data.sector_multiples_loader import SectorMultiplesLoader
 from investigator.infrastructure.database.market_data import get_market_data_fetcher  # Singleton pattern
-from investigator.infrastructure.database.ticker_mapper import TickerCIKMapper  # TODO: Move to infrastructure
+from investigator.infrastructure.database.ticker_mapper import TickerCIKMapper
 from investigator.infrastructure.formatters import ValuationTableFormatter
 from investigator.infrastructure.sec.canonical_mapper import get_canonical_mapper
 

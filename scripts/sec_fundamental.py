@@ -43,7 +43,7 @@ try:
     from utils.ticker_cik_mapper import ticker_to_cik_padded, TickerCIKMapper
     from utils.cache.cache_manager import CacheManager
     from utils.cache.cache_types import CacheType
-    from patterns.llm.llm_facade import create_llm_facade
+    from investigator.infrastructure.llm.llm_facade import create_llm_facade
     from investigator.infrastructure.database.db import get_sec_companyfacts_dao
     from data.models import FundamentalMetrics, FinancialStatementData, QuarterlyData
     from patterns.sec.sec_facade import FundamentalAnalysisFacadeV2

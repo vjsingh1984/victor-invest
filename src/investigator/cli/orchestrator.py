@@ -659,7 +659,10 @@ def serve(ctx, host, port, workers, reload):
     click.echo("Please use the 'analyze' command for analysis.")
     return
 
-    # TODO: Fix API server imports
+    # NOTE: API server is temporarily disabled during refactoring
+    # To re-enable: Fix imports in api/main.py and update create_app() function
+    # Then uncomment the code below
+    # TODO: Re-enable API server after refactoring imports
     # app = create_app(config)
     # uvicorn.run(
     #     app,
