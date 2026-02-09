@@ -1,6 +1,6 @@
 # InvestiGator Documentation Index
 
-**Last Updated**: 2025-02-08
+**Last Updated**: 2025-02-09
 
 ## Core Documentation
 
@@ -46,12 +46,12 @@
 | **AGENTS.md** | Repository guidelines and coding standards |
 | **ENHANCED_DYNAMIC_WEIGHTING_IMPLEMENTATION.md** | Enhanced dynamic weighting system implementation |
 
-## Integration & Testing
+## Project Tracking
 
 | File | Purpose |
 |------|---------|
-| **SECTOR_ANALYSIS_REPORT.md** | Sector analysis report |
-| **CODEBASE_REVIEW.md** | Codebase review documentation |
+| **TODOS.md** | Outstanding TODOs and FIXMEs (19 items tracked) |
+| **CHANGELOG.md** | Project changelog (in root directory) |
 
 ## Workflows
 
