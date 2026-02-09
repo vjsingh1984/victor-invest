@@ -9,6 +9,7 @@ ensuring all frameworks use identical assumptions and reducing latency.
 
 Created: 2025-11-12
 Author: Claude Code
+Updated: 2025-02-09 - Integrated with existing valuation models
 """
 
 import asyncio
@@ -104,7 +105,6 @@ class ParallelValuationOrchestrator:
         fcf_margin_pct: float,
         financials: Dict[str, Any],
         dcf_calculator: Any = None,  # DCFValuation instance
-        pe_calculator: Any = None,  # PERatioValuation instance
         ggm_calculator: Any = None,  # GordonGrowthModel instance
     ) -> BlendedValuationResult:
         """
@@ -120,21 +120,10 @@ class ParallelValuationOrchestrator:
             fcf_margin_pct: FCF margin percentage
             financials: Company financials dictionary
             dcf_calculator: DCFValuation instance (if DCF frameworks included)
-            pe_calculator: PERatioValuation instance (if P/E framework included)
             ggm_calculator: GordonGrowthModel instance (if GGM framework included)
 
         Returns:
             BlendedValuationResult with fair value and execution details
-
-        Example:
-            >>> result = await orchestrator.execute_valuation(
-            ...     frameworks=[dcf_config, pe_config, ev_config],
-            ...     rule_of_40_score=58.8,
-            ...     revenue_growth_pct=28.6,
-            ...     fcf_margin_pct=30.2,
-            ...     financials={...},
-            ...     dcf_calculator=dcf_calc
-            ... )
         """
         start_time = datetime.now()
 
@@ -157,7 +146,6 @@ class ParallelValuationOrchestrator:
                 terminal_growth_rate=terminal_growth_result["terminal_growth_rate"],
                 financials=financials,
                 dcf_calculator=dcf_calculator,
-                pe_calculator=pe_calculator,
                 ggm_calculator=ggm_calculator,
             )
             tasks.append(task)
@@ -235,13 +223,91 @@ class ParallelValuationOrchestrator:
             execution_summary=execution_summary,
         )
 
+    def _calculate_framework_confidence(
+        self,
+        framework_type: str,
+        fair_value: float,
+        financials: Dict[str, Any],
+        terminal_growth_rate: float = None
+    ) -> float:
+        """
+        Calculate confidence score for a valuation framework (0.0 to 1.0)
+
+        Confidence factors:
+        - Data quality (completeness of financials)
+        - Valuation spread (fair_value vs current price reasonableness)
+        - Framework applicability (sector-specific suitability)
+        - Terminal growth tier (higher tier = higher confidence)
+
+        Args:
+            framework_type: Type of valuation framework
+            fair_value: Calculated fair value
+            financials: Company financials
+            terminal_growth_rate: Terminal growth rate (if applicable)
+
+        Returns:
+            Confidence score from 0.0 (low) to 1.0 (high)
+        """
+        confidence_factors = []
+
+        # Factor 1: Data completeness (30% weight)
+        required_fields = ['revenue', 'net_income', 'free_cash_flow', 'total_assets']
+        available_fields = sum(1 for field in required_fields if financials.get(field) is not None)
+        data_completeness = available_fields / len(required_fields)
+        confidence_factors.append(0.3 * data_completeness)
+
+        # Factor 2: Valuation reasonableness (25% weight)
+        # Fair value within 10% to 300% of current price is reasonable
+        price_ratio = fair_value / self.current_price
+        if 0.1 <= price_ratio <= 3.0:
+            reasonableness = 1.0
+        elif price_ratio < 0.01 or price_ratio > 10.0:
+            reasonableness = 0.3
+        else:
+            reasonableness = 0.7
+        confidence_factors.append(0.25 * reasonableness)
+
+        # Factor 3: Framework applicability (25% weight)
+        # DCF and GGM are more reliable for dividend-paying or cash-positive companies
+        if framework_type in [ValuationFrameworkPlanner.FRAMEWORK_DCF_GROWTH,
+                             ValuationFrameworkPlanner.FRAMEWORK_DCF_FADING]:
+            # DCF works better for companies with positive FCF
+            if financials.get('free_cash_flow', 0) > 0:
+                applicability = 0.9
+            else:
+                applicability = 0.5
+        elif framework_type == ValuationFrameworkPlanner.FRAMEWORK_GORDON_GROWTH:
+            # GGM requires dividends
+            applicability = 0.8 if financials.get('dividend_per_share', 0) > 0 else 0.3
+        else:
+            # P/E, PEG, P/S, EV/EBITDA are generally applicable
+            applicability = 0.8
+        confidence_factors.append(0.25 * applicability)
+
+        # Factor 4: Terminal growth tier (20% weight) - if applicable
+        if terminal_growth_rate is not None:
+            # Higher terminal growth tiers generally mean better-understood companies
+            if terminal_growth_rate >= 0.04:
+                tier_confidence = 0.9
+            elif terminal_growth_rate >= 0.03:
+                tier_confidence = 0.8
+            elif terminal_growth_rate >= 0.02:
+                tier_confidence = 0.7
+            else:
+                tier_confidence = 0.6
+            confidence_factors.append(0.2 * tier_confidence)
+        else:
+            # No terminal growth factor for non-DCF frameworks
+            confidence_factors.append(0.2 * 0.7)  # Average confidence
+
+        return min(1.0, max(0.0, sum(confidence_factors)))
+
     async def _execute_framework(
         self,
         framework: FrameworkConfig,
         terminal_growth_rate: float,
         financials: Dict[str, Any],
         dcf_calculator: Any = None,
-        pe_calculator: Any = None,
         ggm_calculator: Any = None,
     ) -> FrameworkResult:
         """
@@ -252,7 +318,6 @@ class ParallelValuationOrchestrator:
             terminal_growth_rate: Unified terminal growth rate (from calculator)
             financials: Company financials
             dcf_calculator: DCF calculator instance
-            pe_calculator: P/E calculator instance
             ggm_calculator: GGM calculator instance
 
         Returns:
@@ -280,7 +345,7 @@ class ParallelValuationOrchestrator:
 
             elif framework.type == ValuationFrameworkPlanner.FRAMEWORK_PE_RATIO:
                 fair_value, metrics = await self._execute_pe_ratio(
-                    financials=financials, params=framework.params, pe_calculator=pe_calculator
+                    financials=financials, params=framework.params
                 )
 
             elif framework.type == ValuationFrameworkPlanner.FRAMEWORK_EV_EBITDA:
@@ -291,7 +356,7 @@ class ParallelValuationOrchestrator:
 
             elif framework.type == ValuationFrameworkPlanner.FRAMEWORK_PEG_RATIO:
                 fair_value, metrics = await self._execute_peg_ratio(
-                    financials=financials, params=framework.params, pe_calculator=pe_calculator
+                    financials=financials, params=framework.params
                 )
 
             elif framework.type == ValuationFrameworkPlanner.FRAMEWORK_GORDON_GROWTH:
@@ -305,19 +370,31 @@ class ParallelValuationOrchestrator:
             else:
                 raise ValueError(f"Unknown framework type: {framework.type}")
 
+            # Calculate confidence score
+            confidence = self._calculate_framework_confidence(
+                framework_type=framework.type,
+                fair_value=fair_value,
+                financials=financials,
+                terminal_growth_rate=terminal_growth_rate if framework.type in [
+                    ValuationFrameworkPlanner.FRAMEWORK_DCF_GROWTH,
+                    ValuationFrameworkPlanner.FRAMEWORK_DCF_FADING,
+                    ValuationFrameworkPlanner.FRAMEWORK_GORDON_GROWTH,
+                ] else None
+            )
+
             # Calculate execution time
             end_time = datetime.now()
             execution_time_ms = (end_time - start_time).total_seconds() * 1000
 
             logger.info(
                 f"{self.symbol} - {framework.type}: ${fair_value:.2f} "
-                f"(weight: {framework.weight*100:.1f}%, {execution_time_ms:.0f}ms)"
+                f"(weight: {framework.weight*100:.1f}%, confidence: {confidence:.2f}, {execution_time_ms:.0f}ms)"
             )
 
             return FrameworkResult(
                 framework_type=framework.type,
                 fair_value=fair_value,
-                confidence=1.0,  # TODO: Implement confidence scoring
+                confidence=confidence,
                 metrics=metrics,
                 execution_time_ms=execution_time_ms,
             )
@@ -328,57 +405,321 @@ class ParallelValuationOrchestrator:
                 framework_type=framework.type, fair_value=None, confidence=0.0, metrics={}, error=str(e)
             )
 
-    # Framework execution methods (placeholders - will integrate with existing calculators)
+    # Framework execution methods - Integrated with existing valuation models
 
     async def _execute_dcf_growth(
         self, terminal_growth_rate: float, financials: Dict[str, Any], params: Dict[str, Any], dcf_calculator: Any
     ) -> tuple[float, Dict[str, Any]]:
-        """Execute DCF with growth assumptions"""
-        # TODO: Call existing DCFValuation with terminal_growth_rate parameter
-        # For now, return placeholder
-        return 291.36, {"method": "dcf_growth", "terminal_growth": terminal_growth_rate}
+        """
+        Execute DCF with growth assumptions
+
+        Integrated with existing DCFValuation.calculate_dcf_valuation()
+        """
+        if dcf_calculator is None:
+            logger.warning(f"{self.symbol} - DCF calculator not provided, using placeholder")
+            # Fallback: Simple DCF approximation
+            fcf = financials.get('free_cash_flow', 0)
+            if fcf <= 0:
+                return 0.0, {"method": "dcf_growth", "error": "Negative FCF", "terminal_growth": terminal_growth_rate}
+
+            # Simple 5-year projection with terminal value
+            discount_rate = financials.get('wacc', 0.10)
+            growth_rate = financials.get('revenue_growth', 0.10)  # Use historical growth
+
+            pv_fcf = sum(fcf * ((1 + growth_rate) ** i) / ((1 + discount_rate) ** (i + 1)) for i in range(5))
+            terminal_value = (fcf * (1 + growth_rate) ** 5) * (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
+            pv_terminal = terminal_value / ((1 + discount_rate) ** 5)
+
+            fair_value = (pv_fcf + pv_terminal) / financials.get('shares_outstanding', 1)
+            return fair_value, {"method": "dcf_growth", "terminal_growth": terminal_growth_rate, "fallback": True}
+
+        # Use actual DCF calculator
+        try:
+            result = dcf_calculator.calculate_dcf_valuation(terminal_growth_rate=terminal_growth_rate)
+            fair_value = result.get('fair_value_per_share', 0)
+            return fair_value, {
+                "method": "dcf_growth",
+                "terminal_growth": terminal_growth_rate,
+                "wacc": result.get('wacc', 0),
+                "projection_years": result.get('projection_years', 5)
+            }
+        except Exception as e:
+            logger.error(f"{self.symbol} - DCF calculation failed: {e}")
+            return 0.0, {"method": "dcf_growth", "error": str(e), "terminal_growth": terminal_growth_rate}
 
     async def _execute_dcf_fading(
         self, terminal_growth_rate: float, financials: Dict[str, Any], params: Dict[str, Any], dcf_calculator: Any
     ) -> tuple[float, Dict[str, Any]]:
-        """Execute DCF with fading growth assumptions"""
-        # TODO: Call existing DCFValuation with fading growth logic
-        return 280.00, {"method": "dcf_fading", "terminal_growth": terminal_growth_rate}
+        """
+        Execute DCF with fading growth assumptions
+
+        Uses existing DCF calculator with adjusted terminal growth for fading
+        """
+        if dcf_calculator is None:
+            logger.warning(f"{self.symbol} - DCF calculator not provided, using placeholder")
+            # Fallback: Lower growth assumption for fading model
+            fading_growth = terminal_growth_rate * 0.7  # 30% lower than base
+            fcf = financials.get('free_cash_flow', 0)
+
+            if fcf <= 0:
+                return 0.0, {"method": "dcf_fading", "error": "Negative FCF", "terminal_growth": fading_growth}
+
+            # Apply fading growth (declining from current to terminal)
+            discount_rate = financials.get('wacc', 0.10)
+            current_growth = financials.get('revenue_growth', 0.15)
+
+            pv_fcf = 0
+            for i in range(5):
+                # Fade from current growth to terminal growth
+                year_growth = current_growth - (current_growth - fading_growth) * (i / 4)
+                pv_fcf += fcf * ((1 + year_growth) ** i) / ((1 + discount_rate) ** (i + 1))
+
+            terminal_value = (fcf * (1 + fading_growth) ** 5) * (1 + fading_growth) / (discount_rate - fading_growth)
+            pv_terminal = terminal_value / ((1 + discount_rate) ** 5)
+
+            fair_value = (pv_fcf + pv_terminal) / financials.get('shares_outstanding', 1)
+            return fair_value, {"method": "dcf_fading", "terminal_growth": fading_growth, "fading_applied": True}
+
+        # Use DCF calculator with lower terminal growth for fading model
+        try:
+            fading_growth = terminal_growth_rate * 0.7  # Conservative estimate
+            result = dcf_calculator.calculate_dcf_valuation(terminal_growth_rate=fading_growth)
+            fair_value = result.get('fair_value_per_share', 0)
+            return fair_value, {
+                "method": "dcf_fading",
+                "terminal_growth": fading_growth,
+                "fading_applied": True,
+                "wacc": result.get('wacc', 0)
+            }
+        except Exception as e:
+            logger.error(f"{self.symbol} - DCF fading calculation failed: {e}")
+            return 0.0, {"method": "dcf_fading", "error": str(e)}
 
     async def _execute_pe_ratio(
-        self, financials: Dict[str, Any], params: Dict[str, Any], pe_calculator: Any
+        self, financials: Dict[str, Any], params: Dict[str, Any]
     ) -> tuple[float, Dict[str, Any]]:
         """Execute P/E ratio valuation"""
-        # TODO: Call existing P/E calculator
-        return 305.00, {"method": "pe_ratio"}
+        eps = financials.get('earnings_per_share', 0)
+        sector = params.get('sector', self.sector)
+
+        if eps <= 0:
+            return 0.0, {"method": "pe_ratio", "error": "Negative or zero EPS"}
+
+        # Get sector-specific P/E multiple
+        sector_pe_multiples = {
+            'Technology': 25.0,
+            'Healthcare': 22.0,
+            'Consumer Cyclical': 20.0,
+            'Consumer Defensive': 18.0,
+            'Industrials': 18.0,
+            'Financials': 12.0,
+            'Energy': 12.0,
+            'Utilities': 15.0,
+            'Real Estate': 16.0,
+            'Communication Services': 20.0,
+        }
+
+        pe_multiple = sector_pe_multiples.get(sector, 18.0)
+
+        # Adjust for growth (higher growth = higher P/E)
+        growth_rate = financials.get('earnings_growth', 0.10)
+        if growth_rate > 0.20:
+            pe_multiple *= 1.3
+        elif growth_rate > 0.10:
+            pe_multiple *= 1.1
+
+        fair_value = eps * pe_multiple
+        return fair_value, {
+            "method": "pe_ratio",
+            "pe_multiple": pe_multiple,
+            "eps": eps,
+            "sector": sector
+        }
 
     async def _execute_ev_ebitda(
         self, financials: Dict[str, Any], params: Dict[str, Any]
     ) -> tuple[float, Dict[str, Any]]:
         """Execute EV/EBITDA valuation"""
-        # TODO: Implement EV/EBITDA calculation
-        return 295.00, {"method": "ev_ebitda"}
+        ebitda = financials.get('ebitda', 0)
+        net_debt = financials.get('net_debt', 0)
+        sector = params.get('sector', self.sector)
+
+        if ebitda <= 0:
+            return 0.0, {"method": "ev_ebitda", "error": "Negative or zero EBITDA"}
+
+        # Get sector-specific EV/EBITDA multiple
+        sector_ev_multiples = {
+            'Technology': 18.0,
+            'Healthcare': 14.0,
+            'Consumer Cyclical': 12.0,
+            'Consumer Defensive': 10.0,
+            'Industrials': 11.0,
+            'Financials': 0,  # Not applicable for banks
+            'Energy': 8.0,
+            'Utilities': 10.0,
+            'Real Estate': 0,  # Use FFO instead
+            'Communication Services': 10.0,
+        }
+
+        ev_multiple = sector_ev_multiples.get(sector, 12.0)
+
+        if ev_multiple <= 0:
+            return 0.0, {"method": "ev_ebitda", "error": f"EV/EBITDA not applicable for {sector}"}
+
+        enterprise_value = ebitda * ev_multiple
+        equity_value = enterprise_value - net_debt
+        fair_value = equity_value / financials.get('shares_outstanding', 1)
+
+        return fair_value, {
+            "method": "ev_ebitda",
+            "ev_multiple": ev_multiple,
+            "ebitda": ebitda,
+            "enterprise_value": enterprise_value,
+            "sector": sector
+        }
 
     async def _execute_ps_ratio(
         self, financials: Dict[str, Any], params: Dict[str, Any]
     ) -> tuple[float, Dict[str, Any]]:
         """Execute P/S ratio valuation"""
-        # TODO: Implement P/S ratio calculation
-        return 310.00, {"method": "ps_ratio"}
+        revenue_per_share = financials.get('revenue_per_share', 0)
+        sector = params.get('sector', self.sector)
+
+        if revenue_per_share <= 0:
+            # Fallback to revenue / shares
+            total_revenue = financials.get('revenue', 0)
+            shares = financials.get('shares_outstanding', 1)
+            if total_revenue <= 0 or shares <= 0:
+                return 0.0, {"method": "ps_ratio", "error": "No revenue data"}
+            revenue_per_share = total_revenue / shares
+
+        # Get sector-specific P/S multiple
+        sector_ps_multiples = {
+            'Technology': 8.0,
+            'Healthcare': 5.0,
+            'Consumer Cyclical': 2.0,
+            'Consumer Defensive': 2.0,
+            'Industrials': 2.0,
+            'Financials': 1.5,
+            'Energy': 1.5,
+            'Utilities': 2.0,
+            'Real Estate': 5.0,
+            'Communication Services': 2.5,
+        }
+
+        ps_multiple = sector_ps_multiples.get(sector, 2.5)
+
+        # Adjust for growth
+        growth_rate = financials.get('revenue_growth', 0.10)
+        if growth_rate > 0.20:
+            ps_multiple *= 1.5
+        elif growth_rate > 0.10:
+            ps_multiple *= 1.2
+
+        fair_value = revenue_per_share * ps_multiple
+        return fair_value, {
+            "method": "ps_ratio",
+            "ps_multiple": ps_multiple,
+            "revenue_per_share": revenue_per_share,
+            "sector": sector
+        }
 
     async def _execute_peg_ratio(
-        self, financials: Dict[str, Any], params: Dict[str, Any], pe_calculator: Any
+        self, financials: Dict[str, Any], params: Dict[str, Any]
     ) -> tuple[float, Dict[str, Any]]:
         """Execute PEG ratio valuation"""
-        # TODO: Implement PEG ratio calculation
-        return 300.00, {"method": "peg_ratio"}
+        eps = financials.get('earnings_per_share', 0)
+        growth_rate = financials.get('earnings_growth', financials.get('revenue_growth', 0.10))
+
+        if eps <= 0 or growth_rate <= 0:
+            return 0.0, {"method": "peg_ratio", "error": "Need positive EPS and growth rate"}
+
+        # PEG ratio = P/E / Growth Rate
+        # Fair value = EPS * PEG * Growth Rate = EPS * PEG_multiple
+        # Industry-standard PEG = 1.0 means fairly valued
+
+        # Get sector-specific PEG multiple (typically 0.8 - 1.5)
+        sector_peg_multiples = {
+            'Technology': 1.5,
+            'Healthcare': 1.3,
+            'Consumer Cyclical': 1.1,
+            'Consumer Defensive': 1.0,
+            'Industrials': 1.0,
+            'Financials': 0.9,
+            'Energy': 0.9,
+            'Utilities': 1.0,
+            'Real Estate': 1.1,
+            'Communication Services': 1.2,
+        }
+
+        peg_multiple = sector_peg_multiples.get(params.get('sector', self.sector), 1.0)
+
+        # Adjust for quality (Rule of 40 companies can command higher PEG)
+        rule_of_40 = financials.get('rule_of_40', 0)
+        if rule_of_40 > 60:
+            peg_multiple *= 1.3
+        elif rule_of_40 > 40:
+            peg_multiple *= 1.1
+
+        fair_value = eps * peg_multiple * growth_rate
+
+        return fair_value, {
+            "method": "peg_ratio",
+            "peg_multiple": peg_multiple,
+            "eps": eps,
+            "growth_rate": growth_rate,
+            "peg_ratio": (eps * peg_multiple * growth_rate) / eps if eps > 0 else 0
+        }
 
     async def _execute_gordon_growth(
         self, terminal_growth_rate: float, financials: Dict[str, Any], params: Dict[str, Any], ggm_calculator: Any
     ) -> tuple[float, Dict[str, Any]]:
         """Execute Gordon Growth Model valuation"""
-        # TODO: Call existing GordonGrowthModel with terminal_growth_rate
-        return 285.00, {"method": "gordon_growth", "terminal_growth": terminal_growth_rate}
+        if ggm_calculator is None:
+            logger.warning(f"{self.symbol} - GGM calculator not provided, using simplified calculation")
+            # Simplified GGM: P = D1 / (r - g)
+            dividend_per_share = financials.get('dividend_per_share', 0)
+            cost_of_equity = financials.get('cost_of_equity', financials.get('wacc', 0.10))
+
+            if dividend_per_share <= 0:
+                return 0.0, {"method": "gordon_growth", "error": "No dividends", "terminal_growth": terminal_growth_rate}
+
+            if cost_of_equity <= terminal_growth_rate:
+                return 0.0, {"method": "gordon_growth", "error": f"Cost of equity ({cost_of_equity:.2f}) <= terminal growth ({terminal_growth_rate:.2f})", "terminal_growth": terminal_growth_rate}
+
+            # Assume 3% dividend growth for next year
+            dividend_next_year = dividend_per_share * 1.03
+            fair_value = dividend_next_year / (cost_of_equity - terminal_growth_rate)
+
+            return fair_value, {
+                "method": "gordon_growth",
+                "terminal_growth": terminal_growth_rate,
+                "dividend_next_year": dividend_next_year,
+                "cost_of_equity": cost_of_equity,
+                "fallback": True
+            }
+
+        # Use actual GGM calculator
+        try:
+            cost_of_equity = financials.get('cost_of_equity', financials.get('wacc', 0.10))
+            result = ggm_calculator.calculate_ggm_valuation(
+                cost_of_equity=cost_of_equity,
+                terminal_growth_rate=terminal_growth_rate
+            )
+
+            if not result.get('applicable', False):
+                return 0.0, {"method": "gordon_growth", "error": result.get('reason', 'Not applicable'), "terminal_growth": terminal_growth_rate}
+
+            fair_value = result.get('fair_value_per_share', 0)
+            return fair_value, {
+                "method": "gordon_growth",
+                "terminal_growth": terminal_growth_rate,
+                "dividend_growth": result.get('growth_rate', 0),
+                "cost_of_equity": cost_of_equity
+            }
+        except Exception as e:
+            logger.error(f"{self.symbol} - GGM calculation failed: {e}")
+            return 0.0, {"method": "gordon_growth", "error": str(e), "terminal_growth": terminal_growth_rate}
 
     def __repr__(self) -> str:
         """String representation"""
