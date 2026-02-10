@@ -50,7 +50,7 @@ sec:
 # Ollama LLM Configuration
 # =============================================================================
 ollama:
-  base_url: http://localhost:11434
+  base_url: http://192.168.1.20:11434
   keep_alive: -1  # -1 = keep models loaded indefinitely
   timeout: 1800
   max_retries: 3
@@ -61,14 +61,14 @@ ollama:
   pool_strategy: prefer_remote  # most_capacity | prefer_remote | round_robin
 
   servers:
-    # M1 Max (localhost) - Primary server with most models
-    - url: http://localhost:11434
-      total_ram_gb: 64
-      usable_ram_gb: 46        # Unified memory: 46GB available for VRAM
-      metal: true
+    # Windows RTX 4000 Ada (192.168.1.20) - Primary server
+    - url: http://192.168.1.20:11434
+      total_ram_gb: 84
+      usable_ram_gb: 20        # 20GB VRAM
+      metal: false             # CUDA, not Metal
       max_concurrent: 3
-      priority: 0              # Local = highest priority (lowest number)
-      description: "M1 Max MacBook Pro - llama3.3:70b, deepseek-r1:70b, qwen3:30b, etc."
+      priority: 0              # Primary server
+      description: "Windows RTX 4000 Ada - gpt-oss:20b, qwen3:30b, deepseek-r1:70b, llama3.1:70b, llama3.3:70b"
 
     # NOTE: Remote servers commented out - set OLLAMA_HOST_M4/WIN env vars to enable
     # # M4 Max #1 (${OLLAMA_HOST_M4:-localhost}) - Remote Apple Silicon
