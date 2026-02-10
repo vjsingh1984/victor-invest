@@ -19,6 +19,11 @@ from investigator.config import get_config
 
 # Removed cache facade - using cache manager directly
 from investigator.infrastructure.cache import get_cache_manager
+# TODO: Migrate peer_metrics_dao to infrastructure/database
+# For now, using absolute import from project root utils
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent))
 from utils.peer_metrics_dao import get_peer_metrics_dao
 
 logger = logging.getLogger(__name__)

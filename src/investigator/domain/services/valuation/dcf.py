@@ -96,6 +96,13 @@ class DCFValuation:
         cache_key = (num_quarters, compute_missing)
 
         if cache_key not in self._ttm_cache:
+            # TODO: Migrate quarterly_calculator to domain/services
+            # For now, using absolute import from project root utils
+            import sys
+            from pathlib import Path
+            _project_root = Path(__file__).parent.parent.parent.parent.parent.parent
+            if str(_project_root) not in sys.path:
+                sys.path.insert(0, str(_project_root))
             from utils.quarterly_calculator import get_rolling_ttm_periods
 
             self._ttm_cache[cache_key] = get_rolling_ttm_periods(
