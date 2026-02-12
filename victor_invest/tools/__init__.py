@@ -54,7 +54,7 @@ Example usage:
     )
 
     if result.success:
-        facts = result.data
+        facts = result.output
     else:
         print(f"Error: {result.error}")
 
@@ -68,6 +68,8 @@ Example usage:
     # Get all available tools
     tools = get_all_tools()
 """
+
+from victor.tools.base import BaseTool as VictorBaseTool
 
 from victor_invest.tools.base import BaseTool, ToolResult
 from victor_invest.tools.cache import CacheTool
@@ -173,6 +175,50 @@ def get_tool_descriptions() -> dict:
     return {name: cls.description for name, cls in TOOL_REGISTRY.items()}
 
 
+def register_investment_tools(
+    tool_registry,
+    config=None,
+    *,
+    enabled: bool = True,
+    strict: bool = False,
+) -> dict:
+    """Register all Victor-Invest tools into a Victor ToolRegistry.
+
+    This enables LLM tool calling for the investment vertical by ensuring
+    the Victor orchestrator has the investment toolset available.
+
+    Args:
+        tool_registry: Victor ToolRegistry instance to register tools with.
+        config: Optional config object passed into tool constructors.
+        enabled: Whether tools are enabled by default in the registry.
+        strict: If True, raise on the first registration error.
+
+    Returns:
+        Dict with registration stats: {registered, errors}.
+    """
+    errors = []
+    registered = 0
+
+    for tool_cls in TOOL_CLASSES:
+        try:
+            tool_instance = tool_cls(config=config)
+            if not isinstance(tool_instance, VictorBaseTool):
+                raise TypeError(f"Expected Victor BaseTool instance, got {type(tool_instance).__name__}")
+            try:
+                tool_registry.register(tool_instance, enabled=enabled)
+            except TypeError:
+                # Fallback for older ToolRegistry variants without `enabled` arg.
+                tool_registry.register(tool_instance)
+            registered += 1
+        except Exception as exc:
+            error_msg = f"{getattr(tool_cls, '__name__', 'UnknownTool')}: {exc}"
+            errors.append(error_msg)
+            if strict:
+                raise
+
+    return {"registered": registered, "errors": errors}
+
+
 __all__ = [
     # Base classes
     "BaseTool",
@@ -198,6 +244,7 @@ __all__ = [
     "get_all_tools",
     "get_tool_names",
     "get_tool_descriptions",
+    "register_investment_tools",
     # Registry
     "TOOL_REGISTRY",
     "TOOL_CLASSES",

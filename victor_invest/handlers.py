@@ -1416,6 +1416,13 @@ class IdentifyPeersHandler(BaseHandler):
         from investigator.infrastructure.database.db import get_database_engine
 
         symbol = context.get("symbol", "")
+        peer_data = context.get("peer_data") or {}
+        if isinstance(peer_data, dict) and peer_data.get("peers"):
+            return {
+                "peers": peer_data.get("peers", []),
+                "peer_metrics": peer_data.get("peer_metrics", {}),
+            }, 0
+
         market_context = context.get("market_context") or {}
         sector = market_context.get("sector")
         industry = market_context.get("industry")
@@ -1609,8 +1616,11 @@ class AnalyzePeersHandler(BaseHandler):
         Returns:
             Tuple of (peer_analyses_list, tool_calls_count)
         """
-        peer_data = context.get("peer_data") or {}
-        peers = peer_data.get("peers", []) if isinstance(peer_data, dict) else context.get("peer_list", [])
+        peer_data = context.get("peer_data")
+        if isinstance(peer_data, dict) and peer_data.get("peers"):
+            peers = peer_data.get("peers", [])
+        else:
+            peers = context.get("peer_list", [])
 
         if not peers:
             return [], 0

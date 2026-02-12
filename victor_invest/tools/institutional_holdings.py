@@ -126,7 +126,7 @@ Investment Signals:
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Optional[Dict[str, Any]] = None,
         action: str = "holdings",
         symbol: Optional[str] = None,
         limit: int = 20,
@@ -163,37 +163,37 @@ Investment Signals:
 
             if action == "holdings":
                 if not symbol:
-                    return ToolResult.error_result("Symbol required for holdings action")
+                    return ToolResult.create_failure("Symbol required for holdings action")
                 return await self._get_holdings(symbol, quarter)
 
             elif action == "top_holders":
                 if not symbol:
-                    return ToolResult.error_result("Symbol required for top_holders action")
+                    return ToolResult.create_failure("Symbol required for top_holders action")
                 return await self._get_top_holders(symbol, limit)
 
             elif action == "changes":
                 if not symbol:
-                    return ToolResult.error_result("Symbol required for changes action")
+                    return ToolResult.create_failure("Symbol required for changes action")
                 return await self._get_ownership_changes(symbol, quarters)
 
             elif action == "institution":
                 if not cik:
-                    return ToolResult.error_result("CIK required for institution action")
+                    return ToolResult.create_failure("CIK required for institution action")
                 return await self._get_institution_holdings(cik, quarter)
 
             elif action == "search":
                 if not query:
-                    return ToolResult.error_result("Query required for search action")
+                    return ToolResult.create_failure("Query required for search action")
                 return await self._search_institutions(query, limit)
 
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: " "holdings, top_holders, changes, institution, search"
                 )
 
         except Exception as e:
             logger.error(f"InstitutionalHoldingsTool execute error: {e}")
-            return ToolResult.error_result(
+            return ToolResult.create_failure(
                 f"Institutional holdings query failed: {str(e)}", metadata={"action": action, "symbol": symbol}
             )
 
@@ -236,8 +236,7 @@ Investment Signals:
 
                     signal = self._calculate_ownership_signal(ownership_proxy)
 
-                    return ToolResult.success_result(
-                        data={
+                    return ToolResult.create_success(output={
                             **ownership_proxy.to_dict(),
                             "investment_signal": signal,
                         },
@@ -256,20 +255,18 @@ Investment Signals:
         ownership = await self._fetcher.get_holdings_by_symbol(symbol, quarter)
 
         if ownership.num_institutions == 0:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "message": "No institutional holdings data found",
                     "num_institutions": 0,
                 },
-                warnings=["No 13F data available for this symbol"],
+                metadata={"warnings": ["No 13F data available for this symbol"]},
             )
 
         # Calculate signal based on ownership
         signal = self._calculate_ownership_signal(ownership)
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 **ownership.to_dict(),
                 "investment_signal": signal,
             },
@@ -299,8 +296,7 @@ Investment Signals:
                         # DataSourceManager returns value in dollars, not thousands
                         total_value_dollars = sum(h.get("value", 0) or 0 for h in top_holders)
 
-                        return ToolResult.success_result(
-                            data={
+                        return ToolResult.create_success(output={
                                 "symbol": symbol,
                                 "num_holders": len(top_holders),
                                 "total_value_thousands": total_value_dollars / 1000,
@@ -320,20 +316,18 @@ Investment Signals:
         holders = await self._fetcher.get_top_holders(symbol, limit)
 
         if not holders:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "top_holders": [],
                     "message": "No institutional holders found",
                 },
-                warnings=["No 13F data available for this symbol"],
+                metadata={"warnings": ["No 13F data available for this symbol"]},
             )
 
         # Calculate total value from top holders
         total_value = sum(h.get("value_thousands", 0) for h in holders)
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol,
                 "num_holders": len(holders),
                 "total_value_thousands": total_value,
@@ -351,20 +345,18 @@ Investment Signals:
         changes = await self._fetcher.get_ownership_changes(symbol, quarters)
 
         if not changes:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "changes": [],
                     "message": "No historical ownership data found",
                 },
-                warnings=["Insufficient 13F history for this symbol"],
+                metadata={"warnings": ["Insufficient 13F history for this symbol"]},
             )
 
         # Analyze trend
         trend = self._analyze_ownership_trend(changes)
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol,
                 "quarters_analyzed": len(changes),
                 "changes": changes,
@@ -381,8 +373,7 @@ Investment Signals:
         holdings = await self._fetcher.get_institution_holdings(cik, quarter)
 
         if not holdings:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "cik": cik,
                     "holdings": [],
                     "message": "No holdings found for this institution",
@@ -406,8 +397,7 @@ Investment Signals:
             for h in holdings[:50]  # Limit to top 50
         ]
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "cik": cik,
                 "total_positions": total_positions,
                 "total_value_thousands": total_value,
@@ -425,8 +415,7 @@ Investment Signals:
         institutions = await self._fetcher.search_institutions(query, limit)
 
         if not institutions:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "query": query,
                     "institutions": [],
                     "message": f"No institutions found matching '{query}'",
@@ -442,8 +431,7 @@ Investment Signals:
             for inst in institutions
         ]
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "query": query,
                 "num_results": len(institution_data),
                 "institutions": institution_data,

@@ -97,6 +97,9 @@ from investigator.domain.services.rl.models import ValuationContext, GrowthStage
 # Dual RL Policy (technical + fundamental)
 from investigator.domain.services.rl.policy import load_dual_policy, DualRLPolicy
 
+# Shared symbol repository for consistent ticker fetching
+from investigator.infrastructure.database.symbol_repository import SymbolRepository
+
 # Shared market data services (used by rl_backtest, batch_analysis_runner, victor_invest)
 from investigator.domain.services.market_data import (
     SharesService,
@@ -166,24 +169,12 @@ class RLBacktester:
             self.dual_policy = load_dual_policy()
             logger.info(f"Dual policy loaded: tech={self.dual_policy.technical._update_count}, fund={self.dual_policy.fundamental._update_count}")
 
-        # Create separate connection for stock database
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
+        # Shared symbol repository for consistent ticker fetching
+        self.symbol_repo = SymbolRepository()
+        self.stock_engine = self.symbol_repo.stock_engine
 
-        stock_password = os.environ.get("STOCK_DB_PASSWORD")
-        stock_host = os.environ.get("STOCK_DB_HOST", "localhost")
-        if not stock_password:
-            raise EnvironmentError(
-                "STOCK_DB_PASSWORD environment variable not set. "
-                "Please set it or source your ~/.investigator/env file."
-            )
-        self.stock_engine = create_engine(
-            f"postgresql://stockuser:{stock_password}@{stock_host}:5432/stock",
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True,
-            pool_recycle=3600,  # Recycle connections after 1 hour
-        )
+        # Session maker for stock database
+        from sqlalchemy.orm import sessionmaker
         self.StockSession = sessionmaker(bind=self.stock_engine)
 
         # Load config
@@ -401,41 +392,33 @@ class RLBacktester:
         symbols: Optional[List[str]] = None,
         top_n: Optional[int] = None,
     ) -> List[str]:
-        """Get list of symbols to backtest."""
+        """Get list of symbols to backtest (legacy method - uses get_symbols_with_sec_data)."""
         if symbols:
             return [s.upper() for s in symbols]
 
-        # Get symbols that exist in BOTH databases
-        with self.db.get_session() as sec_session:
-            sec_symbols_query = """
-                SELECT DISTINCT symbol
-                FROM sec_companyfacts_processed
-                WHERE total_revenue IS NOT NULL
-                  AND net_income IS NOT NULL
-            """
-            sec_result = sec_session.execute(text(sec_symbols_query))
-            sec_symbols = set(row[0] for row in sec_result.fetchall())
+        # Use shared repository - gets symbols with both stock and SEC data
+        valid_symbols = self.symbol_repo.get_symbols_with_sec_data(min_market_cap=1_000_000_000)
+        return valid_symbols[: top_n or 500]
 
-        # Filter by stock database symbols with market cap data
-        stock_session = self.StockSession()
-        try:
-            stock_query = """
-                SELECT ticker
-                FROM symbol
-                WHERE islisted = TRUE
-                  AND skiptametric = FALSE
-                  AND mktcap > 1000000000
-                ORDER BY mktcap DESC
-                LIMIT :limit
-            """
-            stock_result = stock_session.execute(text(stock_query), {"limit": (top_n or 500) * 2})
-            stock_symbols = [row[0] for row in stock_result.fetchall()]
-        finally:
-            stock_session.close()
+    def get_russell1000_symbols(self) -> List[str]:
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_russell1000_symbols()
 
-        # Return intersection, maintaining market cap order
-        valid_symbols = [s for s in stock_symbols if s in sec_symbols][: top_n or 500]
-        return valid_symbols
+    def get_sp500_symbols(self) -> List[str]:
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_sp500_symbols()
+
+    def get_all_symbols(self, us_only: bool = True, order_by: str = "stockid") -> List[str]:
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_all_symbols(us_only=us_only, order_by=order_by)
+
+    def get_top_n_symbols(self, n: int, us_only: bool = True) -> List[str]:
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_top_n_symbols(n, us_only=us_only)
+
+    def get_domestic_filers(self) -> set:
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_domestic_filers()
 
     def get_historical_financials(
         self,
@@ -2098,9 +2081,32 @@ class RLBacktester:
 
 def main():
     parser = argparse.ArgumentParser(description="RL Backtesting Script - Full Valuation Framework")
+
+    # Symbol source options
     parser.add_argument("--symbols", nargs="+", help="Specific symbols to backtest")
-    parser.add_argument("--all-symbols", action="store_true", help="Backtest all eligible symbols")
+    parser.add_argument("--russell1000", action="store_true", help="Backtest Russell 1000 symbols")
+    parser.add_argument("--sp500", action="store_true", help="Backtest S&P 500 symbols")
+    parser.add_argument("--all", action="store_true", help="Backtest ALL stocks from symbol table")
+    parser.add_argument("--all-symbols", action="store_true", help="(Deprecated) Same as --all")
     parser.add_argument("--top-n", type=int, default=100, help="Top N symbols by market cap")
+    parser.add_argument(
+        "--order-by",
+        choices=["stockid", "mktcap", "ticker"],
+        default="stockid",
+        help="Sort order: stockid (ascending), mktcap (descending), ticker (alphabetical). Default: stockid",
+    )
+
+    # Filtering options
+    parser.add_argument(
+        "--skip-domestic-filter",
+        action="store_true",
+        help="Skip the domestic filer filter (process all stocks even without SEC quarterly data)",
+    )
+    parser.add_argument(
+        "--include-foreign",
+        action="store_true",
+        help="Include foreign stocks without SEC CIK (default: US only)",
+    )
     parser.add_argument(
         "--lookback", nargs="+", type=int,
         default=list(RL_BACKTEST_PERIODS.standard_lookback_months),
@@ -2154,19 +2160,50 @@ def main():
 
     os.makedirs("logs", exist_ok=True)
 
+    print("Starting RL Backtest...", flush=True)
+    print(f"  Lookback periods: {args.lookback}", flush=True)
+
     backtester = RLBacktester(
         use_rl_policy=args.use_rl_policy,
         rl_policy_path=args.rl_policy_path,
         use_dual_policy=args.use_dual_policy,
     )
+    print("  Backtester initialized successfully", flush=True)
 
-    # Get symbols
+    # Get symbols based on source
+    us_only = not getattr(args, 'include_foreign', False)
     if args.symbols:
-        symbols = args.symbols
-    elif args.all_symbols:
-        symbols = backtester.get_symbols_to_backtest(top_n=1000)
+        print(f"  Processing {len(args.symbols)} specified symbols", flush=True)
+        symbols = [s.upper() for s in args.symbols]
+    elif getattr(args, 'russell1000', False):
+        print("  Fetching Russell 1000 symbols...", flush=True)
+        symbols = backtester.get_russell1000_symbols()
+        print(f"  Found {len(symbols)} Russell 1000 symbols", flush=True)
+    elif getattr(args, 'sp500', False):
+        print("  Fetching S&P 500 symbols...", flush=True)
+        symbols = backtester.get_sp500_symbols()
+        print(f"  Found {len(symbols)} S&P 500 symbols", flush=True)
+    elif getattr(args, 'all', False) or args.all_symbols:
+        print(f"  Fetching ALL stocks from symbol table (order: {args.order_by})...", flush=True)
+        symbols = backtester.get_all_symbols(us_only=us_only, order_by=args.order_by)
+        print(f"  Found {len(symbols)} symbols", flush=True)
     else:
+        print(f"  Fetching top {args.top_n} symbols by market cap...", flush=True)
         symbols = backtester.get_symbols_to_backtest(top_n=args.top_n)
+        print(f"  Found {len(symbols)} symbols", flush=True)
+
+    # Filter domestic filers (unless skipped)
+    skip_domestic = getattr(args, 'skip_domestic_filter', False)
+    if not skip_domestic:
+        print("  Checking for domestic filers...", flush=True)
+        domestic_filers = backtester.get_domestic_filers()
+        original_count = len(symbols)
+        symbols = [s for s in symbols if s in domestic_filers]
+        filtered_count = original_count - len(symbols)
+        if filtered_count > 0:
+            print(f"  Filtered out {filtered_count} foreign filers -> {len(symbols)} remaining", flush=True)
+    else:
+        print("  Skipping domestic filer filter (--skip-domestic-filter)", flush=True)
 
     # Skip already-processed symbols if resuming
     if args.skip_processed and os.path.exists(args.skip_processed):
@@ -2177,6 +2214,7 @@ def main():
         processed = set(re.findall(r" - INFO - ([A-Z]+) \[", log_content))
         original_count = len(symbols)
         symbols = [s for s in symbols if s not in processed]
+        print(f"  Resuming: skipping {len(processed)} already-processed symbols, {len(symbols)}/{original_count} remaining", flush=True)
         logger.info(f"Resuming: skipping {len(processed)} already-processed symbols, {len(symbols)}/{original_count} remaining")
 
     if args.use_dual_policy:
@@ -2185,6 +2223,16 @@ def main():
         weighting_mode = "RL Policy"
     else:
         weighting_mode = "Rule-Based"
+
+    print("=" * 60, flush=True)
+    print("RL BACKTEST RUNNER", flush=True)
+    print("=" * 60, flush=True)
+    print(f"  Total symbols: {len(symbols)}", flush=True)
+    print(f"  Lookback periods: {args.lookback}", flush=True)
+    print(f"  Weighting mode: {weighting_mode}", flush=True)
+    print(f"  Parallel workers: {args.parallel}", flush=True)
+    print("=" * 60, flush=True)
+
     logger.info(f"Backtesting {len(symbols)} symbols with lookbacks: {args.lookback}")
     logger.info(f"Weighting mode: {weighting_mode}")
     logger.info("Using FULL valuation framework (sector-specific, growth-adjusted, all models)")

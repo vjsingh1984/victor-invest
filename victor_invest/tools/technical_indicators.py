@@ -127,7 +127,7 @@ Returns calculated indicators as structured data suitable for analysis.
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Optional[Dict[str, Any]] = None,
         symbol: str = "",
         action: str = "calculate_all",
         days: int = 365,
@@ -161,14 +161,14 @@ Returns calculated indicators as structured data suitable for analysis.
 
             symbol = symbol.upper().strip()
             if not symbol:
-                return ToolResult.error_result("Symbol is required")
+                return ToolResult.create_failure("Symbol is required")
 
             action = action.lower().strip()
 
             # Fetch market data first
             df = await self._fetch_market_data(symbol, days)
             if df is None or df.empty:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"No market data available for {symbol}", metadata={"symbol": symbol, "days": days}
                 )
 
@@ -192,7 +192,7 @@ Returns calculated indicators as structured data suitable for analysis.
             elif action == "get_summary":
                 return self._format_summary(symbol, enhanced_df)
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: "
                     "calculate_all, get_momentum, get_volatility, get_moving_averages, "
                     "get_volume_indicators, get_support_resistance, get_recent, get_summary"
@@ -200,7 +200,7 @@ Returns calculated indicators as structured data suitable for analysis.
 
         except Exception as e:
             logger.error(f"TechnicalIndicatorsTool execute error for {symbol}: {e}")
-            return ToolResult.error_result(
+            return ToolResult.create_failure(
                 f"Technical analysis failed: {str(e)}", metadata={"symbol": symbol, "action": action}
             )
 
@@ -248,8 +248,7 @@ Returns calculated indicators as structured data suitable for analysis.
             # Clean up any NaN values
             latest = {k: (v if pd.notna(v) else None) for k, v in latest.items()}
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "data_points": len(df),
                     "date_range": {
@@ -313,7 +312,7 @@ Returns calculated indicators as structured data suitable for analysis.
 
         except Exception as e:
             logger.error(f"Error formatting all indicators: {e}")
-            return ToolResult.error_result(f"Failed to format indicators: {str(e)}")
+            return ToolResult.create_failure(f"Failed to format indicators: {str(e)}")
 
     def _format_momentum(self, symbol: str, df: pd.DataFrame, period: int) -> ToolResult:
         """Format momentum indicators."""
@@ -321,8 +320,7 @@ Returns calculated indicators as structured data suitable for analysis.
             latest = df.iloc[-1].to_dict() if not df.empty else {}
             latest = {k: (v if pd.notna(v) else None) for k, v in latest.items()}
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "rsi": {f"rsi_{p}": latest.get(f"RSI_{p}") for p in [9, 14, 21]},
                     "macd": {
@@ -346,7 +344,7 @@ Returns calculated indicators as structured data suitable for analysis.
             )
 
         except Exception as e:
-            return ToolResult.error_result(f"Failed to format momentum: {str(e)}")
+            return ToolResult.create_failure(f"Failed to format momentum: {str(e)}")
 
     def _format_volatility(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format volatility indicators."""
@@ -354,8 +352,7 @@ Returns calculated indicators as structured data suitable for analysis.
             latest = df.iloc[-1].to_dict() if not df.empty else {}
             latest = {k: (v if pd.notna(v) else None) for k, v in latest.items()}
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "bollinger_bands": {
                         "upper": latest.get("BB_Upper"),
@@ -372,7 +369,7 @@ Returns calculated indicators as structured data suitable for analysis.
             )
 
         except Exception as e:
-            return ToolResult.error_result(f"Failed to format volatility: {str(e)}")
+            return ToolResult.create_failure(f"Failed to format volatility: {str(e)}")
 
     def _format_moving_averages(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format moving averages."""
@@ -392,8 +389,7 @@ Returns calculated indicators as structured data suitable for analysis.
                     if value:
                         signals[key] = "above" if current_price > value else "below"
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "current_price": current_price,
                     "sma": sma_data,
@@ -406,7 +402,7 @@ Returns calculated indicators as structured data suitable for analysis.
             )
 
         except Exception as e:
-            return ToolResult.error_result(f"Failed to format moving averages: {str(e)}")
+            return ToolResult.create_failure(f"Failed to format moving averages: {str(e)}")
 
     def _format_volume_indicators(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format volume indicators."""
@@ -414,8 +410,7 @@ Returns calculated indicators as structured data suitable for analysis.
             latest = df.iloc[-1].to_dict() if not df.empty else {}
             latest = {k: (v if pd.notna(v) else None) for k, v in latest.items()}
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "current_volume": latest.get("Volume"),
                     "volume_sma_20": latest.get("Volume_SMA_20"),
@@ -430,7 +425,7 @@ Returns calculated indicators as structured data suitable for analysis.
             )
 
         except Exception as e:
-            return ToolResult.error_result(f"Failed to format volume: {str(e)}")
+            return ToolResult.create_failure(f"Failed to format volume: {str(e)}")
 
     def _format_support_resistance(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Format support/resistance levels."""
@@ -438,8 +433,7 @@ Returns calculated indicators as structured data suitable for analysis.
             latest = df.iloc[-1].to_dict() if not df.empty else {}
             latest = {k: (v if pd.notna(v) else None) for k, v in latest.items()}
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "current_price": latest.get("Close"),
                     "52_week": {
@@ -473,7 +467,7 @@ Returns calculated indicators as structured data suitable for analysis.
             )
 
         except Exception as e:
-            return ToolResult.error_result(f"Failed to format S/R levels: {str(e)}")
+            return ToolResult.create_failure(f"Failed to format S/R levels: {str(e)}")
 
     def _format_recent(self, symbol: str, df: pd.DataFrame, days: int) -> ToolResult:
         """Format recent data with indicators."""
@@ -489,13 +483,12 @@ Returns calculated indicators as structured data suitable for analysis.
                 record = {k: (v if pd.notna(v) else None) for k, v in record.items()}
                 records.append(record)
 
-            return ToolResult.success_result(
-                data={"symbol": symbol, "days": len(records), "data": records},
+            return ToolResult.create_success(output={"symbol": symbol, "days": len(records), "data": records},
                 metadata={"indicator_type": "recent_data", "requested_days": days},
             )
 
         except Exception as e:
-            return ToolResult.error_result(f"Failed to format recent data: {str(e)}")
+            return ToolResult.create_failure(f"Failed to format recent data: {str(e)}")
 
     def _format_summary(self, symbol: str, df: pd.DataFrame) -> ToolResult:
         """Generate technical analysis summary with trading signals."""
@@ -540,8 +533,7 @@ Returns calculated indicators as structured data suitable for analysis.
             else:
                 overall = "neutral"
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "current_price": current_price,
                     "overall_signal": overall,
@@ -570,7 +562,7 @@ Returns calculated indicators as structured data suitable for analysis.
             )
 
         except Exception as e:
-            return ToolResult.error_result(f"Failed to generate summary: {str(e)}")
+            return ToolResult.create_failure(f"Failed to generate summary: {str(e)}")
 
     def _interpret_momentum_signals(self, latest: Dict) -> Dict[str, str]:
         """Interpret momentum indicator signals."""

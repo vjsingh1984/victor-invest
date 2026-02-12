@@ -175,7 +175,7 @@ Returns cache data, operation status, or statistics.
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Optional[Dict[str, Any]] = None,
         action: str = "",
         cache_type: Optional[str] = None,
         key: Optional[Union[Dict, Tuple]] = None,
@@ -237,7 +237,7 @@ Returns cache data, operation status, or statistics.
             elif action == "ping":
                 return await self._ping()
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: "
                     "get, set, exists, delete, delete_by_symbol, clear_type, "
                     "get_stats, get_recent_ops, validate, invalidate_sec, ping"
@@ -245,7 +245,7 @@ Returns cache data, operation status, or statistics.
 
         except Exception as e:
             logger.error(f"CacheTool execute error: {e}")
-            return ToolResult.error_result(f"Cache operation failed: {str(e)}", metadata={"action": action})
+            return ToolResult.create_failure(f"Cache operation failed: {str(e)}", metadata={"action": action})
 
     async def _cache_get(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Get data from cache.
@@ -259,9 +259,9 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not cache_type:
-                return ToolResult.error_result("cache_type is required")
+                return ToolResult.create_failure("cache_type is required")
             if not key:
-                return ToolResult.error_result("key is required")
+                return ToolResult.create_failure("key is required")
 
             cache_type_obj = self._get_cache_type(cache_type)
 
@@ -269,20 +269,18 @@ Returns cache data, operation status, or statistics.
             data = await self._cache_manager.get_async(cache_type_obj, key)
 
             if data is not None:
-                return ToolResult.success_result(
-                    data={"hit": True, "cache_type": cache_type, "key": key, "data": data}, metadata={"cache_hit": True}
+                return ToolResult.create_success(output={"hit": True, "cache_type": cache_type, "key": key, "data": data}, metadata={"cache_hit": True}
                 )
             else:
-                return ToolResult.success_result(
-                    data={"hit": False, "cache_type": cache_type, "key": key, "data": None},
+                return ToolResult.create_success(output={"hit": False, "cache_type": cache_type, "key": key, "data": None},
                     metadata={"cache_hit": False},
                 )
 
         except ValueError as e:
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
         except Exception as e:
             logger.error(f"Cache get error: {e}")
-            return ToolResult.error_result(f"Cache get failed: {str(e)}")
+            return ToolResult.create_failure(f"Cache get failed: {str(e)}")
 
     async def _cache_set(self, cache_type: str, key: Union[Dict, Tuple], value: Dict[str, Any]) -> ToolResult:
         """Set data in cache.
@@ -297,11 +295,11 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not cache_type:
-                return ToolResult.error_result("cache_type is required")
+                return ToolResult.create_failure("cache_type is required")
             if not key:
-                return ToolResult.error_result("key is required")
+                return ToolResult.create_failure("key is required")
             if value is None:
-                return ToolResult.error_result("value is required")
+                return ToolResult.create_failure("value is required")
 
             cache_type_obj = self._get_cache_type(cache_type)
 
@@ -318,8 +316,7 @@ Returns cache data, operation status, or statistics.
             # Use async method for non-blocking I/O
             success = await self._cache_manager.set_async(cache_type_obj, key, value)
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "success": success,
                     "cache_type": cache_type,
                     "key": key,
@@ -328,10 +325,10 @@ Returns cache data, operation status, or statistics.
             )
 
         except ValueError as e:
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
         except Exception as e:
             logger.error(f"Cache set error: {e}")
-            return ToolResult.error_result(f"Cache set failed: {str(e)}")
+            return ToolResult.create_failure(f"Cache set failed: {str(e)}")
 
     async def _cache_exists(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Check if cache entry exists.
@@ -345,17 +342,16 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not cache_type:
-                return ToolResult.error_result("cache_type is required")
+                return ToolResult.create_failure("cache_type is required")
             if not key:
-                return ToolResult.error_result("key is required")
+                return ToolResult.create_failure("key is required")
 
             cache_type_obj = self._get_cache_type(cache_type)
 
             loop = asyncio.get_event_loop()
             exists = await loop.run_in_executor(None, self._cache_manager.exists, cache_type_obj, key)
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "exists": exists,
                     "cache_type": cache_type,
                     "key": key,
@@ -363,10 +359,10 @@ Returns cache data, operation status, or statistics.
             )
 
         except ValueError as e:
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
         except Exception as e:
             logger.error(f"Cache exists error: {e}")
-            return ToolResult.error_result(f"Cache exists check failed: {str(e)}")
+            return ToolResult.create_failure(f"Cache exists check failed: {str(e)}")
 
     async def _cache_delete(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Delete cache entry.
@@ -380,17 +376,16 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not cache_type:
-                return ToolResult.error_result("cache_type is required")
+                return ToolResult.create_failure("cache_type is required")
             if not key:
-                return ToolResult.error_result("key is required")
+                return ToolResult.create_failure("key is required")
 
             cache_type_obj = self._get_cache_type(cache_type)
 
             loop = asyncio.get_event_loop()
             deleted = await loop.run_in_executor(None, self._cache_manager.delete, cache_type_obj, key)
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "deleted": deleted,
                     "cache_type": cache_type,
                     "key": key,
@@ -398,10 +393,10 @@ Returns cache data, operation status, or statistics.
             )
 
         except ValueError as e:
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
         except Exception as e:
             logger.error(f"Cache delete error: {e}")
-            return ToolResult.error_result(f"Cache delete failed: {str(e)}")
+            return ToolResult.create_failure(f"Cache delete failed: {str(e)}")
 
     async def _delete_by_symbol(self, symbol: str) -> ToolResult:
         """Delete all cache entries for a symbol.
@@ -414,7 +409,7 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not symbol:
-                return ToolResult.error_result("symbol is required")
+                return ToolResult.create_failure("symbol is required")
 
             symbol = symbol.upper().strip()
 
@@ -423,13 +418,12 @@ Returns cache data, operation status, or statistics.
 
             total_deleted = sum(results.values())
 
-            return ToolResult.success_result(
-                data={"symbol": symbol, "total_deleted": total_deleted, "deleted_by_type": results}
+            return ToolResult.create_success(output={"symbol": symbol, "total_deleted": total_deleted, "deleted_by_type": results}
             )
 
         except Exception as e:
             logger.error(f"Delete by symbol error: {e}")
-            return ToolResult.error_result(f"Delete by symbol failed: {str(e)}")
+            return ToolResult.create_failure(f"Delete by symbol failed: {str(e)}")
 
     async def _clear_type(self, cache_type: str) -> ToolResult:
         """Clear all entries for a cache type.
@@ -442,25 +436,24 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not cache_type:
-                return ToolResult.error_result("cache_type is required")
+                return ToolResult.create_failure("cache_type is required")
 
             cache_type_obj = self._get_cache_type(cache_type)
 
             loop = asyncio.get_event_loop()
             success = await loop.run_in_executor(None, self._cache_manager.clear_cache_type, cache_type_obj)
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "success": success,
                     "cache_type": cache_type,
                 }
             )
 
         except ValueError as e:
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
         except Exception as e:
             logger.error(f"Clear cache type error: {e}")
-            return ToolResult.error_result(f"Clear cache type failed: {str(e)}")
+            return ToolResult.create_failure(f"Clear cache type failed: {str(e)}")
 
     async def _get_stats(self) -> ToolResult:
         """Get cache performance statistics.
@@ -476,11 +469,11 @@ Returns cache data, operation status, or statistics.
 
             general_stats = await loop.run_in_executor(None, self._cache_manager.get_stats)
 
-            return ToolResult.success_result(data={"performance": performance_stats, "configuration": general_stats})
+            return ToolResult.create_success(output={"performance": performance_stats, "configuration": general_stats})
 
         except Exception as e:
             logger.error(f"Get stats error: {e}")
-            return ToolResult.error_result(f"Get stats failed: {str(e)}")
+            return ToolResult.create_failure(f"Get stats failed: {str(e)}")
 
     async def _get_recent_ops(self, cache_type=None) -> ToolResult:
         """Get recent cache operations for debugging.
@@ -495,11 +488,11 @@ Returns cache data, operation status, or statistics.
             loop = asyncio.get_event_loop()
             recent_ops = await loop.run_in_executor(None, self._cache_manager.get_recent_operations, cache_type, 20)
 
-            return ToolResult.success_result(data={"recent_operations": recent_ops})
+            return ToolResult.create_success(output={"recent_operations": recent_ops})
 
         except Exception as e:
             logger.error(f"Get recent ops error: {e}")
-            return ToolResult.error_result(f"Get recent ops failed: {str(e)}")
+            return ToolResult.create_failure(f"Get recent ops failed: {str(e)}")
 
     async def _validate_entry(self, cache_type: str, key: Union[Dict, Tuple]) -> ToolResult:
         """Validate a cache entry for integrity.
@@ -513,9 +506,9 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not cache_type:
-                return ToolResult.error_result("cache_type is required")
+                return ToolResult.create_failure("cache_type is required")
             if not key:
-                return ToolResult.error_result("key is required")
+                return ToolResult.create_failure("key is required")
 
             cache_type_obj = self._get_cache_type(cache_type)
 
@@ -523,7 +516,7 @@ Returns cache data, operation status, or statistics.
             data = await self._cache_manager.get_async(cache_type_obj, key)
 
             if data is None:
-                return ToolResult.success_result(data={"valid": False, "exists": False, "issues": ["Entry not found"]})
+                return ToolResult.create_success(output={"valid": False, "exists": False, "issues": ["Entry not found"]})
 
             # Validate the entry
             loop = asyncio.get_event_loop()
@@ -531,8 +524,7 @@ Returns cache data, operation status, or statistics.
                 None, self._cache_manager.validate_cache_entry, data, cache_type_obj, True  # strict mode
             )
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "valid": is_valid,
                     "exists": True,
                     "issues": issues,
@@ -542,10 +534,10 @@ Returns cache data, operation status, or statistics.
             )
 
         except ValueError as e:
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
         except Exception as e:
             logger.error(f"Validate entry error: {e}")
-            return ToolResult.error_result(f"Validate entry failed: {str(e)}")
+            return ToolResult.create_failure(f"Validate entry failed: {str(e)}")
 
     async def _invalidate_sec(self, symbol: str, filing_date: str, dry_run: bool = True) -> ToolResult:
         """Invalidate SEC-related cache entries after new filing.
@@ -560,9 +552,9 @@ Returns cache data, operation status, or statistics.
         """
         try:
             if not symbol:
-                return ToolResult.error_result("symbol is required")
+                return ToolResult.create_failure("symbol is required")
             if not filing_date:
-                return ToolResult.error_result("filing_date is required")
+                return ToolResult.create_failure("filing_date is required")
 
             symbol = symbol.upper().strip()
 
@@ -571,11 +563,11 @@ Returns cache data, operation status, or statistics.
                 None, self._cache_manager.invalidate_on_sec_update, symbol, filing_date, dry_run
             )
 
-            return ToolResult.success_result(data=result, metadata={"dry_run": dry_run})
+            return ToolResult.create_success(output=result, metadata={"dry_run": dry_run})
 
         except Exception as e:
             logger.error(f"Invalidate SEC cache error: {e}")
-            return ToolResult.error_result(f"Invalidate SEC cache failed: {str(e)}")
+            return ToolResult.create_failure(f"Invalidate SEC cache failed: {str(e)}")
 
     async def _ping(self) -> ToolResult:
         """Health check for cache system.
@@ -586,13 +578,12 @@ Returns cache data, operation status, or statistics.
         try:
             is_healthy = await self._cache_manager.ping()
 
-            return ToolResult.success_result(
-                data={"healthy": is_healthy, "status": "operational" if is_healthy else "degraded"}
+            return ToolResult.create_success(output={"healthy": is_healthy, "status": "operational" if is_healthy else "degraded"}
             )
 
         except Exception as e:
             logger.error(f"Cache ping error: {e}")
-            return ToolResult.success_result(data={"healthy": False, "status": "error", "error": str(e)})
+            return ToolResult.create_success(output={"healthy": False, "status": "error", "error": str(e)})
 
     def get_schema(self) -> Dict[str, Any]:
         """Get JSON schema for Cache Tool parameters."""

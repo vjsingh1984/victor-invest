@@ -24,15 +24,30 @@ cp config.json.sample config.json  # set SEC user agent, DB creds, Ollama params
 .Run an analysis
 [source,bash]
 ----
-python3 cli_orchestrator.py analyze AAPL -m standard -o results/AAPL.json
-# or
-make analyze SYMBOL=AAPL
+python3 -m victor_invest.cli analyze AAPL --mode standard --output results/
+# or (if installed)
+victor-invest analyze AAPL --mode standard --output results/
 ----
+
+.System health
+[source,bash]
+----
+python3 -m victor_invest.cli status
+python3 -m victor_invest.cli metrics --days 7
+python3 -m victor_invest.cli test-system
+python3 -m victor_invest.cli pull <MODEL>
+----
+
+== Migration Notes
+
+* `victor-invest` is the primary CLI for analysis workflows.
+* `cli_orchestrator.py` remains available for legacy commands and forwards to Victor by default.
+* Force legacy behavior with `INVESTIGATOR_LEGACY=1` or `--legacy`.
 
 == Key Locations
 
 * Source: `src/investigator/` (clean architecture: domain/application/infrastructure/interfaces/shared)
-* CLI entrypoints: `cli_orchestrator.py`, `src/investigator/cli.py`
+* CLI entrypoints: `victor_invest/cli.py` (primary), `cli_orchestrator.py` (legacy)
 * Tests: `tests/`
 * Docs & architecture notes: `docs/` (see `docs/README.adoc`, `docs/DEVELOPER_GUIDE.adoc`)
 * Config/runtime data: `config/`, `data/`, `artifacts/`

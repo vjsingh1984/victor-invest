@@ -151,7 +151,7 @@ class RLBacktestTool(BaseTool):
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Optional[Dict[str, Any]] = None,
         action: str = "run_backtest",
         symbol: str = "",
         lookback_months: Optional[List[int]] = None,
@@ -222,14 +222,14 @@ class RLBacktestTool(BaseTool):
                     analysis_date=analysis_date or date.today(),
                 )
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: run_backtest, "
                     "calculate_rewards, record_prediction, get_historical_data, "
                     "get_context_features"
                 )
         except Exception as e:
             logger.error(f"Error in RLBacktestTool: {e}")
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
 
     async def _run_backtest(
         self,
@@ -273,8 +273,7 @@ class RLBacktestTool(BaseTool):
             except Exception as e:
                 results["errors"].append(f"{months_back}m: {str(e)}")
 
-        return ToolResult.success_result(
-            data=results,
+        return ToolResult.create_success(output=results,
             metadata={
                 "tool": "rl_backtest",
                 "action": "run_backtest",
@@ -294,8 +293,7 @@ class RLBacktestTool(BaseTool):
 
         multi_period_data = await self._get_multi_period_data(symbol, analysis_date, current_price, beta)
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol,
                 "analysis_date": analysis_date.isoformat(),
                 "current_price": current_price,
@@ -325,7 +323,7 @@ class RLBacktestTool(BaseTool):
         consolidated data and extract RL features automatically.
         """
         if not self._outcome_tracker:
-            return ToolResult.error_result("Outcome tracker not available")
+            return ToolResult.create_failure("Outcome tracker not available")
 
         try:
             # Calculate multi-period data
@@ -360,8 +358,7 @@ class RLBacktestTool(BaseTool):
                 if record_id:
                     record_ids.append(record_id)
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "analysis_date": analysis_date.isoformat(),
                     "record_ids": record_ids,
@@ -374,7 +371,7 @@ class RLBacktestTool(BaseTool):
                 },
             )
         except Exception as e:
-            return ToolResult.error_result(f"Failed to record prediction: {e}")
+            return ToolResult.create_failure(f"Failed to record prediction: {e}")
 
     async def _get_historical_data(
         self,
@@ -386,8 +383,7 @@ class RLBacktestTool(BaseTool):
         shares = self._shares_service.get_sec_shares(symbol, analysis_date)
         metadata = await self._get_metadata(symbol)
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol,
                 "analysis_date": analysis_date.isoformat(),
                 "price": price,
@@ -417,15 +413,14 @@ class RLBacktestTool(BaseTool):
         - Sentiment (insider buys/sells, short interest)
         """
         if not self._data_source_manager:
-            return ToolResult.error_result("DataSourceManager not initialized")
+            return ToolResult.create_failure("DataSourceManager not initialized")
 
         try:
             consolidated = self._data_source_manager.get_data(symbol=symbol, as_of_date=analysis_date)
 
             features = consolidated.get_rl_features()
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "analysis_date": analysis_date.isoformat(),
                     "features": features,
@@ -440,7 +435,7 @@ class RLBacktestTool(BaseTool):
                 },
             )
         except Exception as e:
-            return ToolResult.error_result(f"Failed to get context features: {e}")
+            return ToolResult.create_failure(f"Failed to get context features: {e}")
 
     async def _get_multi_period_data(
         self,

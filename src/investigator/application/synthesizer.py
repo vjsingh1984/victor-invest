@@ -25,19 +25,39 @@ from sqlalchemy import text
 from investigator.config import get_config
 
 # Import from Clean Architecture
+from investigator.application.synthesizer_insights import (
+    analyze_field_completeness,
+    check_fallback_flags,
+    detect_markdown_content,
+    extract_bullet_points,
+    extract_decision_process,
+    extract_numerical_insights,
+    extract_priority_insights,
+    extract_reasoning_themes,
+    identify_custom_fields,
+    recommend_report_sections,
+    suggest_visualizations,
+)
+from investigator.application.synthesizer_recommendation import (
+    calculate_consistency_bonus,
+    calculate_price_target,
+    calculate_stop_loss,
+    determine_final_recommendation,
+    extract_catalysts,
+    extract_position_size,
+)
+from investigator.application.synthesizer_text_insights import (
+    extract_comprehensive_insights,
+    extract_comprehensive_risks,
+    extract_insights_from_text,
+)
 from investigator.domain.models import InvestmentRecommendation
 from investigator.infrastructure.cache import CacheManager, CacheType, get_cache_manager
 from investigator.infrastructure.database.db import (  # TODO: Move to investigator.infrastructure.database
     DatabaseManager,
     get_llm_responses_dao,
 )
-from investigator.infrastructure.reporting import (
-    PDFReportGenerator,
-    ReportConfig,
-    WeeklyReportGenerator,
-)
 from investigator.infrastructure.ui import ASCIIArt
-from patterns.analysis.peer_comparison import get_peer_comparison_analyzer  # TODO: Move to investigator.domain.services
 from patterns.llm.llm_facade import create_llm_facade  # TODO: Move to investigator.infrastructure.llm
 
 # Configure logging
@@ -97,6 +117,8 @@ class InvestmentSynthesizer:
 
         # Initialize generators
         self.chart_generator = ChartGenerator(self.config.reports_dir / "charts")
+        from investigator.infrastructure.reporting import PDFReportGenerator, ReportConfig, WeeklyReportGenerator
+
         self.report_generator = PDFReportGenerator(
             self.config.reports_dir / "synthesis",
             ReportConfig(
@@ -742,8 +764,16 @@ class InvestmentSynthesizer:
 
             # Get peer comparison data
             symbol_logger.info("Fetching peer comparison data")
-            peer_analyzer = get_peer_comparison_analyzer()
-            peer_comparison = peer_analyzer.get_peer_comparison(symbol)
+            peer_comparison = {}
+            try:
+                from patterns.analysis.peer_comparison import (
+                    get_peer_comparison_analyzer,
+                )
+
+                peer_analyzer = get_peer_comparison_analyzer()
+                peer_comparison = peer_analyzer.get_peer_comparison(symbol)
+            except Exception as peer_err:
+                symbol_logger.warning(f"Peer comparison unavailable, continuing without it: {peer_err}")
 
             # Generate synthesis using LLM (but only if not using direct extraction)
             model_name = self.config.ollama.models.get("synthesis", "deepseek-r1:32b")
@@ -4425,350 +4455,48 @@ Your responses must be precise, quantitative, and suitable for institutional inv
 
     def _calculate_consistency_bonus(self, quality_indicators: List[float]) -> float:
         """Calculate bonus for consistent business quality across quarters"""
-        if len(quality_indicators) < 2:
-            return 0.0
-
-        # Calculate standard deviation
-        mean_quality = sum(quality_indicators) / len(quality_indicators)
-        variance = sum((x - mean_quality) ** 2 for x in quality_indicators) / len(quality_indicators)
-        std_dev = variance**0.5
-
-        # Lower standard deviation = more consistent = higher bonus
-        # Scale: 0-1 point bonus based on consistency
-        max_bonus = 1.0
-        consistency_bonus = max(0.0, max_bonus - (std_dev / 2.0))
-
-        return consistency_bonus
+        return calculate_consistency_bonus(quality_indicators)
 
     def _determine_final_recommendation(
         self, overall_score: float, ai_recommendation: Dict, data_quality: float
     ) -> Dict:
         """Determine final recommendation with risk management"""
-        # Try to get recommendation from structured response first
-        if "investment_recommendation" in ai_recommendation:
-            inv_rec = ai_recommendation["investment_recommendation"]
-            base_recommendation = inv_rec.get("recommendation", "HOLD")
-            confidence = inv_rec.get("confidence_level", "MEDIUM")
-        else:
-            # Handle case where recommendation might be a dict due to JSON parsing errors
-            rec_data = ai_recommendation.get("recommendation", "HOLD")
-            if isinstance(rec_data, dict):
-                base_recommendation = rec_data.get("rating", "HOLD")
-                confidence = rec_data.get("confidence", "LOW")
-            else:
-                base_recommendation = rec_data if isinstance(rec_data, str) else "HOLD"
-                confidence = ai_recommendation.get("confidence", "MEDIUM")
-
-        # Adjust for data quality
-        if data_quality < 0.5:
-            confidence = "LOW"
-            if base_recommendation in ["STRONG BUY", "STRONG SELL"]:
-                base_recommendation = base_recommendation.replace("STRONG ", "")
-
-        # Adjust based on score thresholds
-        if overall_score >= 8.0 and base_recommendation not in ["BUY", "STRONG BUY"]:
-            base_recommendation = "BUY"
-        elif overall_score <= 3.0 and base_recommendation not in ["SELL", "STRONG SELL"]:
-            base_recommendation = "SELL"
-        elif 4.0 <= overall_score <= 6.0 and base_recommendation in ["STRONG BUY", "STRONG SELL"]:
-            base_recommendation = "HOLD"
-
-        return {"recommendation": base_recommendation, "confidence": confidence}
+        return determine_final_recommendation(overall_score, ai_recommendation, data_quality)
 
     def _calculate_price_target(
         self, symbol: str, llm_responses: Dict, ai_recommendation: Dict, current_price: float
     ) -> float:
         """Calculate sophisticated price target"""
-        # Try to extract from structured AI recommendation first
-        if "investment_recommendation" in ai_recommendation:
-            target_data = ai_recommendation["investment_recommendation"].get("target_price", {})
-            if target_data.get("12_month_target"):
-                return target_data["12_month_target"]
-
-        # Try legacy format
-        ai_targets = ai_recommendation.get("price_targets", {})
-        if ai_targets.get("12_month"):
-            return ai_targets["12_month"]
-
-        # Use current price passed in, fallback to reasonable default if price is 0
-        if current_price <= 0:
-            # Log warning and use a placeholder
-            self.main_logger.warning(
-                f"No current price available for {symbol}, using placeholder for target calculation"
-            )
-            current_price = 100  # Fallback only as last resort
-
-        # Extract overall score from different possible locations
-        overall_score = 5.0  # Default
-        if "composite_scores" in ai_recommendation:
-            overall_score = ai_recommendation["composite_scores"].get("overall_score", 5.0)
-        elif "overall_score" in ai_recommendation:
-            overall_score = ai_recommendation.get("overall_score", 5.0)
-
-        # Expected return mapping based on score
-        if overall_score >= 8.0:
-            expected_return = 0.15  # 15% (more conservative for institutional)
-        elif overall_score >= 6.5:
-            expected_return = 0.10  # 10%
-        elif overall_score >= 5.0:
-            expected_return = 0.05  # 5%
-        else:
-            expected_return = -0.05  # -5%
-
-        price_target = round(current_price * (1 + expected_return), 2)
-        self.main_logger.info(
-            f"Calculated price target for {symbol}: ${price_target:.2f} (current: ${current_price:.2f}, score: {overall_score:.1f})"
-        )
-
-        return price_target
+        _ = llm_responses  # retained for backward-compatible method signature
+        return calculate_price_target(symbol, ai_recommendation, current_price, self.main_logger)
 
     def _calculate_stop_loss(self, current_price: float, recommendation: Dict, overall_score: float) -> float:
         """Calculate stop loss based on risk management"""
-        if not current_price or current_price <= 0:
-            return 0
-
-        # Base stop loss percentage on score and recommendation
-        rec_type = recommendation.get("recommendation", "HOLD")
-
-        if "STRONG BUY" in rec_type:
-            stop_loss_pct = 0.12  # 12% stop loss
-        elif "BUY" in rec_type:
-            stop_loss_pct = 0.10  # 10% stop loss
-        elif "HOLD" in rec_type:
-            stop_loss_pct = 0.08  # 8% stop loss
-        else:  # SELL
-            stop_loss_pct = 0.05  # 5% stop loss
-
-        # Adjust for overall score
-        if overall_score < 4.0:
-            stop_loss_pct *= 0.5  # Tighter stop for low conviction
-
-        return round(current_price * (1 - stop_loss_pct), 2)
+        return calculate_stop_loss(current_price, recommendation, overall_score)
 
     def _extract_position_size(self, ai_recommendation: Dict) -> str:
         """Extract position size recommendation"""
-        if "investment_recommendation" in ai_recommendation:
-            pos_sizing = ai_recommendation["investment_recommendation"].get("position_sizing", {})
-            weight = pos_sizing.get("recommended_weight", 0.0)
-            if weight >= 0.05:
-                return "LARGE"
-            elif weight >= 0.03:
-                return "MODERATE"
-            elif weight > 0:
-                return "SMALL"
-        return ai_recommendation.get("position_size", "MODERATE")
+        return extract_position_size(ai_recommendation)
 
     def _extract_catalysts(self, ai_recommendation: Dict) -> List[str]:
         """Extract key catalysts from recommendation"""
-        catalysts = []
-
-        # Try structured format first
-        if "key_catalysts" in ai_recommendation:
-            cat_data = ai_recommendation["key_catalysts"]
-            if isinstance(cat_data, list):
-                for cat in cat_data[:3]:
-                    if isinstance(cat, dict):
-                        catalysts.append(cat.get("catalyst", ""))
-                    elif isinstance(cat, str):
-                        catalysts.append(cat)
-
-        # Fallback to simple list
-        return catalysts or ai_recommendation.get("catalysts", [])
+        return extract_catalysts(ai_recommendation)
 
     def _extract_insights_from_text(self, text_details: str) -> tuple[List[str], List[str]]:
         """Extract insights and risks from additional text details beyond JSON"""
-        import re
-
-        insights = []
-        risks = []
-
-        if not text_details:
-            return insights, risks
-
-        # Clean and normalize text
-        text = text_details.strip()
-
-        # Extract insights using various patterns
-        insight_patterns = [
-            r"(?:key\s+)?insights?[:\s]+(.*?)(?=\n\n|\nkey\s+risks?|\n[A-Z]|$)",
-            r"(?:important\s+)?findings?[:\s]+(.*?)(?=\n\n|\nkey\s+risks?|\n[A-Z]|$)",
-            r"(?:notable\s+)?observations?[:\s]+(.*?)(?=\n\n|\nkey\s+risks?|\n[A-Z]|$)",
-            r"(?:investment\s+)?highlights?[:\s]+(.*?)(?=\n\n|\nkey\s+risks?|\n[A-Z]|$)",
-        ]
-
-        for pattern in insight_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
-            for match in matches:
-                # Extract bullet points or numbered items
-                bullet_items = re.findall(r"[•\-\*]\s*(.+)", match)
-                numbered_items = re.findall(r"\d+\.\s*(.+)", match)
-
-                # Add bullet items
-                for item in bullet_items:
-                    clean_item = item.strip()
-                    if len(clean_item) > 10 and clean_item not in insights:
-                        insights.append(clean_item[:200])  # Limit length
-
-                # Add numbered items
-                for item in numbered_items:
-                    clean_item = item.strip()
-                    if len(clean_item) > 10 and clean_item not in insights:
-                        insights.append(clean_item[:200])  # Limit length
-
-        # Extract risks using various patterns
-        risk_patterns = [
-            r"(?:key\s+)?risks?[:\s]+(.*?)(?=\n\n|\nkey\s+insights?|\n[A-Z]|$)",
-            r"(?:risk\s+)?factors?[:\s]+(.*?)(?=\n\n|\nkey\s+insights?|\n[A-Z]|$)",
-            r"(?:potential\s+)?concerns?[:\s]+(.*?)(?=\n\n|\nkey\s+insights?|\n[A-Z]|$)",
-            r"(?:investment\s+)?risks?[:\s]+(.*?)(?=\n\n|\nkey\s+insights?|\n[A-Z]|$)",
-            r"downside[:\s]+(.*?)(?=\n\n|\nkey\s+insights?|\n[A-Z]|$)",
-        ]
-
-        for pattern in risk_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
-            for match in matches:
-                # Extract bullet points or numbered items
-                bullet_items = re.findall(r"[•\-\*]\s*(.+)", match)
-                numbered_items = re.findall(r"\d+\.\s*(.+)", match)
-
-                # Add bullet items
-                for item in bullet_items:
-                    clean_item = item.strip()
-                    if len(clean_item) > 10 and clean_item not in risks:
-                        risks.append(clean_item[:200])  # Limit length
-
-                # Add numbered items
-                for item in numbered_items:
-                    clean_item = item.strip()
-                    if len(clean_item) > 10 and clean_item not in risks:
-                        risks.append(clean_item[:200])  # Limit length
-
-        # If no structured patterns found, try to extract from general text
-        if not insights and not risks:
-            # Split text into sentences and look for insight/risk indicators
-            sentences = re.split(r"[.!?]+", text)
-
-            for sentence in sentences:
-                sentence = sentence.strip()
-                if len(sentence) < 20:
-                    continue
-
-                # Check for insight indicators
-                insight_indicators = ["strength", "opportunity", "advantage", "positive", "growth", "improve"]
-                if any(indicator in sentence.lower() for indicator in insight_indicators):
-                    if len(insights) < 3:  # Limit to avoid noise
-                        insights.append(sentence[:200])
-
-                # Check for risk indicators
-                risk_indicators = ["risk", "concern", "challenge", "threat", "weakness", "decline", "pressure"]
-                if any(indicator in sentence.lower() for indicator in risk_indicators):
-                    if len(risks) < 3:  # Limit to avoid noise
-                        risks.append(sentence[:200])
-
-        # Limit total items
-        insights = insights[:5]  # Max 5 insights
-        risks = risks[:5]  # Max 5 risks
-
-        return insights, risks
+        return extract_insights_from_text(text_details)
 
     def _extract_comprehensive_risks(
         self, llm_responses: Dict, ai_recommendation: Dict, additional_risks: List[str] = None
     ) -> List[str]:
         """Extract and prioritize comprehensive risk factors"""
-        import re
-
-        risks = []
-
-        # From AI synthesis
-        if isinstance(ai_recommendation, dict):
-            ai_risks = ai_recommendation.get("key_risks", [])
-            if isinstance(ai_risks, list):
-                risks.extend(ai_risks[:3])
-
-        # Add additional risks from text details if available
-        if additional_risks:
-            risks.extend(additional_risks)
-
-        # Extract from fundamental responses
-        for resp in llm_responses.get("fundamental", {}).values():
-            content = resp.get("content", "")
-            if isinstance(content, dict):
-                content = json.dumps(content)
-            elif not isinstance(content, str):
-                content = str(content)
-            risk_section = re.search(r"risk[s]?[:\s]*(.*?)(?=\n\n|\d+\.)", content, re.IGNORECASE | re.DOTALL)
-            if risk_section:
-                risk_items = re.findall(r"[•\-]\s*(.+)", risk_section.group(1))
-                risks.extend(risk_items[:2])
-
-        # Deduplicate and limit
-        unique_risks = []
-        seen = set()
-        for risk in risks:
-            risk_lower = risk.lower().strip()
-            if risk_lower not in seen and len(risk_lower) > 10:
-                seen.add(risk_lower)
-                unique_risks.append(risk)
-
-        return unique_risks[:8] if unique_risks else ["Limited risk data available"]
+        return extract_comprehensive_risks(llm_responses, ai_recommendation, additional_risks)
 
     def _extract_comprehensive_insights(
         self, llm_responses: Dict, ai_recommendation: Dict, additional_insights: List[str] = None
     ) -> List[str]:
         """Extract and prioritize comprehensive insights"""
-        import re
-
-        insights = []
-
-        # Add additional insights from text details if available
-        if additional_insights:
-            insights.extend(additional_insights)
-
-        # From AI synthesis catalysts
-        if isinstance(ai_recommendation, dict):
-            catalysts = ai_recommendation.get("key_catalysts", [])
-            if isinstance(catalysts, list):
-                insights.extend([f"Catalyst: {cat}" for cat in catalysts[:2]])
-
-        # Extract key findings from responses
-        for resp in llm_responses.get("fundamental", {}).values():
-            content = resp.get("content", "")
-            if isinstance(content, dict):
-                content = json.dumps(content)
-            elif not isinstance(content, str):
-                content = str(content)
-            insights_section = re.search(
-                r"key\s+(?:insight|finding)[s]?[:\s]*(.*?)(?=\n\n|\d+\.)", content, re.IGNORECASE | re.DOTALL
-            )
-            if insights_section:
-                insight_items = re.findall(r"[•\-]\s*(.+)", insights_section.group(1))
-                insights.extend(insight_items[:2])
-
-        # Technical insights
-        tech_resp = llm_responses.get("technical")
-        if tech_resp:
-            content = tech_resp.get("content", "")
-            if isinstance(content, dict):
-                content = json.dumps(content)
-            elif not isinstance(content, str):
-                content = str(content)
-            tech_insights = re.findall(
-                r"KEY INSIGHTS[:\s]*\*?\*?(.*?)(?=\*\*[A-Z]|\n\n)", content, re.IGNORECASE | re.DOTALL
-            )
-            if tech_insights:
-                tech_items = re.findall(r"[•\-]\s*(.+)", tech_insights[0])
-                insights.extend([f"Technical: {item}" for item in tech_items[:2]])
-
-        # Deduplicate and limit
-        unique_insights = []
-        seen = set()
-        for insight in insights:
-            insight_lower = insight.lower().strip()
-            if insight_lower not in seen and len(insight_lower) > 10:
-                seen.add(insight_lower)
-                unique_insights.append(insight)
-
-        return unique_insights[:8] if unique_insights else ["Analysis insights pending"]
+        return extract_comprehensive_insights(llm_responses, ai_recommendation, additional_insights)
 
     def _save_synthesis_llm_response(
         self, symbol: str, prompt: str, response: str, processing_time_ms: int, synthesis_mode: str = "comprehensive"
@@ -5666,220 +5394,49 @@ Respond with detailed JSON investment analysis."""
 
     def _extract_reasoning_themes(self, thinking_content: str) -> List[str]:
         """Extract key reasoning themes from thinking content"""
-        if not thinking_content:
-            return []
-
-        themes = []
-        # Look for common reasoning patterns
-        patterns = [
-            r"fundamental[s]?\s+(?:analysis|factors|strengths)",
-            r"technical\s+(?:analysis|indicators|patterns)",
-            r"risk[s]?\s+(?:assessment|factors|considerations)",
-            r"market\s+(?:position|environment|conditions)",
-            r"valuation\s+(?:methods|approaches|metrics)",
-            r"growth\s+(?:prospects|potential|drivers)",
-            r"competitive\s+(?:advantage|position|landscape)",
-        ]
-
-        for pattern in patterns:
-            if re.search(pattern, thinking_content, re.IGNORECASE):
-                # Extract the matched theme
-                match = re.search(pattern, thinking_content, re.IGNORECASE)
-                if match:
-                    themes.append(match.group(0).lower())
-
-        return list(set(themes))  # Remove duplicates
+        return extract_reasoning_themes(thinking_content)
 
     def _extract_decision_process(self, thinking_content: str) -> Dict[str, Any]:
         """Extract decision-making process from thinking content"""
-        if not thinking_content:
-            return {}
-
-        process = {
-            "has_structured_approach": bool(re.search(r"first|then|next|finally", thinking_content, re.IGNORECASE)),
-            "considers_alternatives": bool(
-                re.search(r"but|however|alternatively|on the other hand", thinking_content, re.IGNORECASE)
-            ),
-            "weighs_factors": bool(re.search(r"weight|balance|consider|factor", thinking_content, re.IGNORECASE)),
-            "mentions_uncertainty": bool(
-                re.search(r"uncertain|unclear|maybe|might|could", thinking_content, re.IGNORECASE)
-            ),
-            "shows_confidence": bool(re.search(r"confident|certain|sure|clear", thinking_content, re.IGNORECASE)),
-        }
-
-        return process
+        return extract_decision_process(thinking_content)
 
     def _detect_markdown_content(self, content: str) -> bool:
         """Detect if content contains markdown formatting"""
-        if not content:
-            return False
-
-        markdown_patterns = [r"\*\*.*?\*\*", r"\*.*?\*", r"#+ ", r"- ", r"\d+\. ", r"```"]
-        return any(re.search(pattern, content) for pattern in markdown_patterns)
+        return detect_markdown_content(content)
 
     def _extract_bullet_points(self, content: str) -> List[str]:
         """Extract bullet points from content"""
-        if not content:
-            return []
-
-        # Look for various bullet point patterns
-        patterns = [r"- (.+)", r"• (.+)", r"\* (.+)", r"\d+\. (.+)"]
-        bullets = []
-
-        for pattern in patterns:
-            matches = re.findall(pattern, content, re.MULTILINE)
-            bullets.extend(matches)
-
-        return [bullet.strip() for bullet in bullets if len(bullet.strip()) > 5]
+        return extract_bullet_points(content)
 
     def _extract_numerical_insights(self, content: str) -> List[Dict[str, Any]]:
         """Extract numerical insights from content"""
-        if not content:
-            return []
-
-        numbers = []
-        # Look for percentages, ratios, monetary amounts
-        patterns = [
-            (r"(\d+(?:\.\d+)?%)", "percentage"),
-            (r"\$(\d+(?:,\d{3})*(?:\.\d{2})?)", "monetary"),
-            (r"(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)", "ratio"),
-            (r"(\d+(?:\.\d+)?x)", "multiple"),
-        ]
-
-        for pattern, num_type in patterns:
-            matches = re.findall(pattern, content)
-            for match in matches:
-                if isinstance(match, tuple):
-                    numbers.append({"type": num_type, "value": match, "context": "content_extraction"})
-                else:
-                    numbers.append({"type": num_type, "value": match, "context": "content_extraction"})
-
-        return numbers[:10]  # Limit to first 10 to avoid clutter
+        return extract_numerical_insights(content)
 
     def _analyze_field_completeness(self, ai_recommendation: Dict) -> Dict[str, Any]:
         """Analyze completeness of standard fields in AI recommendation"""
-        standard_fields = [
-            "overall_score",
-            "investment_thesis",
-            "recommendation",
-            "confidence_level",
-            "position_size",
-            "time_horizon",
-            "risk_reward_ratio",
-            "key_catalysts",
-            "downside_risks",
-        ]
-
-        completeness = {
-            "total_standard_fields": len(standard_fields),
-            "present_fields": [],
-            "missing_fields": [],
-            "completeness_ratio": 0.0,
-        }
-
-        for field in standard_fields:
-            if field in ai_recommendation and ai_recommendation[field]:
-                completeness["present_fields"].append(field)
-            else:
-                completeness["missing_fields"].append(field)
-
-        completeness["completeness_ratio"] = len(completeness["present_fields"]) / len(standard_fields)
-
-        return completeness
+        return analyze_field_completeness(ai_recommendation)
 
     def _identify_custom_fields(self, ai_recommendation: Dict) -> List[str]:
         """Identify custom/non-standard fields in the response"""
-        standard_fields = {
-            "overall_score",
-            "investment_thesis",
-            "recommendation",
-            "confidence_level",
-            "position_size",
-            "time_horizon",
-            "risk_reward_ratio",
-            "key_catalysts",
-            "downside_risks",
-            "thinking",
-            "details",
-            "processing_metadata",
-            "_fallback_created",
-            "_parsing_error",
-        }
-
-        custom_fields = []
-        for key in ai_recommendation.keys():
-            if key not in standard_fields:
-                custom_fields.append(key)
-
-        return custom_fields
+        return identify_custom_fields(ai_recommendation)
 
     def _check_fallback_flags(self, ai_recommendation: Dict) -> Dict[str, bool]:
         """Check for various fallback and error flags"""
-        return {
-            "is_fallback": ai_recommendation.get("_fallback_created", False),
-            "has_parsing_error": ai_recommendation.get("_parsing_error", False),
-            "is_emergency_fallback": ai_recommendation.get("_emergency_fallback", False),
-            "has_processing_metadata": bool(ai_recommendation.get("processing_metadata")),
-        }
+        return check_fallback_flags(ai_recommendation)
 
     def _recommend_report_sections(
         self, ai_recommendation: Dict, thinking_content: str, additional_details: str
     ) -> List[str]:
         """Recommend which report sections should be included based on available content"""
-        sections = ["executive_summary", "recommendation"]  # Always include these
-
-        if thinking_content and len(thinking_content) > 200:
-            sections.append("reasoning_analysis")
-
-        if additional_details and len(additional_details) > 100:
-            sections.append("additional_insights")
-
-        if ai_recommendation.get("key_catalysts") and len(ai_recommendation["key_catalysts"]) > 2:
-            sections.append("catalyst_analysis")
-
-        if ai_recommendation.get("downside_risks") and len(ai_recommendation["downside_risks"]) > 2:
-            sections.append("risk_assessment")
-
-        if ai_recommendation.get("processing_metadata"):
-            sections.append("methodology_notes")
-
-        return sections
+        return recommend_report_sections(ai_recommendation, thinking_content, additional_details)
 
     def _extract_priority_insights(self, thinking_content: str, additional_details: str) -> List[str]:
         """Extract the most important insights for highlighting in reports"""
-        insights = []
-
-        if thinking_content:
-            # Look for key insights in thinking
-            key_phrases = re.findall(
-                r"(?:key|important|crucial|critical|significant).{1,100}", thinking_content, re.IGNORECASE
-            )
-            insights.extend([phrase.strip() for phrase in key_phrases[:3]])
-
-        if additional_details:
-            # Look for highlighted items in details
-            highlights = re.findall(r"(?:\*\*|##).{1,100}", additional_details)
-            insights.extend([highlight.strip() for highlight in highlights[:2]])
-
-        return insights
+        return extract_priority_insights(thinking_content, additional_details)
 
     def _suggest_visualizations(self, ai_recommendation: Dict) -> List[str]:
         """Suggest visualizations based on the content of the recommendation"""
-        suggestions = []
-
-        if ai_recommendation.get("overall_score"):
-            suggestions.append("score_gauge_chart")
-
-        if ai_recommendation.get("key_catalysts") and ai_recommendation.get("downside_risks"):
-            suggestions.append("risk_catalyst_matrix")
-
-        if ai_recommendation.get("time_horizon"):
-            suggestions.append("timeline_chart")
-
-        if ai_recommendation.get("processing_metadata", {}).get("tokens"):
-            suggestions.append("processing_metrics_chart")
-
-        return suggestions
+        return suggest_visualizations(ai_recommendation)
 
 
 def main():

@@ -68,6 +68,7 @@ Note on Execution Models:
 - run_compiled_workflow(): Uses UnifiedWorkflowCompiler (LangGraph) for transforms
 """
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
@@ -92,6 +93,8 @@ from victor_invest.workflows.rl_backtest import (
     run_rl_backtest_batch,
 )
 from victor_invest.workflows.state import AnalysisMode, AnalysisWorkflowState
+
+logger = logging.getLogger(__name__)
 
 
 class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
@@ -234,51 +237,20 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
                 synthesis = result.context.get("synthesis")
                 print(f"Recommendation: {synthesis.get('recommendation')}")
         """
-        from victor.core.verticals import VerticalRegistry
-        from victor.framework import Agent
         from victor.workflows.executor import WorkflowExecutor
 
-        from victor_invest.role_provider import register_investment_role_provider
-        from victor_invest.vertical import InvestmentVertical
-
-        # Ensure handlers are registered before workflow execution
-        ensure_handlers_registered()
+        from victor_invest.framework_bootstrap import create_investment_orchestrator
 
         workflow = self.get_workflow(workflow_name)
         if not workflow:
             raise ValueError(f"Unknown workflow: {workflow_name}")
 
-        # Resolve model from config if not specified
-        if model is None and provider == "ollama":
-            try:
-                from investigator.config import get_config
-
-                config = get_config()
-                model = config.ollama.models.get("synthesis", "gpt-oss:20b")
-            except Exception:
-                model = "gpt-oss:20b"
-
-        # Register InvestmentVertical with Victor's registry if not already registered
-        # This enables third-party verticals to work with Agent.create()
-        if not VerticalRegistry.get("investment"):
-            VerticalRegistry.register(InvestmentVertical)
-
-        # Register investment-specific role provider for subagent tool selection
-        # This ensures subagents use investment tools instead of coding tools
-        register_investment_role_provider()
-
-        # Use Victor's public Agent.create() API - the golden path
-        # This properly handles provider setup, vertical integration, and component assembly
-        agent = await Agent.create(
+        orchestrator = await create_investment_orchestrator(
             provider=provider,
             model=model,
-            vertical=InvestmentVertical,
-            temperature=0.3,
-            max_tokens=4096,
+            ensure_handlers=ensure_handlers_registered,
+            warning_callback=logger.warning,
         )
-
-        # Get underlying orchestrator for workflow execution
-        orchestrator = agent.get_orchestrator()
 
         # Create executor with proper orchestrator
         executor = WorkflowExecutor(
@@ -356,6 +328,16 @@ class InvestmentWorkflowProvider(BaseYAMLWorkflowProvider):
         # Create tool registry (handlers may need it)
         tool_registry = ToolRegistry()
 
+        # Register investment tools for compute node tool access
+        try:
+            from victor_invest.tools import register_investment_tools
+
+            stats = register_investment_tools(tool_registry)
+            if stats.get("errors"):
+                logger.warning("Some investment tools failed to register: %s", stats["errors"])
+        except Exception as exc:
+            logger.warning("Investment tool registration failed: %s", exc)
+
         # Create executor with handler support
         executor = WorkflowExecutor(
             orchestrator,
@@ -392,8 +374,10 @@ def ensure_handlers_registered() -> None:
     if _handlers_registered:
         return
     from victor_invest.handlers import register_handlers
+    from victor.framework.handler_registry import sync_handlers_with_executor
 
     register_handlers()
+    sync_handlers_with_executor(direction="to_executor")
     _handlers_registered = True
 
 

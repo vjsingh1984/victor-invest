@@ -35,7 +35,7 @@ Tools in Victor-Invest are designed to work in TWO modes:
        # In workflow node
        sec_tool = SECFilingTool()
        result = await sec_tool.execute(symbol="AAPL")
-       state.sec_data = result.data  # Added to synthesis prompt
+       state.sec_data = result.output  # Added to synthesis prompt
 
 2. LLM TOOL CALLING (On-Demand Pattern)
    - Registered with Victor Agent
@@ -59,15 +59,16 @@ See: docs/ARCHITECTURE_DECISION_DATA_ACCESS.md for full rationale.
 """
 
 import logging
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from abc import abstractmethod
+from typing import Any, Dict, Optional
+
+from victor.tools.base import BaseTool as VictorBaseTool
+from victor.tools.base import ToolResult as VictorToolResult
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class ToolResult:
+class ToolResult(VictorToolResult):
     """Standardized result container for tool execution.
 
     All tools return a ToolResult to provide consistent handling of
@@ -78,7 +79,6 @@ class ToolResult:
         output: The result data if successful (can be any structure).
                Named 'output' for compatibility with Victor framework.
         error: Error message if execution failed
-        warnings: Optional list of non-fatal warnings encountered
         metadata: Optional metadata about the execution (timing, source, etc.)
 
     Example:
@@ -93,57 +93,44 @@ class ToolResult:
         result = ToolResult(
             success=False,
             error="Symbol INVALID not found",
-            warnings=["Attempted cache lookup"]
+            metadata={"reason": "cache_lookup_failed"}
         )
     """
 
-    success: bool
-    output: Optional[Any] = None  # Named 'output' for Victor framework compatibility
-    error: Optional[str] = None
-    warnings: Optional[List[str]] = field(default_factory=list)
-    metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
-
-    def __post_init__(self):
-        """Ensure warnings and metadata are always lists/dicts."""
-        if self.warnings is None:
-            self.warnings = []
-        if self.metadata is None:
-            self.metadata = {}
-
-    @property
-    def data(self) -> Optional[Any]:
-        """Alias for output (backward compatibility)."""
-        return self.output
-
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary for serialization."""
-        return {
-            "success": self.success,
-            "output": self.output,
-            "data": self.output,  # Backward compatibility
-            "error": self.error,
-            "warnings": self.warnings,
-            "metadata": self.metadata,
-        }
+        return self.model_dump()
 
     @classmethod
-    def success_result(
-        cls, data: Dict[str, Any], warnings: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None
+    def create_success(
+        cls,
+        output: Any = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> "ToolResult":
-        """Factory method for successful results."""
+        """Victor-native success factory."""
         return cls(
-            success=True, output=data, warnings=warnings or [], metadata=metadata or {}  # Map data arg to output field
+            success=True,
+            output=output,
+            error=None,
+            metadata=metadata or {},
         )
 
     @classmethod
-    def error_result(
-        cls, error: str, warnings: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None
+    def create_failure(
+        cls,
+        error: str,
+        output: Any = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> "ToolResult":
-        """Factory method for error results."""
-        return cls(success=False, error=error, warnings=warnings or [], metadata=metadata or {})
+        """Victor-native failure factory."""
+        return cls(
+            success=False,
+            output=output,
+            error=error,
+            metadata=metadata or {},
+        )
 
-
-class BaseTool(ABC):
+class BaseTool(VictorBaseTool):
     """Abstract base class for all investment tools.
 
     Tools wrap existing investigator infrastructure to provide a clean,
@@ -167,11 +154,12 @@ class BaseTool(ABC):
             async def execute(self, symbol: str, **kwargs) -> ToolResult:
                 try:
                     # Do work
-                    return ToolResult.success_result({"result": "data"})
+                    return ToolResult.create_success({"result": "data"})
                 except Exception as e:
-                    return ToolResult.error_result(str(e))
+                    return ToolResult.create_failure(str(e))
     """
 
+    # Class-level properties satisfy Victor's abstract name/description contract.
     name: str = ""
     description: str = ""
 
@@ -198,8 +186,13 @@ class BaseTool(ABC):
         if not self._initialized:
             await self.initialize()
 
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        """Victor-compatible parameter schema property."""
+        return self.get_schema()
+
     @abstractmethod
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs) -> ToolResult:
+    async def execute(self, _exec_ctx: Optional[Dict[str, Any]] = None, **kwargs) -> ToolResult:
         """Execute the tool with provided parameters.
 
         Args:
@@ -213,7 +206,7 @@ class BaseTool(ABC):
 
         Note:
             Implementations should never raise exceptions to callers.
-            Instead, catch all exceptions and return ToolResult.error_result().
+            Instead, catch all exceptions and return ToolResult.create_failure().
         """
         raise NotImplementedError("Subclasses must implement execute()")
 

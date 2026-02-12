@@ -35,21 +35,27 @@ InvestiGator unifies SEC fundamentals, technical indicators, and LLM synthesis t
 
 == 📌 Quick Facts
 
-* *Primary entry point:* `./investigator_v2.sh` → `cli_orchestrator.py`
+* *Primary entry point:* `python -m victor_invest.cli` (or `victor-invest` if installed)
 * *Core runtime:* Python 3.11+, async agent framework, Ollama-hosted LLMs
 * *Target platform:* macOS 12+ on Apple Silicon (Metal acceleration enabled)
 * *Data sources:* SEC EDGAR APIs, local market data snapshot (PostgreSQL/Parquet)
 * *Caching:* Multi-layer (File/Parquet/RDBMS) with deterministic prompts
 * *Packaged namespace:* `src/investigator/` provides domain/application/infrastructure/interfaces layers while legacy modules in `agents/`, `core/`, and `utils/` remain during migration
 
+== 📚 Documentation Scope
+
+* *Canonical operating docs:* `docs/DEVELOPER_GUIDE.adoc`, `docs/OPERATIONS_RUNBOOK.md`, `docs/ARCHITECTURE.md`, and this file.
+* *Historical analysis/session docs:* many `docs/*_2025*.md` and phase notes are retained as archives and may include legacy `cli_orchestrator.py` command examples.
+* *Execution rule:* for active workflows, always prefer `python -m victor_invest.cli ...` commands.
+
 == 🧭 Architectural Overview
 
 [source,text]
 ----
-                                 ┌────────────────────┐
-                                 │   CLI Orchestrator │
-                                 │(cli_orchestrator.py│
-                                 └─────────┬──────────┘
+                                 ┌──────────────────────┐
+                                 │     Victor CLI       │
+                                 │ (victor_invest.cli)  │
+                                 └──────────┬───────────┘
                                            │
      ┌───────────────────────────┬─────────┼──────────┬───────────────────────────┐
      │                           │         │          │                           │
@@ -89,8 +95,8 @@ InvestiGator unifies SEC fundamentals, technical indicators, and LLM synthesis t
 | `agents/`
 | Specialized async agents (SEC fundamentals, technical indicators, fundamentals, synthesis, ETF context) based on `InvestmentAgent`.
 
-| `api/` & `cli_orchestrator.py`
-| External interfaces exposing orchestration services to shell scripts, APIs, and tests.
+| `api/` & `victor_invest/cli.py`
+| External interfaces exposing orchestration services to shell scripts, APIs, and tests. `cli_orchestrator.py` remains legacy-compatible.
 
 | `utils/`
 | Shared infrastructure: cache manager, database access, market data fetchers, ticker mapping, prompt optimization, logging helpers.
@@ -99,7 +105,7 @@ InvestiGator unifies SEC fundamentals, technical indicators, and LLM synthesis t
 | Reusable prompt templates, formatting helpers, pattern matchers for LLM outputs.
 
 | `tests/`
-| Mirrored module structure, fixtures in `tests/fixtures/`, integration harnesses via CLI orchestrator.
+| Mirrored module structure, fixtures in `tests/fixtures/`, integration harnesses via Victor CLI workflows.
 |===
 
 == 🗂️ Repository Map
@@ -118,8 +124,8 @@ investigator/
 ├─ archive/             # Git-ignored cold storage (historic logs, metrics, reports)
 ├─ artifacts/           # Optional workspace for generated outputs during dev
 ├─ diagrams/            # Architecture visuals consumed by README
-├─ investigator_v2.sh   # Preferred entrypoint; bootstraps Python orchestrator
-└─ cli_orchestrator.py  # Command routing for agentic pipeline
+├─ investigator_v2.sh   # Utility wrapper for expanded data/indicator operations
+└─ cli_orchestrator.py  # Legacy command router (for backward compatibility)
 ----
 
 == 🔄 Data & Control Flow
@@ -166,7 +172,7 @@ pip install -r requirements-dev.txt
 .Smoke test
 [source,bash]
 ----
-./investigator_v2.sh --test-system
+python3 -m victor_invest.cli test-system
 ----
 
 == 📈 Running Analyses
@@ -174,11 +180,11 @@ pip install -r requirements-dev.txt
 [cols="2,4",options="header"]
 |===
 | Goal | Command
-| Single symbol comprehensive | `./investigator_v2.sh --symbol AAPL`
-| Standard-depth run | `./investigator_v2.sh --symbol MSFT --mode standard`
-| Batch from CLI | `python cli_orchestrator.py batch AAPL MSFT NVDA --mode comprehensive`
-| Peer comparison | `python cli_orchestrator.py compare AAPL MSFT GOOGL --output comparison.json`
-| Regenerate using cached artifacts | `python cli_orchestrator.py rerun-task <TASK_ID>`
+| Single symbol comprehensive | `python -m victor_invest.cli analyze AAPL --mode comprehensive --output results/`
+| Standard-depth run | `python -m victor_invest.cli analyze MSFT --mode standard --output results/`
+| Batch from CLI | `python -m victor_invest.cli batch AAPL MSFT NVDA --mode comprehensive --output-dir results/`
+| Peer comparison | `python -m victor_invest.cli compare AAPL MSFT GOOGL --output results/comparison.json`
+| Generate reports from cached batch results | `python -m victor_invest.cli from-batch batch_results.jsonl --output reports/`
 |=== 
 
 Generated artifacts land in `results/<SYMBOL_TIMESTAMP>.json` alongside cached prompts and charts under `data/`.
@@ -192,6 +198,12 @@ Generated artifacts land in `results/<SYMBOL_TIMESTAMP>.json` alongside cached p
 * *Caching:* Prefer `CacheManager` APIs; specify cache type enums for parity across handlers.
 * *Observability:* Use `structlog`-style context (symbol/task ids) for new log lines.
 
+== 🔄 Migration Notes
+
+* `victor-invest` is the primary CLI for analysis workflows.
+* `cli_orchestrator.py` remains available for legacy commands and forwards to Victor by default.
+* Force legacy behavior with `INVESTIGATOR_LEGACY=1` or `--legacy`.
+
 == 🧪 Testing & Quality
 
 [source,bash]
@@ -199,7 +211,7 @@ Generated artifacts land in `results/<SYMBOL_TIMESTAMP>.json` alongside cached p
 pytest tests/ -v                               # core unit + integration
 pytest tests/ --cov=patterns --cov=utils \
        --cov-report=html                       # coverage + HTML report in htmlcov/
-./investigator_v2.sh --test-system             # orchestrated smoke test
+python3 -m victor_invest.cli test-system       # orchestrated smoke test
 ./investigator_v2.sh --symbol TSLA --mode standard --dry-run  # CLI dry-run validation
 ----
 

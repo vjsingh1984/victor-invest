@@ -54,13 +54,13 @@ python -m investigator.infrastructure.database.installer --postgres postgresql:/
 
 ```bash
 # Quick analysis (technical + market context)
-investigator analyze single AAPL --mode quick
+victor-invest analyze AAPL --mode quick
 
 # Standard analysis (includes SEC fundamentals)
-investigator analyze single MSFT --mode standard
+victor-invest analyze MSFT --mode standard
 
 # Comprehensive analysis (full synthesis with peer comparison)
-investigator analyze single GOOGL --mode comprehensive
+victor-invest analyze GOOGL --mode comprehensive
 ```
 
 ## Architecture
@@ -102,21 +102,32 @@ investigator analyze single GOOGL --mode comprehensive
 
 ```bash
 # Analysis commands
-investigator analyze single <SYMBOL> [--mode quick|standard|comprehensive]
-investigator analyze batch <SYMBOLS...> [--parallel 4]
+victor-invest analyze <SYMBOL> [--mode quick|standard|comprehensive]
+victor-invest batch <SYMBOLS...> [--parallel 4]
+victor-invest compare <TARGET> <PEERS...>
 
 # Data commands
 investigator data fetch <SYMBOL> --source <SOURCE>
 investigator data status
 
 # Cache management
-investigator cache sizes
-investigator cache clear [--symbol SYMBOL]
+victor-invest cache-sizes
+victor-invest clean-cache [--symbol SYMBOL]
 
 # System status
-investigator system status
-investigator system health
+victor-invest status
+victor-invest metrics --days 7
+victor-invest test-system
+
+# Model management
+victor-invest pull <MODEL>
 ```
+
+## Migration Notes
+
+- `victor-invest` is the primary CLI for analysis workflows.
+- `cli_orchestrator.py` remains available for legacy commands and will forward to Victor by default.
+- To force legacy behavior, set `INVESTIGATOR_LEGACY=1` or pass `--legacy` on the legacy CLI.
 
 ## Configuration
 

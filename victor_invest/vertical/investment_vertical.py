@@ -63,9 +63,40 @@ See: docs/ARCHITECTURE_DECISION_DATA_ACCESS.md for full rationale.
 
 from typing import Any, Dict, List, Optional
 
-from victor.core.verticals import StageDefinition, VerticalBase, VerticalConfig
+from victor.core.verticals import VerticalBase
 
-from victor_invest.prompts.investment_prompts import INVESTMENT_SYSTEM_PROMPT
+DEFAULT_INVESTMENT_TOOL_NAMES = [
+    "sec_filing",
+    "valuation",
+    "technical_indicators",
+    "market_data",
+    "cache",
+    "entry_exit_signals",
+]
+
+
+def _ensure_investment_tool_pack_registered(tool_names: List[str]) -> None:
+    """Register the investment tool pack in Victor's registry (if available)."""
+    try:
+        from victor.framework.tool_packs import ToolPack, get_tool_pack_registry
+    except Exception:
+        return
+
+    registry = get_tool_pack_registry()
+    if registry.get("investment") is not None:
+        return
+
+    try:
+        registry.register(
+            ToolPack(
+                name="investment",
+                tools=tool_names,
+                description="Investment analysis tool pack",
+            )
+        )
+    except ValueError:
+        # Already registered by another import path
+        pass
 
 
 class InvestmentVertical(VerticalBase):
@@ -90,117 +121,18 @@ class InvestmentVertical(VerticalBase):
         Returns:
             List of tool names to enable.
         """
-        return [
-            "sec_filing",
-            "valuation",
-            "technical_indicators",
-            "market_data",
-            "cache",
-            "entry_exit_signals",
-        ]
+        try:
+            yaml_tools = super().get_tools()
+        except NotImplementedError:
+            yaml_tools = list(DEFAULT_INVESTMENT_TOOL_NAMES)
 
-    @classmethod
-    def get_system_prompt(cls) -> str:
-        """Get the system prompt for investment analysis.
+        _ensure_investment_tool_pack_registered(yaml_tools)
+        try:
+            from victor.framework.tool_packs import resolve_tool_pack
 
-        Returns:
-            System prompt text with investment domain expertise.
-        """
-        return INVESTMENT_SYSTEM_PROMPT
-
-    @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
-        """Get investment-specific stage definitions.
-
-        Returns:
-            Dictionary mapping stage names to definitions.
-        """
-        return {
-            "INITIAL": StageDefinition(
-                name="INITIAL",
-                description="Understanding the investment research request",
-                keywords=["analyze", "research", "evaluate", "what", "how"],
-                next_stages={"DATA_GATHERING", "PLANNING"},
-            ),
-            "PLANNING": StageDefinition(
-                name="PLANNING",
-                description="Planning the analysis approach",
-                keywords=["plan", "approach", "strategy", "methodology"],
-                next_stages={"DATA_GATHERING"},
-            ),
-            "DATA_GATHERING": StageDefinition(
-                name="DATA_GATHERING",
-                description="Collecting SEC filings and market data",
-                keywords=["sec", "filing", "data", "fetch", "gather"],
-                tools={"sec_filing", "market_data", "cache"},
-                next_stages={"FUNDAMENTAL_ANALYSIS", "TECHNICAL_ANALYSIS"},
-            ),
-            "FUNDAMENTAL_ANALYSIS": StageDefinition(
-                name="FUNDAMENTAL_ANALYSIS",
-                description="Performing valuation and financial analysis",
-                keywords=["valuation", "dcf", "pe", "fundamental", "financial"],
-                tools={"valuation", "cache"},
-                next_stages={"TECHNICAL_ANALYSIS", "SYNTHESIS"},
-            ),
-            "TECHNICAL_ANALYSIS": StageDefinition(
-                name="TECHNICAL_ANALYSIS",
-                description="Analyzing price action, technical indicators, and entry/exit signals",
-                keywords=["technical", "chart", "indicator", "rsi", "macd", "entry", "exit", "signal"],
-                tools={"technical_indicators", "market_data", "entry_exit_signals", "cache"},
-                next_stages={"MARKET_CONTEXT", "SYNTHESIS"},
-            ),
-            "MARKET_CONTEXT": StageDefinition(
-                name="MARKET_CONTEXT",
-                description="Evaluating market conditions and sector dynamics",
-                keywords=["market", "sector", "macro", "context"],
-                tools={"market_data", "cache"},
-                next_stages={"SYNTHESIS"},
-            ),
-            "SYNTHESIS": StageDefinition(
-                name="SYNTHESIS",
-                description="Synthesizing analysis into investment recommendation",
-                keywords=["recommend", "conclusion", "thesis", "summary"],
-                next_stages={"COMPLETION"},
-            ),
-            "COMPLETION": StageDefinition(
-                name="COMPLETION",
-                description="Finalizing investment analysis",
-                keywords=["done", "finished", "complete", "final"],
-                next_stages=set(),
-            ),
-        }
-
-    @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Get hints for provider selection.
-
-        Investment analysis benefits from strong reasoning capabilities.
-
-        Returns:
-            Dictionary with provider preferences.
-        """
-        return {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 100000,
-            "requires_tool_calling": True,
-            "preferred_capabilities": ["reasoning", "structured_output"],
-        }
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Get criteria for evaluating investment analysis quality.
-
-        Returns:
-            List of evaluation criteria descriptions.
-        """
-        return [
-            "Data accuracy and completeness",
-            "Multi-model valuation consistency",
-            "Technical analysis precision",
-            "Market context relevance",
-            "Recommendation clarity and confidence",
-            "Risk factor identification",
-        ]
+            return resolve_tool_pack("investment")
+        except Exception:
+            return yaml_tools
 
     @classmethod
     def get_task_type_hints(cls) -> Dict[str, Any]:
@@ -340,29 +272,14 @@ class InvestmentVertical(VerticalBase):
             workflow = provider.get_workflow("comprehensive")
             result = await executor.execute(workflow, {"symbol": "AAPL"})
         """
-        from victor.framework import Agent
+        from victor_invest.framework_bootstrap import create_investment_orchestrator
+        from victor_invest.workflows import ensure_handlers_registered
 
-        # Get default model from investigator config if not specified
-        if model is None and provider == "ollama":
-            try:
-                from investigator.config import get_config
-
-                config = get_config()
-                model = config.ollama.models.get("synthesis", "gpt-oss:20b")
-            except Exception:
-                model = "gpt-oss:20b"
-
-        # Create Agent with Investment vertical
-        agent = await Agent.create(
+        return await create_investment_orchestrator(
             provider=provider,
             model=model,
-            tools=cls.get_tools(),
-            vertical=cls,
-            temperature=0.3,
+            ensure_handlers=ensure_handlers_registered,
         )
-
-        # Return the underlying orchestrator
-        return agent.get_orchestrator()
 
     @classmethod
     async def run_analysis(

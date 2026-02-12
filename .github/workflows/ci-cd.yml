@@ -114,11 +114,85 @@ jobs:
           name: codecov-py${{ matrix.python-version }}
           fail_ci_if_error: false
 
+  # Victor Framework Compatibility
+  victor-compat:
+    name: Victor Compatibility
+    runs-on: ubuntu-latest
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11']
+        victor-version:
+          - 'victor-ai==0.5.0'
+          - 'victor-ai>=0.5.0,<0.6.0'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies and Victor version
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install --upgrade --force-reinstall "${{ matrix.victor-version }}"
+
+      - name: Show Victor version
+        run: |
+          python - <<'PY'
+          import importlib.metadata as m
+          print("victor-ai:", m.version("victor-ai"))
+          PY
+
+      - name: Run Victor compatibility tests
+        run: |
+          pytest tests/unit/victor_invest/ -v --tb=short
+
+  # Workflow Performance Gate (deterministic, stubbed execution)
+  performance-benchmark:
+    name: Workflow Performance Gate
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run workflow benchmark gate
+        run: |
+          python3 scripts/benchmark_victor_workflows.py \
+            --runner stub \
+            --budget-profile ci_stub \
+            --symbol AAPL \
+            --modes quick standard comprehensive \
+            --fail-on-budget-breach \
+            --output-json artifacts/benchmarks/workflow_benchmark_ci.json
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-benchmark
+          path: artifacts/benchmarks/workflow_benchmark_ci.json
+          retention-days: 14
+
   # Build Package
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [test, security]  # Security scan must pass before building
+    needs: [test, security, victor-compat, performance-benchmark]  # Compatibility + quality gates must pass before building
 
     steps:
       - uses: actions/checkout@v4

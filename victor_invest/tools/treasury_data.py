@@ -120,7 +120,7 @@ and investment recommendations based on current market regime.
             raise
 
     async def execute(
-        self, _exec_ctx: Dict[str, Any], action: str = "curve", days: int = 365, maturity: str = "10y", **kwargs
+        self, _exec_ctx: Optional[Dict[str, Any]] = None, action: str = "curve", days: int = 365, maturity: str = "10y", **kwargs
     ) -> ToolResult:
         """Execute treasury data query.
 
@@ -157,23 +157,22 @@ and investment recommendations based on current market regime.
             elif action == "summary":
                 return await self._get_summary()
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: " "curve, spread, regime, recession, history, summary"
                 )
 
         except Exception as e:
             logger.error(f"TreasuryDataTool execute error: {e}")
-            return ToolResult.error_result(f"Treasury data query failed: {str(e)}", metadata={"action": action})
+            return ToolResult.create_failure(f"Treasury data query failed: {str(e)}", metadata={"action": action})
 
     async def _get_yield_curve(self) -> ToolResult:
         """Get current yield curve."""
         curve = await self._treasury_client.get_yield_curve()
 
         if curve is None:
-            return ToolResult.error_result("Could not retrieve yield curve data")
+            return ToolResult.create_failure("Could not retrieve yield curve data")
 
-        return ToolResult.success_result(
-            data=curve.to_dict(),
+        return ToolResult.create_success(output=curve.to_dict(),
             metadata={
                 "source": "treasury.gov",
                 "curve_shape": curve.curve_shape,
@@ -185,13 +184,12 @@ and investment recommendations based on current market regime.
         curve = await self._treasury_client.get_yield_curve()
 
         if curve is None:
-            return ToolResult.error_result("Could not retrieve yield curve data")
+            return ToolResult.create_failure("Could not retrieve yield curve data")
 
         # Get yield curve analysis for shape
         analysis = await self._yield_analyzer.analyze()
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "date": str(curve.date),
                 "spreads": {
                     "10y_2y_bps": curve.spread_10y_2y,
@@ -214,12 +212,11 @@ and investment recommendations based on current market regime.
         """Get market regime from yield curve analysis."""
         analysis = await self._yield_analyzer.analyze()
 
-        return ToolResult.success_result(
-            data=analysis.to_dict(),
-            warnings=analysis.warnings,
+        return ToolResult.create_success(output=analysis.to_dict(),
             metadata={
                 "source": "yield_curve_analyzer",
                 "curve_shape": analysis.shape.value,
+                "warnings": analysis.warnings,
             },
         )
 
@@ -227,13 +224,12 @@ and investment recommendations based on current market regime.
         """Get recession probability and economic phase."""
         assessment = await self._recession_indicator.assess()
 
-        return ToolResult.success_result(
-            data=assessment.to_dict(),
-            warnings=assessment.warnings,
+        return ToolResult.create_success(output=assessment.to_dict(),
             metadata={
                 "economic_phase": assessment.phase.value,
                 "investment_posture": assessment.investment_posture.value,
                 "confidence": assessment.confidence,
+                "warnings": assessment.warnings,
             },
         )
 
@@ -242,7 +238,7 @@ and investment recommendations based on current market regime.
         history = await self._treasury_client.get_yield_history(days, maturity)
 
         if not history:
-            return ToolResult.error_result(f"Could not retrieve historical data for {maturity}")
+            return ToolResult.create_failure(f"Could not retrieve historical data for {maturity}")
 
         # Calculate summary statistics
         yields = [h.get("yield") for h in history if h.get("yield") is not None]
@@ -254,8 +250,7 @@ and investment recommendations based on current market regime.
         else:
             avg_yield = min_yield = max_yield = current_yield = None
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "maturity": maturity,
                 "period_days": days,
                 "data_points": len(history),
@@ -276,8 +271,7 @@ and investment recommendations based on current market regime.
         """Get comprehensive market regime summary."""
         summary = await self._recession_indicator.get_market_regime_summary()
 
-        return ToolResult.success_result(
-            data=summary,
+        return ToolResult.create_success(output=summary,
             metadata={
                 "source": "market_regime_services",
                 "includes": ["yield_curve", "recession", "sector_recommendations"],

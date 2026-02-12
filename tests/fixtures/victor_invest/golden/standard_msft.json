@@ -1,0 +1,9 @@
+{
+  "symbol": "MSFT",
+  "fundamental_status": "success",
+  "technical_status": "success",
+  "synthesis_status": "success",
+  "recommendation": "HOLD",
+  "confidence": "MEDIUM",
+  "price_target": 415.0
+}

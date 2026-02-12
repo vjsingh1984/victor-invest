@@ -6,7 +6,7 @@
 - **Database:** PostgreSQL for market data; ensure `config.json` holds correct DSN.
 
 ## Routine Commands
-- Health/status: `python3 cli_orchestrator.py status`
+- Health/status: `python3 -m victor_invest.cli status`
 - Cache maintenance: `make cache-inspect SYMBOL=AAPL`, `make cache-clean SYMBOL=AAPL`, wipe all via `make clean-all`
 - Core checks: `make format lint type-check test` or one-shot `make ci`
 - Coverage review: `make test-cov` → open `htmlcov/index.html`

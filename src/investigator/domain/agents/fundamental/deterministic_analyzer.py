@@ -16,8 +16,9 @@ Date: 2025-01-05
 
 import logging
 import statistics
-from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+from .deterministic_payloads import build_deterministic_response
 
 logger = logging.getLogger(__name__)
 
@@ -57,22 +58,7 @@ class DeterministicAnalyzer:
         Returns:
             Dictionary with response, model_info, and metadata
         """
-        return {
-            "response": payload,
-            "prompt": "",
-            "model_info": {
-                "model": f"deterministic-{label}",
-                "temperature": 0.0,
-                "top_p": 0.0,
-                "format": "json",
-            },
-            "metadata": {
-                "generated_at": datetime.now().isoformat(),
-                "agent_id": self.agent_id,
-                "analysis_type": label,
-                "cache_type": "deterministic_analysis",
-            },
-        }
+        return build_deterministic_response(self.agent_id, label, payload)
 
     def _require_financials(self, company_data: Dict) -> Dict:
         """

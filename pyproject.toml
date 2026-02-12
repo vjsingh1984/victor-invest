@@ -43,7 +43,7 @@ classifiers = [
 
 dependencies = [
     # Victor AI Framework (from PyPI)
-    "victor-ai>=0.3.0",
+    "victor-ai>=0.5.0,<0.6.0",
 
     # Core dependencies
     "requests>=2.31.0",

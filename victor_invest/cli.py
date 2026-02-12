@@ -15,6 +15,7 @@ import asyncio
 import json
 import sys
 from datetime import datetime
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -36,7 +37,7 @@ except ImportError:
     OrchestratorProtocol = None
     WorkflowEventType = None
 
-from victor_invest.vertical import InvestmentVertical
+from victor_invest.framework_bootstrap import create_investment_orchestrator
 from victor_invest.workflows import (
     AnalysisMode,
     AnalysisWorkflowState,
@@ -45,6 +46,40 @@ from victor_invest.workflows import (
 )
 
 console = Console()
+
+
+def _get_ollama_base_url() -> str:
+    try:
+        from investigator.config import get_config
+
+        config = get_config()
+        base_url = getattr(config.ollama, "base_url", None)
+        if base_url:
+            return base_url
+    except Exception:
+        pass
+    return os.getenv("OLLAMA_URL") or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434"
+
+
+async def _create_workflow_executor(provider: str, model: Optional[str], timeout: float):
+    from victor.workflows.executor import WorkflowExecutor
+
+    from victor_invest.workflows import ensure_handlers_registered
+
+    orchestrator = await create_investment_orchestrator(
+        provider=provider,
+        model=model,
+        ensure_handlers=ensure_handlers_registered,
+        warning_callback=lambda msg: console.print(f"[yellow]{msg}[/yellow]"),
+    )
+
+    executor = WorkflowExecutor(
+        orchestrator,
+        max_parallel=4,
+        default_timeout=timeout,
+    )
+
+    return executor
 
 
 def _convert_workflow_result_to_state(workflow_result, symbol: str, mode: str) -> AnalysisWorkflowState:
@@ -394,6 +429,246 @@ def analyze(
     asyncio.run(_run_analysis(symbol, mode, output, provider, model, stream, report))
 
 
+@cli.command()
+@click.argument("symbols", nargs=-1, required=True)
+@click.option(
+    "--mode",
+    "-m",
+    type=click.Choice(["quick", "standard", "comprehensive"]),
+    default="standard",
+    help="Analysis mode for each symbol",
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    type=click.Path(),
+    default="results",
+    help="Output directory for results",
+)
+@click.option(
+    "--provider",
+    "-p",
+    type=str,
+    default="ollama",
+    help="LLM provider (ollama, anthropic, openai)",
+)
+@click.option(
+    "--model",
+    type=str,
+    default=None,
+    help="Model name (default: provider-specific)",
+)
+@click.option(
+    "--parallel",
+    type=int,
+    default=2,
+    help="Max concurrent analyses",
+)
+def batch(
+    symbols: tuple[str, ...],
+    mode: str,
+    output_dir: str,
+    provider: str,
+    model: Optional[str],
+    parallel: int,
+):
+    """Run batch investment analysis across multiple symbols."""
+    validate_victor_installed()
+    asyncio.run(_run_batch(symbols, mode, output_dir, provider, model, parallel))
+
+
+async def _run_batch(
+    symbols: tuple[str, ...],
+    mode: str,
+    output_dir: str,
+    provider: str,
+    model: Optional[str],
+    parallel: int,
+):
+    workflow_provider = InvestmentWorkflowProvider()
+    workflow_name = workflow_provider.get_workflow_for_task_type(mode) or mode
+    workflow = workflow_provider.get_workflow(workflow_name)
+    if not workflow:
+        console.print(f"[red]Unknown workflow: {workflow_name}[/red]")
+        return
+
+    executor = await _create_workflow_executor(provider, model, timeout=300.0)
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    results = {}
+    failures = {}
+
+    semaphore = asyncio.Semaphore(max(1, parallel))
+
+    async def run_one(symbol: str):
+        async with semaphore:
+            try:
+                result = await executor.execute(
+                    workflow,
+                    initial_context={"symbol": symbol},
+                    timeout=300.0,
+                )
+                return symbol, result
+            except Exception as exc:
+                return symbol, exc
+
+    tasks = [asyncio.create_task(run_one(sym.upper())) for sym in symbols]
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Running batch analysis...", total=len(tasks))
+
+        for finished in asyncio.as_completed(tasks):
+            symbol, outcome = await finished
+            if isinstance(outcome, Exception):
+                failures[symbol] = str(outcome)
+                progress.advance(task)
+                continue
+
+            if not outcome.success:
+                failures[symbol] = outcome.error or "Workflow failed"
+                progress.advance(task)
+                continue
+
+            state = _convert_workflow_result_to_state(outcome, symbol, mode)
+            results[symbol] = state
+
+            result_file = output_path / f"{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            with open(result_file, "w") as f:
+                json.dump(
+                    {
+                        "symbol": state.symbol,
+                        "mode": state.mode.value,
+                        "fundamental_analysis": state.fundamental_analysis,
+                        "technical_analysis": state.technical_analysis,
+                        "market_context": state.market_context,
+                        "synthesis": state.synthesis,
+                        "recommendation": state.recommendation,
+                        "errors": state.errors,
+                    },
+                    f,
+                    indent=2,
+                    default=str,
+                )
+
+            progress.advance(task)
+
+    summary_file = output_path / f"batch_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    with open(summary_file, "w") as f:
+        json.dump(
+            {
+                "symbols": [s.upper() for s in symbols],
+                "mode": mode,
+                "completed": len(results),
+                "failed": len(failures),
+                "failures": failures,
+                "timestamp": datetime.now().isoformat(),
+            },
+            f,
+            indent=2,
+        )
+
+    console.print(f"\n[green]Completed {len(results)}/{len(symbols)} analyses[/green]")
+    console.print(f"[green]Summary saved to: {summary_file}[/green]")
+
+
+@cli.command()
+@click.argument("target")
+@click.argument("peers", nargs=-1, required=True)
+@click.option("--output", "-o", type=click.Path(), default=None, help="Output file or directory")
+@click.option(
+    "--provider",
+    "-p",
+    type=str,
+    default="ollama",
+    help="LLM provider (ollama, anthropic, openai)",
+)
+@click.option(
+    "--model",
+    type=str,
+    default=None,
+    help="Model name (default: provider-specific)",
+)
+def compare(
+    target: str,
+    peers: tuple[str, ...],
+    output: Optional[str],
+    provider: str,
+    model: Optional[str],
+):
+    """Compare a target company against peers."""
+    validate_victor_installed()
+    asyncio.run(_run_compare(target, peers, output, provider, model))
+
+
+async def _run_compare(
+    target: str,
+    peers: tuple[str, ...],
+    output: Optional[str],
+    provider: str,
+    model: Optional[str],
+):
+    workflow_provider = InvestmentWorkflowProvider()
+    workflow = workflow_provider.get_workflow("peer_comparison")
+    if not workflow:
+        console.print("[red]Peer comparison workflow not found.[/red]")
+        return
+
+    executor = await _create_workflow_executor(provider, model, timeout=300.0)
+
+    peer_list = [{"symbol": peer.upper()} for peer in peers]
+    context = {
+        "symbol": target.upper(),
+        "analysis_mode": "comprehensive",
+        "has_peers": True,
+        "peer_data": {"peers": peer_list, "peer_metrics": {}},
+    }
+
+    result = await executor.execute(
+        workflow,
+        initial_context=context,
+        timeout=300.0,
+    )
+
+    if not result.success:
+        console.print(f"[red]Workflow failed:[/red] {result.error}")
+        return
+
+    peer_comparison = result.context.get("peer_comparison") if hasattr(result, "context") else {}
+    console.print("\n[bold]Peer Comparison Result[/bold]")
+    if peer_comparison:
+        console.print(json.dumps(peer_comparison, indent=2))
+    else:
+        console.print("[yellow]No peer comparison output found in context.[/yellow]")
+
+    if output:
+        output_path = Path(output)
+        if output_path.suffix:
+            file_path = output_path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            output_path.mkdir(parents=True, exist_ok=True)
+            file_path = output_path / f"{target.upper()}_peer_comparison.json"
+
+        with open(file_path, "w") as f:
+            json.dump(
+                {
+                    "target": target.upper(),
+                    "peers": [p.upper() for p in peers],
+                    "peer_comparison": peer_comparison,
+                    "context": result.context if hasattr(result, "context") else {},
+                },
+                f,
+                indent=2,
+                default=str,
+            )
+        console.print(f"[green]Comparison saved to: {file_path}[/green]")
+
+
 async def _run_analysis(
     symbol: str,
     mode: str,
@@ -589,6 +864,171 @@ def status():
         table.add_row("pandas", "✗ Missing", "pip install pandas")
 
     console.print(table)
+
+
+@cli.command()
+@click.option("--days", "-d", default=7, help="Days of history to show")
+def metrics(days: int):
+    """View system metrics and performance."""
+    import glob
+    from datetime import timedelta
+
+    cutoff_date = datetime.now() - timedelta(days=days)
+    metrics_files = glob.glob("metrics/metrics_*.json")
+
+    all_metrics = []
+    for filepath in sorted(metrics_files):
+        try:
+            with open(filepath, "r") as f:
+                data = json.load(f)
+                timestamp = datetime.fromisoformat(data["timestamp"])
+                if timestamp >= cutoff_date:
+                    all_metrics.append(data)
+        except Exception:
+            continue
+
+    if not all_metrics:
+        console.print("[yellow]No metrics data available.[/yellow]")
+        return
+
+    console.print(f"\n[bold]Metrics Summary (Last {days} days)[/bold]")
+    console.print("=" * 50)
+
+    latest = all_metrics[-1]
+
+    sys_metrics = latest.get("system_metrics", {})
+    if sys_metrics:
+        console.print("\n[bold]System Metrics[/bold]")
+        total = sys_metrics.get("total_analyses", 0)
+        success = sys_metrics.get("successful_analyses", 0)
+        cache_hits = sys_metrics.get("cache_hits", 0)
+        cache_misses = sys_metrics.get("cache_misses", 0)
+        success_rate = (success / max(total, 1)) * 100
+        cache_hit_rate = (cache_hits / max(cache_hits + cache_misses, 1)) * 100
+        console.print(f"  Total Analyses: {total}")
+        console.print(f"  Success Rate: {success_rate:.1f}%")
+        console.print(f"  Cache Hit Rate: {cache_hit_rate:.1f}%")
+
+    agent_metrics = latest.get("agent_metrics", {})
+    if agent_metrics:
+        console.print("\n[bold]Agent Performance[/bold]")
+        for agent, metrics in agent_metrics.items():
+            executions = metrics.get("executions", 0)
+            failures = metrics.get("failures", 0)
+            avg_duration = metrics.get("average_duration", 0)
+            success_rate = ((executions - failures) / max(executions, 1)) * 100
+            console.print(f"  {agent}:")
+            console.print(f"    Executions: {executions}")
+            console.print(f"    Avg Duration: {avg_duration:.2f}s")
+            console.print(f"    Success Rate: {success_rate:.1f}%")
+
+
+@cli.command("test-system")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose output")
+def test_system(verbose: bool):
+    """Run system health tests."""
+    console.print("Running system health tests...")
+    console.print("=" * 60)
+
+    def run_test(name, func):
+        try:
+            ok, detail = func()
+            return name, ok, detail
+        except Exception as exc:
+            return name, False, str(exc)
+
+    def check_python():
+        ok = sys.version_info >= (3, 11)
+        return ok, sys.version.split()[0]
+
+    def check_ollama():
+        import urllib.request
+
+        base_url = _get_ollama_base_url()
+        try:
+            with urllib.request.urlopen(f"{base_url}/api/tags", timeout=5) as resp:
+                return resp.status == 200, f"HTTP {resp.status}"
+        except Exception as exc:
+            return False, str(exc)
+
+    def check_database():
+        try:
+            from sqlalchemy import text
+            from investigator.infrastructure.database.db import get_database_engine
+
+            engine = get_database_engine()
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return True, "OK"
+        except Exception as exc:
+            return False, str(exc)
+
+    def check_cache():
+        try:
+            from investigator.infrastructure.cache import get_cache_manager
+
+            get_cache_manager()
+            return True, "OK"
+        except Exception as exc:
+            return False, str(exc)
+
+    tests = [
+        ("Python version", check_python),
+        ("Ollama connection", check_ollama),
+        ("Database connection", check_database),
+        ("Cache system", check_cache),
+    ]
+
+    results = [run_test(name, func) for name, func in tests]
+
+    console.print("\nTest Results:")
+    console.print("-" * 60)
+    passed = 0
+    for name, ok, detail in results:
+        status = "✅ PASS" if ok else "❌ FAIL"
+        console.print(f"{name:30s}: {status}")
+        if verbose and detail:
+            console.print(f"  {detail}")
+        if ok:
+            passed += 1
+
+    console.print(f"\nPassed: {passed}/{len(results)}")
+    if passed < len(results):
+        raise SystemExit(1)
+
+
+@cli.command()
+@click.argument("model")
+def pull(model: str):
+    """Pull an Ollama model."""
+    try:
+        from investigator.infrastructure.llm import OllamaClient
+    except ImportError as exc:
+        console.print(f"[red]Error:[/red] Ollama client unavailable: {exc}")
+        raise SystemExit(1)
+
+    base_url = _get_ollama_base_url()
+
+    async def pull_model():
+        ollama_client = OllamaClient(base_url)
+
+        async with ollama_client:
+            console.print(f"Pulling model: [cyan]{model}[/cyan]")
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Downloading...", total=None)
+                async for status in ollama_client.pull_model(model, stream=True):
+                    if status.get("status") == "success":
+                        break
+                progress.update(task, description="Download complete")
+
+            console.print(f"[green]Model {model} pulled successfully[/green]")
+
+    asyncio.run(pull_model())
 
 
 @cli.command()

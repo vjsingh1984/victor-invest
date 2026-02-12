@@ -1,0 +1,9 @@
+{
+  "symbol": "AAPL",
+  "fundamental_status": "success",
+  "technical_status": "success",
+  "synthesis_status": "success",
+  "recommendation": "BUY",
+  "confidence": "HIGH",
+  "price_target": 220.0
+}

@@ -2,6 +2,11 @@
 
 This document provides a comprehensive reference for all data-related CLI commands in Victor-Invest.
 
+**Note:** The primary CLI for analysis and orchestration is now `victor-invest`.
+The `./investigator_v2.sh` script remains the fastest way to run the expanded
+data/indicator utilities documented below. Use Victor CLI for analysis flows:
+`victor-invest analyze`, `victor-invest batch`, `victor-invest compare`.
+
 ## Table of Contents
 
 1. [Quick Reference](#quick-reference)

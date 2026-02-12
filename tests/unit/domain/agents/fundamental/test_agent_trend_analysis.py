@@ -48,6 +48,7 @@ def mock_agent():
     mock = MagicMock(spec=FundamentalAnalysisAgent)
 
     # Bind the real methods
+    mock._get_trend_analyzer = FundamentalAnalysisAgent._get_trend_analyzer.__get__(mock)
     mock._analyze_revenue_trend = FundamentalAnalysisAgent._analyze_revenue_trend.__get__(mock)
     mock._analyze_margin_trend = FundamentalAnalysisAgent._analyze_margin_trend.__get__(mock)
     mock._analyze_cash_flow_trend = FundamentalAnalysisAgent._analyze_cash_flow_trend.__get__(mock)

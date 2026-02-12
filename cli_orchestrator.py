@@ -27,6 +27,7 @@ import click
 import logging
 import sys
 import os
+import subprocess
 from typing import List, Optional
 from datetime import datetime
 import json
@@ -106,6 +107,31 @@ def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
     # Canonical mapper debug tracing can be toggled independently
     if profile == "debug" or numeric_level <= logging.DEBUG or os.getenv("INVESTIGATOR_DEBUG_CANONICAL") == "1":
         logging.getLogger("utils.canonical_key_mapper").setLevel(logging.DEBUG)
+
+
+def _victor_cli_available() -> bool:
+    try:
+        import importlib
+
+        importlib.import_module("victor_invest.cli")
+        return True
+    except Exception:
+        return False
+
+
+def _should_forward_to_victor(ctx) -> bool:
+    legacy_env = os.getenv("INVESTIGATOR_LEGACY", "").strip().lower()
+    if legacy_env in {"1", "true", "yes"}:
+        return False
+    if ctx.obj.get("legacy", False):
+        return False
+    return _victor_cli_available()
+
+
+def _forward_to_victor_cli(args: list[str]) -> None:
+    command = [sys.executable, "-m", "victor_invest.cli"] + args
+    result = subprocess.run(command)
+    raise SystemExit(result.returncode)
 
 
 # Load configuration
@@ -233,8 +259,9 @@ def generate_executive_summary(full_analysis: dict) -> dict:
 @click.option("--log-level", "-l", default="INFO", help="Log level")
 @click.option("--log-file", "-f", help="Log file path")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging (equivalent to --log-level DEBUG)")
+@click.option("--legacy", is_flag=True, help="Use legacy orchestrator instead of Victor workflows")
 @click.pass_context
-def cli(ctx, config, log_level, log_file, verbose):
+def cli(ctx, config, log_level, log_file, verbose, legacy):
     """InvestiGator - Agentic AI Investment Analysis System"""
     effective_level = "DEBUG" if verbose else log_level
     setup_logging(effective_level, log_file)
@@ -242,6 +269,7 @@ def cli(ctx, config, log_level, log_file, verbose):
     # FIX Issue #2: Store config path in context so commands can pass it to get_config()
     ctx.obj["config_path"] = config
     ctx.obj["config"] = load_config(config)
+    ctx.obj["legacy"] = legacy
 
 
 @cli.command()
@@ -275,6 +303,25 @@ def analyze(ctx, symbol, mode, output, format, detail_level, report, force_refre
     """Analyze a single stock symbol"""
     config = ctx.obj["config"]
     force_refresh = force_refresh or refresh_alias
+
+    if _should_forward_to_victor(ctx):
+        output_path = Path(output) if output else None
+        can_forward = True
+
+        if force_refresh or detail_level != "standard" or format != "json":
+            can_forward = False
+        elif output_path and output_path.suffix:
+            can_forward = False
+
+        if can_forward:
+            args = ["analyze", symbol, "--mode", mode]
+            if output:
+                args += ["--output", output]
+            if report:
+                args.append("--report")
+            click.echo("Routing to Victor workflows. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+            _forward_to_victor_cli(args)
+            return
 
     async def run_analysis():
         # Initialize components
@@ -518,6 +565,14 @@ def batch(ctx, symbols, mode, output_dir, detail_level, force_refresh, refresh_a
     config = ctx.obj["config"]
     force_refresh = force_refresh or refresh_alias
 
+    if _should_forward_to_victor(ctx):
+        can_forward = not force_refresh and detail_level == "standard"
+        if can_forward:
+            args = ["batch"] + list(symbols) + ["--mode", mode, "--output-dir", output_dir]
+            click.echo("Routing to Victor batch workflows. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+            _forward_to_victor_cli(args)
+            return
+
     async def run_batch():
         # Initialize components
         from investigator.config import get_config
@@ -603,6 +658,14 @@ def compare(ctx, target, peers, output):
     """Compare target symbol with peer companies"""
     config = ctx.obj["config"]
 
+    if _should_forward_to_victor(ctx):
+        args = ["compare", target] + list(peers)
+        if output:
+            args += ["--output", output]
+        click.echo("Routing to Victor peer comparison. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(args)
+        return
+
     async def run_comparison():
         # Initialize components
         from investigator.infrastructure.cache import get_cache_manager
@@ -657,6 +720,14 @@ def serve(ctx, host, port, workers, reload):
     """Start the REST API server"""
     config = ctx.obj["config"]
 
+    if _should_forward_to_victor(ctx):
+        if workers != 4 or reload:
+            click.echo("Victor serve does not support --workers/--reload; ignoring those flags.")
+        args = ["serve", "--host", host, "--port", str(port)]
+        click.echo("Routing to Victor API server. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(args)
+        return
+
     # Update config with CLI options
     config["api"]["host"] = host
     config["api"]["port"] = port
@@ -684,6 +755,11 @@ def serve(ctx, host, port, workers, reload):
 def status(ctx):
     """Check system status and health"""
     config = ctx.obj["config"]
+
+    if _should_forward_to_victor(ctx):
+        click.echo("Routing to Victor status. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(["status"])
+        return
 
     async def check_status():
         # Initialize components
@@ -743,6 +819,12 @@ def status(ctx):
 def metrics(ctx, days):
     """View system metrics and performance"""
     config = ctx.obj["config"]
+
+    if _should_forward_to_victor(ctx):
+        args = ["metrics", "--days", str(days)]
+        click.echo("Routing to Victor metrics. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(args)
+        return
 
     async def show_metrics():
         # Initialize metrics collector
@@ -806,6 +888,10 @@ def metrics(ctx, days):
 def pull(ctx, model):
     """Pull an Ollama model"""
     config = ctx.obj["config"]
+    if _should_forward_to_victor(ctx):
+        click.echo("Routing to Victor model pull. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(["pull", model])
+        return
 
     async def pull_model():
         ollama_client = OllamaClient(config["ollama"]["base_url"])
@@ -997,6 +1083,20 @@ def format_peer_comparison(results: dict) -> str:
 @click.pass_context
 def clean_cache(ctx, clean_all, clean_db, clean_disk, symbol):
     """Clean analysis caches"""
+    if _should_forward_to_victor(ctx):
+        args = ["clean-cache"]
+        if clean_all:
+            args.append("--all")
+        if clean_db:
+            args.append("--db")
+        if clean_disk:
+            args.append("--disk")
+        if symbol:
+            args += ["--symbol", symbol]
+        click.echo("Routing to Victor cache management. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(args)
+        return
+
     from investigator.infrastructure.cache import get_cache_manager
     from investigator.infrastructure.cache.cache_types import CacheType
     from investigator.infrastructure.cache.rdbms_cache_handler import RdbmsCacheStorageHandler
@@ -1071,6 +1171,16 @@ def clean_cache(ctx, clean_all, clean_db, clean_disk, symbol):
 @click.pass_context
 def inspect_cache(ctx, symbol, verbose):
     """Inspect cache contents and statistics"""
+    if _should_forward_to_victor(ctx):
+        args = ["inspect-cache"]
+        if symbol:
+            args += ["--symbol", symbol]
+        if verbose:
+            args.append("--verbose")
+        click.echo("Routing to Victor cache inspection. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(args)
+        return
+
     from investigator.infrastructure.cache import get_cache_manager
     from investigator.infrastructure.cache.cache_types import CacheType
 
@@ -1108,6 +1218,11 @@ def inspect_cache(ctx, symbol, verbose):
 @click.pass_context
 def cache_sizes(ctx):
     """Show cache sizes by type"""
+    if _should_forward_to_victor(ctx):
+        click.echo("Routing to Victor cache sizes. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(["cache-sizes"])
+        return
+
     from pathlib import Path
     import os
 
@@ -1146,6 +1261,13 @@ def cache_sizes(ctx):
 def test_system(ctx, verbose):
     """Run system health tests"""
     import subprocess
+    if _should_forward_to_victor(ctx):
+        args = ["test-system"]
+        if verbose:
+            args.append("--verbose")
+        click.echo("Routing to Victor system tests. Set INVESTIGATOR_LEGACY=1 to use legacy orchestrator.")
+        _forward_to_victor_cli(args)
+        return
 
     click.echo("Running system health tests...")
     click.echo("=" * 60)

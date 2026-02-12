@@ -221,7 +221,7 @@ async def fetch_historical_data(state_input) -> dict:
             if result.success:
                 historical_data[months_back] = {
                     "analysis_date": analysis_date.isoformat(),
-                    "data": result.data,
+                    "data": result.output,
                 }
             else:
                 historical_data[months_back] = {
@@ -277,7 +277,7 @@ async def run_historical_valuation(state_input) -> dict:
                     valuation_results[months_back] = {
                         "analysis_date": hist_data["analysis_date"],
                         "price": price,
-                        "valuation": result.data,
+                        "valuation": result.output,
                     }
                 else:
                     valuation_results[months_back] = {
@@ -339,7 +339,7 @@ async def calculate_rewards(state_input) -> dict:
                     reward_data[months_back] = {
                         "analysis_date": val_result["analysis_date"],
                         "price": price,
-                        "multi_period": result.data.get("multi_period", {}),
+                        "multi_period": result.output.get("multi_period", {}),
                     }
                 else:
                     reward_data[months_back] = {
@@ -429,7 +429,7 @@ async def record_predictions(state_input) -> dict:
                         "analysis_date": reward_info["analysis_date"],
                         "price": price,
                         "fair_value": blended_fair_value,
-                        "record_ids": result.data.get("record_ids", []),
+                        "record_ids": result.output.get("record_ids", []),
                         "status": "recorded",
                     }
                 )

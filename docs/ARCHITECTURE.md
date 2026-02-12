@@ -6,11 +6,12 @@
 > **🎯 Clean Architecture Migration**: As of November 2025, InvestiGator has migrated to Clean Architecture (Hexagonal Architecture) with clear separation between domain, infrastructure, application, and interface layers.
 >
 > **New Structure**: `src/investigator/{domain,infrastructure,application,interfaces,config}/`
-> **Main CLI**: `cli_orchestrator.py` (root level)
+> **Main CLI**: `python -m victor_invest.cli` (or `victor-invest` if installed)
 > **Entry Points**:
->   - `investigator` command (via pyproject.toml)
+>   - `victor-invest` command (via pyproject.toml)
+>   - `python -m victor_invest.cli`
 >   - `python -m investigator` (via `__main__.py`)
->   - `./cli_orchestrator.py` (direct execution)
+>   - `./cli_orchestrator.py` (legacy compatibility mode)
 > **Tests**: `tests/unit/{domain,infrastructure,application,config}/`
 
 ## Executive Summary
@@ -786,7 +787,7 @@ Return result
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ User initiates analysis                                           │
-│ python cli_orchestrator.py analyze AAPL -m standard              │
+│ python -m victor_invest.cli analyze AAPL --mode standard         │
 └────────────────────┬─────────────────────────────────────────────┘
                      │
                      ▼

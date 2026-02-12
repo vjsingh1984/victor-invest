@@ -51,6 +51,28 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
     logging.warning("reportlab not available - PDF report generation will be disabled")
 
+    # Keep module importable in environments without reportlab.
+    # Report generation paths already gate on REPORTLAB_AVAILABLE.
+    inch = 72.0
+    letter = (612.0, 792.0)
+    A4 = (595.0, 842.0)
+
+    class _CanvasFallback:
+        class Canvas:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def showPage(self):
+                pass
+
+            def save(self):
+                pass
+
+    canvas = _CanvasFallback()
+
+    class Flowable:  # type: ignore[too-many-ancestors]
+        pass
+
 logger = logging.getLogger(__name__)
 
 

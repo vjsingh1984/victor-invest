@@ -126,7 +126,7 @@ Investment Signals:
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Optional[Dict[str, Any]] = None,
         action: str = "current",
         symbol: Optional[str] = None,
         periods: int = 12,
@@ -159,35 +159,35 @@ Investment Signals:
 
             if action == "current":
                 if not symbol:
-                    return ToolResult.error_result("Symbol required for current action")
+                    return ToolResult.create_failure("Symbol required for current action")
                 return await self._get_current(symbol)
 
             elif action == "history":
                 if not symbol:
-                    return ToolResult.error_result("Symbol required for history action")
+                    return ToolResult.create_failure("Symbol required for history action")
                 return await self._get_history(symbol, periods)
 
             elif action == "volume":
                 if not symbol:
-                    return ToolResult.error_result("Symbol required for volume action")
+                    return ToolResult.create_failure("Symbol required for volume action")
                 return await self._get_volume(symbol, days)
 
             elif action == "squeeze":
                 if not symbol:
-                    return ToolResult.error_result("Symbol required for squeeze action")
+                    return ToolResult.create_failure("Symbol required for squeeze action")
                 return await self._get_squeeze_risk(symbol)
 
             elif action == "most_shorted":
                 return await self._get_most_shorted(limit)
 
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: " "current, history, volume, squeeze, most_shorted"
                 )
 
         except Exception as e:
             logger.error(f"ShortInterestTool execute error: {e}")
-            return ToolResult.error_result(
+            return ToolResult.create_failure(
                 f"Short interest query failed: {str(e)}", metadata={"action": action, "symbol": symbol}
             )
 
@@ -220,19 +220,17 @@ Investment Signals:
             source = "finra"
 
         if not data:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol.upper(),
                     "message": "No short interest data found",
                 },
-                warnings=["No FINRA short interest data available for this symbol"],
+                metadata={"warnings": ["No FINRA short interest data available for this symbol"]},
             )
 
         # Calculate signal
         signal = self._calculate_signal(data)
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 **data.to_dict(),
                 "signal": signal,
             },
@@ -247,20 +245,18 @@ Investment Signals:
         history = await self._fetcher.get_short_interest_history(symbol, periods)
 
         if not history:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol.upper(),
                     "history": [],
                     "message": "No historical short interest data found",
                 },
-                warnings=["Insufficient historical data for this symbol"],
+                metadata={"warnings": ["Insufficient historical data for this symbol"]},
             )
 
         # Calculate trend
         trend = self._analyze_trend(history)
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol.upper(),
                 "periods": len(history),
                 "history": [h.to_dict() for h in history],
@@ -277,20 +273,18 @@ Investment Signals:
         volume = await self._fetcher.get_short_volume(symbol, days)
 
         if not volume:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol.upper(),
                     "volume": [],
                     "message": "No short volume data found",
                 },
-                warnings=["No daily short volume data available for this symbol"],
+                metadata={"warnings": ["No daily short volume data available for this symbol"]},
             )
 
         # Calculate average short volume ratio
         avg_short_pct = sum(v.short_percent for v in volume) / len(volume) if volume else 0
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol.upper(),
                 "days": len(volume),
                 "avg_short_percent": round(avg_short_pct, 2),
@@ -306,8 +300,7 @@ Investment Signals:
         """Calculate short squeeze risk assessment."""
         risk = await self._fetcher.calculate_squeeze_risk(symbol)
 
-        return ToolResult.success_result(
-            data=risk.to_dict(),
+        return ToolResult.create_success(output=risk.to_dict(),
             metadata={
                 "source": "finra",
                 "risk_level": risk.risk_level,
@@ -319,15 +312,13 @@ Investment Signals:
         stocks = await self._fetcher.get_most_shorted(limit)
 
         if not stocks:
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "stocks": [],
                     "message": "No most shorted data available",
                 }
             )
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "count": len(stocks),
                 "stocks": stocks,
             },

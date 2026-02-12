@@ -1,0 +1,74 @@
+metadata:
+  name: investment
+  description: Institutional-grade investment research and equity analysis
+  version: "1.0.0"
+  tags:
+    - investment
+    - equity_research
+    - valuation
+
+core:
+  tools:
+    list:
+      - sec_filing
+      - valuation
+      - technical_indicators
+      - market_data
+      - cache
+      - entry_exit_signals
+  system_prompt:
+    source: file
+    file_path: investment_system_prompt.txt
+  stages:
+    INITIAL:
+      description: Understanding the investment research request
+      keywords: [analyze, research, evaluate, what, how]
+      next_stages: [DATA_GATHERING, PLANNING]
+    PLANNING:
+      description: Planning the analysis approach
+      keywords: [plan, approach, strategy, methodology]
+      next_stages: [DATA_GATHERING]
+    DATA_GATHERING:
+      description: Collecting SEC filings and market data
+      tools: [sec_filing, market_data, cache]
+      keywords: [sec, filing, data, fetch, gather]
+      next_stages: [FUNDAMENTAL_ANALYSIS, TECHNICAL_ANALYSIS]
+    FUNDAMENTAL_ANALYSIS:
+      description: Performing valuation and financial analysis
+      tools: [valuation, cache]
+      keywords: [valuation, dcf, pe, fundamental, financial]
+      next_stages: [TECHNICAL_ANALYSIS, SYNTHESIS]
+    TECHNICAL_ANALYSIS:
+      description: Analyzing price action, technical indicators, and entry/exit signals
+      tools: [technical_indicators, market_data, entry_exit_signals, cache]
+      keywords: [technical, chart, indicator, rsi, macd, entry, exit, signal]
+      next_stages: [MARKET_CONTEXT, SYNTHESIS]
+    MARKET_CONTEXT:
+      description: Evaluating market conditions and sector dynamics
+      tools: [market_data, cache]
+      keywords: [market, sector, macro, context]
+      next_stages: [SYNTHESIS]
+    SYNTHESIS:
+      description: Synthesizing analysis into investment recommendation
+      keywords: [recommend, conclusion, thesis, summary]
+      next_stages: [COMPLETION]
+    COMPLETION:
+      description: Finalizing investment analysis
+      keywords: [done, finished, complete, final]
+      next_stages: []
+
+provider:
+  hints:
+    preferred_providers: [anthropic, openai]
+    min_context_window: 100000
+    requires_tool_calling: true
+    preferred_capabilities: [reasoning, structured_output]
+
+evaluation:
+  criteria:
+    - Data accuracy and completeness
+    - Multi-model valuation consistency
+    - Technical analysis precision
+    - Market context relevance
+    - Recommendation clarity and confidence
+    - Risk factor identification

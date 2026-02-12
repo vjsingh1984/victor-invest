@@ -116,7 +116,7 @@ values, and cluster detection flags.
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Optional[Dict[str, Any]] = None,
         symbol: str = "",
         action: str = "sentiment",
         days: int = 90,
@@ -145,7 +145,7 @@ values, and cluster detection flags.
 
             symbol = symbol.upper().strip()
             if not symbol:
-                return ToolResult.error_result("Symbol is required")
+                return ToolResult.create_failure("Symbol is required")
 
             action = action.lower().strip()
 
@@ -160,13 +160,13 @@ values, and cluster detection flags.
             elif action == "fetch":
                 return await self._fetch_filings(symbol, days)
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: " "sentiment, recent, clusters, key_insiders, fetch"
                 )
 
         except Exception as e:
             logger.error(f"InsiderTradingTool execute error for {symbol}: {e}")
-            return ToolResult.error_result(
+            return ToolResult.create_failure(
                 f"Insider trading analysis failed: {str(e)}", metadata={"symbol": symbol, "action": action}
             )
 
@@ -203,8 +203,7 @@ values, and cluster detection flags.
                     else:
                         classification = "neutral"
 
-                    return ToolResult.success_result(
-                        data={
+                    return ToolResult.create_success(output={
                             "symbol": symbol,
                             "period_days": days,
                             "sentiment_score": round(sentiment_score, 3),
@@ -228,13 +227,12 @@ values, and cluster detection flags.
         # Fallback to specialized sentiment service for detailed analysis
         sentiment = await self._sentiment_service.analyze_sentiment(symbol, days)
 
-        return ToolResult.success_result(
-            data=sentiment.to_dict(),
-            warnings=sentiment.warnings,
+        return ToolResult.create_success(output=sentiment.to_dict(),
             metadata={
                 "source": "insider_activity_service",
                 "is_signal": sentiment.is_signal,
                 "signal_strength": sentiment.signal_strength,
+                "warnings": sentiment.warnings,
             },
         )
 
@@ -284,8 +282,7 @@ values, and cluster detection flags.
                             if (t.get("transaction_code") or t.get("code")) == "S"
                         )
 
-                        return ToolResult.success_result(
-                            data={
+                        return ToolResult.create_success(output={
                                 "symbol": symbol,
                                 "period_days": days,
                                 "transactions": formatted_filings,
@@ -332,8 +329,7 @@ values, and cluster detection flags.
         total_purchases = sum(f.get("total_value", 0) for f in filings if f.get("transaction_code") == "P")
         total_sales = sum(abs(f.get("total_value", 0)) for f in filings if f.get("transaction_code") == "S")
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol,
                 "period_days": days,
                 "transactions": formatted_filings,
@@ -370,8 +366,7 @@ values, and cluster detection flags.
         else:
             signal = "no_significant_clusters"
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol,
                 "period_days": days,
                 "clusters": cluster_data,
@@ -388,8 +383,7 @@ values, and cluster detection flags.
         """Get key insider summary."""
         summary = await self._sentiment_service.get_key_insider_summary(symbol, days)
 
-        return ToolResult.success_result(
-            data=summary,
+        return ToolResult.create_success(output=summary,
             metadata={
                 "key_insider_count": len(summary.get("key_insiders", [])),
             },
@@ -408,8 +402,7 @@ values, and cluster detection flags.
             filings = await self._fetcher.fetch_recent_filings(symbol, days)
 
             if not filings:
-                return ToolResult.success_result(
-                    data={
+                return ToolResult.create_success(output={
                         "symbol": symbol,
                         "filings_fetched": 0,
                         "filings_saved": 0,
@@ -421,8 +414,7 @@ values, and cluster detection flags.
             loop = asyncio.get_event_loop()
             saved_count = await loop.run_in_executor(None, self._dao.save_filings_batch, filings)
 
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "symbol": symbol,
                     "filings_fetched": len(filings),
                     "filings_saved": saved_count,
@@ -436,7 +428,7 @@ values, and cluster detection flags.
 
         except Exception as e:
             logger.error(f"Error fetching filings for {symbol}: {e}")
-            return ToolResult.error_result(f"Failed to fetch filings: {str(e)}", metadata={"symbol": symbol})
+            return ToolResult.create_failure(f"Failed to fetch filings: {str(e)}", metadata={"symbol": symbol})
 
     def get_schema(self) -> Dict[str, Any]:
         """Get JSON schema for Insider Trading Tool parameters."""

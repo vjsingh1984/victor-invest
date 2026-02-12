@@ -91,6 +91,7 @@ Example:
 import asyncio
 import logging
 from typing import Any, Callable, Dict, Optional
+from weakref import WeakKeyDictionary
 
 from victor.framework.graph import END, StateGraph
 
@@ -124,43 +125,67 @@ def _state_to_dict(state: AnalysisWorkflowState) -> dict:
     return state.to_dict()
 
 
-# Tool instances (lazy-initialized)
-_sec_tool: Optional[SECFilingTool] = None
-_valuation_tool: Optional[ValuationTool] = None
-_technical_tool: Optional[TechnicalIndicatorsTool] = None
-_market_tool: Optional[MarketDataTool] = None
+# Task-scoped tool instances (lazy-initialized)
+# Avoids cross-run shared mutable state while preserving reuse within a run.
+_task_tool_cache: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _get_task_tool_cache() -> dict[str, Any]:
+    """Get or create tool cache for the current asyncio task."""
+    task = asyncio.current_task()
+    if task is None:
+        # Fallback path should be rare; caller will create non-cached instances.
+        return {}
+
+    cache = _task_tool_cache.get(task)
+    if cache is None:
+        cache = {}
+        _task_tool_cache[task] = cache
+    return cache
 
 
 async def _get_sec_tool() -> SECFilingTool:
     """Get or create SEC filing tool instance."""
-    global _sec_tool
-    if _sec_tool is None:
-        _sec_tool = SECFilingTool()
-    return _sec_tool
+    cache = _get_task_tool_cache()
+    tool = cache.get("sec_tool")
+    if tool is None:
+        tool = SECFilingTool()
+        if asyncio.current_task() is not None:
+            cache["sec_tool"] = tool
+    return tool
 
 
 async def _get_valuation_tool() -> ValuationTool:
     """Get or create valuation tool instance."""
-    global _valuation_tool
-    if _valuation_tool is None:
-        _valuation_tool = ValuationTool()
-    return _valuation_tool
+    cache = _get_task_tool_cache()
+    tool = cache.get("valuation_tool")
+    if tool is None:
+        tool = ValuationTool()
+        if asyncio.current_task() is not None:
+            cache["valuation_tool"] = tool
+    return tool
 
 
 async def _get_technical_tool() -> TechnicalIndicatorsTool:
     """Get or create technical indicators tool instance."""
-    global _technical_tool
-    if _technical_tool is None:
-        _technical_tool = TechnicalIndicatorsTool()
-    return _technical_tool
+    cache = _get_task_tool_cache()
+    tool = cache.get("technical_tool")
+    if tool is None:
+        tool = TechnicalIndicatorsTool()
+        if asyncio.current_task() is not None:
+            cache["technical_tool"] = tool
+    return tool
 
 
 async def _get_market_tool() -> MarketDataTool:
     """Get or create market data tool instance."""
-    global _market_tool
-    if _market_tool is None:
-        _market_tool = MarketDataTool()
-    return _market_tool
+    cache = _get_task_tool_cache()
+    tool = cache.get("market_tool")
+    if tool is None:
+        tool = MarketDataTool()
+        if asyncio.current_task() is not None:
+            cache["market_tool"] = tool
+    return tool
 
 
 # =============================================================================
@@ -194,8 +219,8 @@ async def fetch_sec_data(state_input) -> dict:
         if facts_result.success or metrics_result.success:
             state.sec_data = {
                 "symbol": state.symbol,
-                "company_facts": facts_result.data if facts_result.success else None,
-                "financial_metrics": metrics_result.data if metrics_result.success else None,
+                "company_facts": facts_result.output if facts_result.success else None,
+                "financial_metrics": metrics_result.output if metrics_result.success else None,
                 "agent_spec": SEC_AGENT_SPEC.name,
                 "status": "success",
             }
@@ -245,9 +270,9 @@ async def fetch_market_data(state_input) -> dict:
         if quote_result.success or history_result.success:
             state.market_data = {
                 "symbol": state.symbol,
-                "quote": quote_result.data if quote_result.success else None,
-                "history": history_result.data if history_result.success else None,
-                "company_info": info_result.data if info_result.success else None,
+                "quote": quote_result.output if quote_result.success else None,
+                "history": history_result.output if history_result.success else None,
+                "company_info": info_result.output if info_result.success else None,
                 "status": "success",
             }
         else:
@@ -291,8 +316,8 @@ async def run_fundamental_analysis(state_input) -> dict:
         # Get current price for valuation models
         quote_result = await market_tool.execute(symbol=state.symbol, action="get_quote")
         current_price = None
-        if quote_result.success and quote_result.data:
-            current_price = quote_result.data.get("current_price")
+        if quote_result.success and quote_result.output:
+            current_price = quote_result.output.get("current_price")
 
         # Extract quarterly metrics from SEC data for valuation models
         quarterly_metrics = []
@@ -316,8 +341,8 @@ async def run_fundamental_analysis(state_input) -> dict:
         if valuation_result.success:
             state.fundamental_analysis = {
                 "symbol": state.symbol,
-                "valuation_models": valuation_result.data,
-                "archetype": archetype_result.data if archetype_result.success else None,
+                "valuation_models": valuation_result.output,
+                "archetype": archetype_result.output if archetype_result.success else None,
                 "current_price": current_price,
                 "agent_spec": FUNDAMENTAL_AGENT_SPEC.name,
                 "model_weights": SYNTHESIS_AGENT_SPEC.metadata.get("weight_distribution", {}),
@@ -372,9 +397,9 @@ async def run_technical_analysis(state_input) -> dict:
         if analysis_result.success:
             state.technical_analysis = {
                 "symbol": state.symbol,
-                "indicators": analysis_result.data,
-                "trend": trend_result.data if trend_result.success else None,
-                "support_resistance": levels_result.data if levels_result.success else None,
+                "indicators": analysis_result.output,
+                "trend": trend_result.output if trend_result.success else None,
+                "support_resistance": levels_result.output if levels_result.success else None,
                 "agent_spec": TECHNICAL_AGENT_SPEC.name,
                 "status": "success",
             }
@@ -425,7 +450,7 @@ async def run_market_context_analysis(state_input) -> dict:
         for period in periods:
             result = await market_tool.execute(symbol=state.symbol, action="get_price_change", period=period)
             if result.success:
-                price_changes[period] = result.data
+                price_changes[period] = result.output
 
         # Calculate relative performance vs market (SPY)
         market_result = await market_tool.execute(symbol="SPY", action="get_price_change", period="1y")
@@ -433,7 +458,7 @@ async def run_market_context_analysis(state_input) -> dict:
         relative_performance = None
         if market_result.success and "1y" in price_changes:
             stock_return = price_changes["1y"].get("percent_change", 0)
-            market_return = market_result.data.get("percent_change", 0)
+            market_return = market_result.output.get("percent_change", 0)
             relative_performance = stock_return - market_return
 
         state.market_context = {
@@ -442,7 +467,7 @@ async def run_market_context_analysis(state_input) -> dict:
             "industry": info.get("industry") if info else None,
             "price_changes": price_changes,
             "relative_performance_vs_spy": relative_performance,
-            "market_benchmark": market_result.data if market_result.success else None,
+            "market_benchmark": market_result.output if market_result.success else None,
             "beta": info.get("beta") if info else None,
             "agent_spec": MARKET_AGENT_SPEC.name,
             "status": "success",

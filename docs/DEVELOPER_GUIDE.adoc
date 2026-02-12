@@ -43,10 +43,10 @@ cp config.json.sample config.json
 # Edit config.json with your SEC user agent and database credentials
 
 # Initialize database schema
-python3 cli_orchestrator.py setup-database
+python3 -m investigator.infrastructure.database.installer --sqlite investigator.db
 
 # Run system health check
-python3 cli_orchestrator.py status
+python3 -m victor_invest.cli status
 ----
 
 === First Analysis
@@ -54,7 +54,7 @@ python3 cli_orchestrator.py status
 [source,bash]
 ----
 # Run comprehensive analysis for a symbol
-python3 cli_orchestrator.py analyze AAPL -m standard -o results/AAPL_analysis.json
+python3 -m victor_invest.cli analyze AAPL --mode standard --output results/
 
 # Or use the convenience wrapper
 ./investigator_v2.sh --symbol AAPL --mode standard
@@ -67,16 +67,16 @@ python3 cli_orchestrator.py analyze AAPL -m standard -o results/AAPL_analysis.js
 [source,bash]
 ----
 # Single symbol analysis (modes: quick, standard, comprehensive)
-python3 cli_orchestrator.py analyze AAPL -m comprehensive -o results/AAPL.json
+python3 -m victor_invest.cli analyze AAPL --mode comprehensive --output results/
 
 # Batch analysis
-python3 cli_orchestrator.py batch AAPL MSFT GOOGL --mode standard --output-dir results/
+python3 -m victor_invest.cli batch AAPL MSFT GOOGL --mode standard --output-dir results/
 
 # Peer group comparison
-python3 cli_orchestrator.py compare AAPL MSFT GOOGL --output comparison.json
+python3 -m victor_invest.cli compare AAPL MSFT GOOGL --output comparison.json
 
 # Force cache refresh (bypass all caches)
-python3 cli_orchestrator.py analyze TSLA --force-refresh
+python3 -m victor_invest.cli analyze TSLA --mode standard --force-refresh
 ----
 
 === Cache Management Commands
@@ -84,22 +84,22 @@ python3 cli_orchestrator.py analyze TSLA --force-refresh
 [source,bash]
 ----
 # Clean all caches
-python3 cli_orchestrator.py clean-cache --all
+python3 -m victor_invest.cli clean-cache --all
 
 # Clean cache for specific symbol
-python3 cli_orchestrator.py clean-cache --symbol AAPL
+python3 -m victor_invest.cli clean-cache --symbol AAPL
 
 # Clean database cache only
-python3 cli_orchestrator.py clean-cache --db
+python3 -m victor_invest.cli clean-cache --db
 
 # Clean disk cache only
-python3 cli_orchestrator.py clean-cache --disk
+python3 -m victor_invest.cli clean-cache --disk
 
 # Inspect cache contents
-python3 cli_orchestrator.py inspect-cache --symbol AAPL --verbose
+python3 -m victor_invest.cli inspect-cache --symbol AAPL --verbose
 
 # Show cache sizes by type
-python3 cli_orchestrator.py cache-sizes
+python3 -m victor_invest.cli cache-sizes
 ----
 
 === Testing Commands
@@ -119,7 +119,7 @@ pytest tests/cache/test_cache_manager.py -v
 pytest tests/integration/ -v
 
 # System smoke test
-./investigator_v2.sh --test-system
+python3 -m victor_invest.cli test-system
 ----
 
 === Development Commands
@@ -139,13 +139,19 @@ mypy patterns/ utils/
 ruff .
 
 # System status check
-python3 cli_orchestrator.py status
+python3 -m victor_invest.cli status
+
+# System health tests
+python3 -m victor_invest.cli test-system
+
+# Pull an Ollama model
+python3 -m victor_invest.cli pull <MODEL>
 
 # View metrics
-python3 cli_orchestrator.py metrics --days 7
+python3 -m victor_invest.cli metrics --days 7
 
 # System statistics
-python3 cli_orchestrator.py system-stats
+python3 -m victor_invest.cli status
 ----
 
 == Development Guidelines
@@ -523,10 +529,10 @@ PGPASSWORD=investigator psql -h ${DB_HOST:-localhost} -U investigator -d sec_dat
   -c "DELETE FROM llm_responses WHERE symbol = '${SYMBOL}';"
 
 # Option 2: Use CLI command
-python3 cli_orchestrator.py clean-cache --symbol ${SYMBOL}
+python3 -m victor_invest.cli clean-cache --symbol ${SYMBOL}
 
 # Run fresh analysis
-python3 cli_orchestrator.py analyze ${SYMBOL} -m standard
+python3 -m victor_invest.cli analyze ${SYMBOL} --mode standard
 ----
 
 [NOTE]
@@ -573,7 +579,7 @@ archetypes:
 
 [source,bash]
 ----
-python3 cli_orchestrator.py analyze AAPL --mode comprehensive --force-refresh
+python3 -m victor_invest.cli analyze AAPL --mode comprehensive --force-refresh
 curl -X POST http://localhost:8080/api/analyze -d '{"symbol":"MSFT"}'
 ----
 
@@ -586,7 +592,7 @@ reproduce runs.
 
 *Solution:*
 
-. Check Ollama status: `python3 cli_orchestrator.py status`
+. Check Ollama status: `python3 -m victor_invest.cli status`
 . Check VRAM usage: Review LLM semaphore logs
 . Reduce concurrency: Lower `max_concurrent_agents` in config.yaml
 . Use smaller model: Switch from 70B to 7B model
@@ -597,7 +603,7 @@ reproduce runs.
 
 *Solution:*
 
-. Inspect cache: `python3 cli_orchestrator.py inspect-cache --symbol AAPL --verbose`
+. Inspect cache: `python3 -m victor_invest.cli inspect-cache --symbol AAPL --verbose`
 . Check cache key structure (must include symbol, llm_type, fiscal_period)
 . Verify TTL hasn't expired
 . Check config: `force_refresh` should be `false`

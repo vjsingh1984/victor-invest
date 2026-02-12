@@ -7,10 +7,9 @@ import asyncio
 import json
 import logging
 import math
-import statistics
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import yaml
@@ -21,19 +20,14 @@ from investigator.domain.services.company_metadata_service import CompanyMetadat
 from investigator.domain.services.data_normalizer import (  # TODO: Move to infrastructure
     DataNormalizer,
     normalize_financials,
-    round_for_prompt,
 )
 from investigator.domain.services.deterministic_competitive_analyzer import analyze_competitive_position
 
 # Deterministic services (replace LLM calls with rule-based computation)
-from investigator.domain.services.deterministic_valuation_synthesizer import synthesize_valuation
 from investigator.domain.services.dynamic_model_weighting import DynamicModelWeightingService
 from investigator.domain.services.fiscal_period_service import get_fiscal_period_service
 from investigator.domain.services.safe_formatters import format_currency as _fmt_currency
 from investigator.domain.services.safe_formatters import format_int_with_commas as _fmt_int_comma
-from investigator.domain.services.safe_formatters import (
-    format_number,
-)
 from investigator.domain.services.safe_formatters import format_percentage as _fmt_pct
 from investigator.domain.services.safe_formatters import (
     is_valid_number,
@@ -43,7 +37,6 @@ from investigator.domain.services.toon_formatter import TOONFormatter, to_toon_q
 from investigator.domain.services.valuation import SectorValuationRouter  # Sector-aware valuation routing
 
 # New valuation models (Milestone 7 - Plan implementation)
-from investigator.domain.services.valuation.damodaran_dcf import DamodaranDCFModel
 from investigator.domain.services.valuation.dcf import DCFValuation
 from investigator.domain.services.valuation.ggm import GordonGrowthModel
 
@@ -58,15 +51,8 @@ from investigator.domain.services.valuation.models import (
     CompanyArchetype,
     CompanyProfile,
     DataQualityFlag,
-    EVEBITDAModel,
-    PBMultipleModel,
-    PEMultipleModel,
-    PSMultipleModel,
 )
-from investigator.domain.services.valuation.models.common import clamp
-from investigator.domain.services.valuation.models.saas_valuation import SaaSValuationModel
 from investigator.domain.services.valuation.orchestrator import MultiModelValuationOrchestrator
-from investigator.domain.services.valuation.rule_of_40_valuation import RuleOf40Valuation
 from investigator.infrastructure.cache import CacheManager
 from investigator.infrastructure.cache.cache_key_builder import build_cache_key
 from investigator.infrastructure.cache.cache_types import CacheType
@@ -81,6 +67,16 @@ from .constants import (
     PROCESSED_ADDITIONAL_FINANCIAL_KEYS,
     PROCESSED_RATIO_KEYS,
 )
+from .company_fetch import fetch_latest_company_data_from_processed_table
+from .data_quality_assessor import get_data_quality_assessor
+from .deterministic_analyzer import DeterministicAnalyzer
+from .deterministic_payloads import (
+    build_deterministic_cache_record,
+    build_deterministic_response,
+)
+from .formatters import safe_fmt_float as _safe_fmt_float
+from .formatters import safe_fmt_int_comma as _safe_fmt_int_comma
+from .formatters import safe_fmt_pct as _safe_fmt_pct
 from .logging_utils import (
     format_trend_context,
     log_data_quality_issues,
@@ -90,37 +86,29 @@ from .logging_utils import (
     log_valuation_snapshot,
 )
 from .models import QuarterlyData
-
-
-# Module-level safe formatting functions for use in prompts
-def _safe_fmt_pct(value: Any, decimals: int = 1) -> str:
-    """Safe percentage formatting with None/NaN handling."""
-    if value is None:
-        return "N/A"
-    rounded = round_for_prompt(value, decimals)
-    if rounded is None:
-        return "N/A"
-    return f"{rounded:.{decimals}f}%"
-
-
-def _safe_fmt_float(value: Any, decimals: int = 2) -> str:
-    """Safe float formatting with None/NaN handling."""
-    if value is None:
-        return "N/A"
-    rounded = round_for_prompt(value, decimals)
-    if rounded is None:
-        return "N/A"
-    return f"{rounded:.{decimals}f}"
-
-
-def _safe_fmt_int_comma(value: Any) -> str:
-    """Safe integer formatting with comma separators."""
-    if value is None:
-        return "N/A"
-    rounded = round_for_prompt(value, 0)
-    if rounded is None:
-        return "N/A"
-    return f"{rounded:,.0f}"
+from .quarterly_fetch import (
+    build_financials_from_bulk_tables,
+    build_financials_from_processed_data,
+    fetch_processed_quarter_payload,
+    normalize_cached_quarter,
+    query_recent_processed_periods,
+)
+from .summaries import extract_latest_financials as _extract_latest_financials_helper
+from .summaries import get_historical_trend as _get_historical_trend_helper
+from .summaries import summarize_company_data as _summarize_company_data_helper
+from .trend_analyzer import get_trend_analyzer
+from .valuation_models import calculate_relative_valuation_models
+from .valuation_extensions import calculate_valuation_extensions
+from .valuation_orchestrator import (
+    dispatch_valuation_synthesis,
+    log_multi_model_summary,
+    run_multi_model_blending,
+)
+from .valuation_synthesis import (
+    build_models_detail_lines,
+    build_valuation_synthesis_prompt,
+)
+from .valuation_weighting import resolve_fallback_weights
 
 
 class FundamentalAnalysisAgent(InvestmentAgent):
@@ -1426,177 +1414,28 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         self.logger.info(f"Fetching {num_quarters} quarters from processed table for {symbol}")
 
         try:
-            # Get CIK for symbol
             cik = self.ticker_mapper.resolve_cik(symbol)
             if not cik:
                 raise ValueError(f"No CIK found for {symbol}")
 
-            # CLEAN ARCHITECTURE: Query sec_companyfacts_processed table directly
-            # This table has ALL historical quarters (e.g., 66 quarters for AAPL from 2009-2025)
-            # No need for hybrid strategy - just get the most recent num_quarters
-            from sqlalchemy import text
-
             from investigator.infrastructure.database.db import get_db_manager
 
             db_manager = get_db_manager()
-
-            query = text(
-                """
-                SELECT
-                    symbol, fiscal_year, fiscal_period, adsh,
-                    filed_date as filed,
-                    period_end_date as period_end,
-                    form_type as form,
-                    total_revenue,
-                    net_income,
-                    gross_profit,
-                    operating_income,
-                    interest_expense,
-                    income_tax_expense,
-                    cost_of_revenue,
-                    total_assets,
-                    total_liabilities,
-                    stockholders_equity,
-                    current_assets,
-                    current_liabilities,
-                    accounts_receivable,
-                    inventory,
-                    cash_and_equivalents,
-                    long_term_debt,
-                    short_term_debt,
-                    total_debt,
-                    operating_cash_flow,
-                    capital_expenditures,
-                    free_cash_flow,
-                    dividends_paid,
-                    cash_flow_statement_qtrs,
-                    income_statement_qtrs,
-                    property_plant_equipment_net,
-                    weighted_average_diluted_shares_outstanding as shares_outstanding
-                FROM sec_companyfacts_processed
-                WHERE symbol = :symbol
-                ORDER BY
-                    fiscal_year DESC,
-                    CASE fiscal_period
-                        WHEN 'FY' THEN 4
-                        WHEN 'Q3' THEN 3
-                        WHEN 'Q2' THEN 2
-                        WHEN 'Q1' THEN 1
-                        ELSE 0
-                    END DESC
-                LIMIT :sql_limit
-            """
+            fiscal_period_service = get_fiscal_period_service()
+            quarters_data = query_recent_processed_periods(
+                symbol=symbol,
+                num_quarters=num_quarters,
+                db_manager=db_manager,
+                fiscal_period_service=fiscal_period_service,
+                logger=self.logger,
             )
-
-            # Calculate SQL LIMIT: For Q4 computation, need extra rows to fetch Q1-Q3 for all years
-            # Formula: requested_quarters + 3 ensures we always have enough data
-            # Example: 12 quarters requested → LIMIT 15 (handles both FY-aligned and mid-quarter cases)
-            sql_limit = num_quarters + 3
-
-            with db_manager.get_session() as session:
-                result = session.execute(query, {"symbol": symbol, "sql_limit": sql_limit})
-                rows = result.fetchall()
-
-            if not rows:
-                self.logger.warning(f"No quarterly data in processed table for {symbol}")
+            if not quarters_data:
                 return []
 
-            # Convert rows to dict format (same as hybrid strategy output)
-            quarters_data = []
+            quarterly_data_list: List[QuarterlyData] = []
+            bulk_strategy = None
 
-            # Get FiscalPeriodService for centralized YTD detection
-            fiscal_period_service = get_fiscal_period_service()
-
-            for idx, row in enumerate(rows):
-                # Convert numeric YTD indicators to boolean flags using centralized service
-                # cash_flow_statement_qtrs/income_statement_qtrs indicate how many quarters data is cumulative
-                # qtrs=1 means individual quarter, qtrs>=2 means YTD cumulative
-                cf_qtrs = int(row.cash_flow_statement_qtrs) if row.cash_flow_statement_qtrs else 1
-                inc_qtrs = int(row.income_statement_qtrs) if row.income_statement_qtrs else 1
-
-                quarters_data.append(
-                    {
-                        "symbol": row.symbol,
-                        "fiscal_year": row.fiscal_year,
-                        "fiscal_period": row.fiscal_period,
-                        "adsh": row.adsh,
-                        "filed": str(row.filed) if row.filed else None,
-                        "period_end": str(row.period_end) if row.period_end else None,
-                        "form": row.form,
-                        # Income Statement
-                        "total_revenue": float(row.total_revenue) if row.total_revenue else 0,
-                        "net_income": float(row.net_income) if row.net_income else 0,
-                        "gross_profit": float(row.gross_profit) if row.gross_profit else 0,
-                        "operating_income": float(row.operating_income) if row.operating_income else 0,
-                        "interest_expense": float(row.interest_expense) if row.interest_expense else 0,
-                        "income_tax_expense": float(row.income_tax_expense) if row.income_tax_expense else 0,
-                        "cost_of_revenue": float(row.cost_of_revenue) if row.cost_of_revenue else 0,
-                        # Balance Sheet
-                        "total_assets": float(row.total_assets) if row.total_assets else 0,
-                        "total_liabilities": float(row.total_liabilities) if row.total_liabilities else 0,
-                        "stockholders_equity": float(row.stockholders_equity) if row.stockholders_equity else 0,
-                        "current_assets": float(row.current_assets) if row.current_assets else 0,
-                        "current_liabilities": float(row.current_liabilities) if row.current_liabilities else 0,
-                        "accounts_receivable": float(row.accounts_receivable) if row.accounts_receivable else 0,
-                        "inventory": float(row.inventory) if row.inventory else 0,
-                        "cash_and_equivalents": float(row.cash_and_equivalents) if row.cash_and_equivalents else 0,
-                        "long_term_debt": float(row.long_term_debt) if row.long_term_debt else 0,
-                        "short_term_debt": float(row.short_term_debt) if row.short_term_debt else 0,
-                        "total_debt": float(row.total_debt) if row.total_debt else 0,
-                        # Cash Flow
-                        "operating_cash_flow": float(row.operating_cash_flow) if row.operating_cash_flow else 0,
-                        "capital_expenditures": float(row.capital_expenditures) if row.capital_expenditures else 0,
-                        "free_cash_flow": float(row.free_cash_flow) if row.free_cash_flow else 0,
-                        "dividends_paid": float(row.dividends_paid) if row.dividends_paid else 0,
-                        # Other
-                        "property_plant_equipment_net": (
-                            float(row.property_plant_equipment_net) if row.property_plant_equipment_net else 0
-                        ),
-                        "shares_outstanding": float(row.shares_outstanding) if row.shares_outstanding else 0,
-                        # Keep numeric values for data processor
-                        "cash_flow_statement_qtrs": cf_qtrs,
-                        "income_statement_qtrs": inc_qtrs,
-                        # Add boolean flags for QuarterlyData constructor using centralized service
-                        "is_ytd_cashflow": fiscal_period_service.is_ytd(cf_qtrs),
-                        "is_ytd_income": fiscal_period_service.is_ytd(inc_qtrs),
-                    }
-                )
-
-            # ═══════════════════════════════════════════════════════════════════════════
-            # FY Period Handling - CORRECT Design
-            # ═══════════════════════════════════════════════════════════════════════════
-            # FY periods MUST be included in the input to quarterly_processor
-            #
-            # Data Flow:
-            #   1. quarters_data contains BOTH FY and Q periods (from database)
-            #   2. get_rolling_ttm_periods() will:
-            #      - Use FY periods to compute missing Q4 (Q4 = FY - Q1 - Q2 - Q3)
-            #      - Convert YTD Q2/Q3 to individual quarters
-            #      - Return ONLY Q periods (Q1, Q2, Q3, Q4) - FY periods filtered internally
-            #   3. DCF receives clean quarterly data (no FY periods in output)
-            #
-            # DO NOT filter FY periods here - they are needed for Q4 computation!
-            # ═══════════════════════════════════════════════════════════════════════════
-
-            fy_count = sum(1 for q in quarters_data if q.get("fiscal_period") == "FY")
-            q_count = sum(1 for q in quarters_data if q.get("fiscal_period", "").startswith("Q"))
-
-            self.logger.info(
-                f"✅ Retrieved {len(quarters_data)} periods from processed table for {symbol} "
-                f"({q_count} Q periods, {fy_count} FY periods - FY needed for Q4 computation)"
-            )
-
-            if len(quarters_data) < num_quarters:
-                self.logger.warning(
-                    f"Only {len(quarters_data)} quarters available for {symbol} (target: {num_quarters}). "
-                    f"Company may be newly public or have incomplete filing history."
-                )
-
-            # Convert quarters_data to QuarterlyData objects
-            quarterly_data_list = []
-
-            for q in reversed(quarters_data):  # Reverse to chronological order (oldest first)
-                # Phase 10: Check cache for this specific quarter (ADSH-based)
+            for q in reversed(quarters_data):
                 quarter_cache_key = build_cache_key(
                     CacheType.QUARTERLY_METRICS,
                     symbol=symbol,
@@ -1604,203 +1443,97 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     fiscal_period=q["fiscal_period"],
                     adsh=q["adsh"],
                 )
-
-                cached_quarter = self.cache.get(CacheType.QUARTERLY_METRICS, quarter_cache_key) if self.cache else None
-
-                # Fix for Issue #1: Ensure cached data is QuarterlyData object, not dict/string
-                if cached_quarter:
-                    if isinstance(cached_quarter, dict):
-                        # Cache returned dict, convert to QuarterlyData
-                        try:
-                            cached_quarter = QuarterlyData.from_dict(cached_quarter)
-                            self.logger.debug(
-                                f"Cache HIT (dict→QuarterlyData) for {symbol} {q['fiscal_year']}-{q['fiscal_period']}"
-                            )
-                        except Exception as e:
-                            self.logger.warning(f"Failed to deserialize cached quarter for {symbol}: {e}, re-fetching")
-                            cached_quarter = None
-                    elif not isinstance(cached_quarter, QuarterlyData):
-                        # Unexpected type, re-fetch
-                        self.logger.warning(
-                            f"Invalid cached quarter type for {symbol} {q['fiscal_year']}-{q['fiscal_period']}: "
-                            f"{type(cached_quarter)}, re-fetching"
-                        )
-                        cached_quarter = None
-                    else:
-                        self.logger.debug(
-                            f"Cache HIT for {symbol} {q['fiscal_year']}-{q['fiscal_period']} (ADSH: {q['adsh']})"
-                        )
-
+                cached_quarter = (
+                    self.cache.get(CacheType.QUARTERLY_METRICS, quarter_cache_key) if self.cache else None
+                )
+                cached_quarter = normalize_cached_quarter(
+                    cached_quarter=cached_quarter,
+                    quarterly_data_cls=QuarterlyData,
+                    symbol=symbol,
+                    fiscal_year=q["fiscal_year"],
+                    fiscal_period=q["fiscal_period"],
+                    logger=self.logger,
+                )
                 if cached_quarter and isinstance(cached_quarter, QuarterlyData):
                     quarterly_data_list.append(cached_quarter)
                     continue
 
-                # NEW: Try fetching from sec_companyfacts_processed table (3-table architecture)
                 self.logger.debug(
-                    f"🔍 [FETCH_QUARTERS] Attempting processed table for {symbol} {q['fiscal_year']}-{q['fiscal_period']} ADSH={q['adsh'][:20]}..."
+                    "🔍 [FETCH_QUARTERS] Attempting processed table for %s %s-%s ADSH=%s...",
+                    symbol,
+                    q["fiscal_year"],
+                    q["fiscal_period"],
+                    q["adsh"][:20],
                 )
                 processed_data = self._fetch_from_processed_table(
                     symbol, q["fiscal_year"], q["fiscal_period"], q["adsh"]
                 )
 
-                # Validate processed data quality before using it
                 use_processed = False
+                is_ytd_cashflow = False
+                is_ytd_income = False
                 if processed_data:
-                    # CLEAN ARCHITECTURE: Statement-level structure
-                    # Revenue is in income_statement now, not financial_data
-                    income_statement = processed_data.get("income_statement", {})
-                    revenue = income_statement.get("total_revenue", 0)
-
-                    # Check if processed data has meaningful values (not all zeros)
-                    if revenue and revenue > 0:
-                        ratios = processed_data.get("ratios", {})
-                        quality = processed_data.get("data_quality_score", 0)
+                    processed_payload = build_financials_from_processed_data(
+                        processed_data=processed_data,
+                        shares_outstanding=q.get("shares_outstanding", 0),
+                    )
+                    if processed_payload:
                         use_processed = True
-
-                        # Extract and flatten statement-level structure for QuarterlyData
-                        cash_flow = processed_data.get("cash_flow", {})
-                        balance_sheet = processed_data.get("balance_sheet", {})
-
-                        # CRITICAL: Extract is_ytd flags BEFORE flattening
-                        # These flags indicate if Q2/Q3 values are YTD cumulative (from 10-Q filings)
-                        # SEC doesn't provide is_ytd in raw JSON - we infer from fiscal_period in _fetch_from_processed_table()
-                        is_ytd_cashflow = cash_flow.get("is_ytd", False)
-                        is_ytd_income = income_statement.get("is_ytd", False)
-
-                        # Create financial_data dict from statement-level structure
-                        financial_data = {
-                            # Income Statement (7 fields)
-                            "revenues": income_statement.get("total_revenue", 0),
-                            "net_income": income_statement.get("net_income", 0),
-                            "gross_profit": income_statement.get("gross_profit", 0),
-                            "operating_income": income_statement.get("operating_income", 0),
-                            "interest_expense": income_statement.get("interest_expense", 0),
-                            "income_tax_expense": income_statement.get("income_tax_expense", 0),
-                            # Balance Sheet (10 fields)
-                            "total_assets": balance_sheet.get("total_assets", 0),
-                            "total_liabilities": balance_sheet.get("total_liabilities", 0),
-                            "stockholders_equity": balance_sheet.get("stockholders_equity", 0),
-                            "current_assets": balance_sheet.get("current_assets", 0),
-                            "current_liabilities": balance_sheet.get("current_liabilities", 0),
-                            # CRITICAL: Include debt fields for DCF/WACC calculation
-                            "total_debt": balance_sheet.get("total_debt", 0),
-                            "long_term_debt": balance_sheet.get("long_term_debt", 0),
-                            "short_term_debt": balance_sheet.get("short_term_debt", 0),
-                            "cash_and_equivalents": balance_sheet.get("cash_and_equivalents", 0),
-                            "net_debt": balance_sheet.get("net_debt", 0),
-                            # Cash Flow (3 fields)
-                            "operating_cash_flow": cash_flow.get("operating_cash_flow", 0),
-                            "capital_expenditures": cash_flow.get("capital_expenditures", 0),
-                            "dividends_paid": cash_flow.get("dividends_paid", 0),
-                            # Extract shares_outstanding for DCF/symbol_update
-                            "weighted_average_diluted_shares_outstanding": q.get("shares_outstanding", 0),
-                        }
-
+                        financial_data = processed_payload["financial_data"]
+                        ratios = processed_payload["ratios"]
+                        quality = processed_payload["quality"]
+                        is_ytd_cashflow = processed_payload["is_ytd_cashflow"]
+                        is_ytd_income = processed_payload["is_ytd_income"]
+                        revenue = processed_payload["revenue"]
                         self.logger.info(
-                            f"✅ Using pre-processed data from sec_companyfacts_processed for "
-                            f"{symbol} {q['fiscal_year']}-{q['fiscal_period']} (Revenue: ${revenue/1e9:.1f}B, Quality: {quality}%)"
+                            "✅ Using pre-processed data from sec_companyfacts_processed for %s %s-%s "
+                            "(Revenue: $%.1fB, Quality: %s%%)",
+                            symbol,
+                            q["fiscal_year"],
+                            q["fiscal_period"],
+                            revenue / 1e9,
+                            quality,
                         )
                     else:
+                        income_statement = processed_data.get("income_statement", {})
+                        revenue = income_statement.get("total_revenue", 0)
                         self.logger.warning(
-                            f"⚠️  Processed data for {symbol} {q['fiscal_year']}-{q['fiscal_period']} has zero/missing revenue "
-                            f"(Revenue: ${revenue}), falling back to bulk tables (ADSH: {q['adsh']})"
+                            "⚠️  Processed data for %s %s-%s has zero/missing revenue (Revenue: $%s), falling back to bulk tables (ADSH: %s)",
+                            symbol,
+                            q["fiscal_year"],
+                            q["fiscal_period"],
+                            revenue,
+                            q["adsh"],
                         )
 
                 if not use_processed:
-                    # FALLBACK: Extract from bulk tables using CanonicalKeyMapper
                     self.logger.warning(
-                        f"⚠️  Processed data not found for {symbol} {q['fiscal_year']}-{q['fiscal_period']}, "
-                        f"falling back to bulk tables with canonical key extraction (ADSH: {q['adsh']})"
+                        "⚠️  Processed data not found for %s %s-%s, falling back to bulk tables with canonical key extraction (ADSH: %s)",
+                        symbol,
+                        q["fiscal_year"],
+                        q["fiscal_period"],
+                        q["adsh"],
                     )
-
-                    # Get sector for canonical key extraction (with fallback to 'Unknown')
                     sector = self._get_sector_for_symbol(symbol)
+                    if bulk_strategy is None:
+                        from investigator.infrastructure.sec.data_strategy import get_fiscal_period_strategy
 
-                    # Define canonical keys needed for quarterly data extraction
-                    canonical_keys_needed = FALLBACK_CANONICAL_KEYS
+                        bulk_strategy = get_fiscal_period_strategy()
 
-                    # Collect all XBRL tags from canonical keys (sector-aware)
-                    all_tags = set()
-                    for canonical_key in canonical_keys_needed:
-                        # Get sector-specific + global fallback tags
-                        tags = self.canonical_mapper.get_tags(canonical_key, sector)
-                        all_tags.update(tags)
-
-                    # Initialize strategy for bulk table access
-                    from investigator.infrastructure.sec.data_strategy import get_fiscal_period_strategy
-
-                    strategy = get_fiscal_period_strategy()
-
-                    # Extract data from bulk tables using collected tag list
-                    tag_values = strategy.get_num_data_for_adsh(q["adsh"], tags=list(all_tags))
-
-                    # Helper to convert Decimal to float (bulk tables return Decimal type)
-                    from decimal import Decimal
-
-                    def to_float(val):
-                        if isinstance(val, Decimal):
-                            return float(val)
-                        return val if val is not None else 0
-
-                    # Map using canonical keys with sector-aware fallback priority
-                    def extract_canonical_value(canonical_key: str) -> float:
-                        """Extract value using canonical key fallback chain"""
-                        tags_priority = self.canonical_mapper.get_tags(canonical_key, sector)
-                        for tag in tags_priority:
-                            if tag in tag_values and tag_values[tag] is not None:
-                                return to_float(tag_values[tag])
-                        return 0
-
-                    ocf_value = extract_canonical_value("operating_cash_flow")
-                    capex_value = extract_canonical_value("capital_expenditures")
-                    fcf_value = extract_canonical_value("free_cash_flow")
-
-                    # Derive free cash flow if missing/zero (ocf - |capex|)
-                    if ocf_value is not None or capex_value is not None:
-                        ocf_float = float(ocf_value or 0.0)
-                        capex_float = float(capex_value or 0.0)
-                        derived_fcf = ocf_float - abs(capex_float)
-                        # Prefer derived value when canonical lookup returned None/0
-                        if fcf_value is None or abs(float(fcf_value)) < 1e-6:
-                            fcf_value = derived_fcf
-                            if abs(derived_fcf) > 1e-6:
-                                self.logger.debug(
-                                    "🔄 [FALLBACK] Derived FCF for %s %s-%s via OCF %.2f - |CapEx| %.2f = %.2f",
-                                    symbol,
-                                    q["fiscal_year"],
-                                    q["fiscal_period"],
-                                    ocf_float,
-                                    capex_float,
-                                    derived_fcf,
-                                )
-
-                    financial_data = {
-                        "revenues": extract_canonical_value("total_revenue"),
-                        "net_income": extract_canonical_value("net_income"),
-                        "total_assets": extract_canonical_value("total_assets"),
-                        "total_liabilities": extract_canonical_value("total_liabilities"),
-                        "stockholders_equity": extract_canonical_value("stockholders_equity"),
-                        "current_assets": extract_canonical_value("current_assets"),
-                        "current_liabilities": extract_canonical_value("current_liabilities"),
-                        "long_term_debt": extract_canonical_value("long_term_debt"),
-                        "short_term_debt": extract_canonical_value("short_term_debt"),
-                        "total_debt": extract_canonical_value("total_debt"),
-                        "operating_cash_flow": ocf_value,
-                        "capital_expenditures": capex_value,
-                        "free_cash_flow": fcf_value if fcf_value is not None else 0,
-                        "dividends_paid": extract_canonical_value("dividends_paid"),
-                        "weighted_average_diluted_shares_outstanding": extract_canonical_value(
-                            "weighted_average_diluted_shares_outstanding"
-                        ),
-                    }
-
-                    # Calculate ratios
+                    financial_data = build_financials_from_bulk_tables(
+                        symbol=symbol,
+                        fiscal_year=q["fiscal_year"],
+                        fiscal_period=q["fiscal_period"],
+                        adsh=q["adsh"],
+                        sector=sector,
+                        canonical_keys_needed=FALLBACK_CANONICAL_KEYS,
+                        canonical_mapper=self.canonical_mapper,
+                        strategy=bulk_strategy,
+                        logger=self.logger,
+                    )
                     ratios = self._calculate_quarterly_ratios(financial_data)
-
-                    # Assess quality
                     quality = self._assess_quarter_quality(financial_data)
 
-                # Create QuarterlyData with ADSH threading
                 qdata = QuarterlyData(
                     fiscal_year=q["fiscal_year"],
                     fiscal_period=q["fiscal_period"],
@@ -1808,38 +1541,41 @@ class FundamentalAnalysisAgent(InvestmentAgent):
                     ratios=ratios,
                     data_quality=quality,
                     filing_date=str(q["filed"]),
-                    is_ytd_cashflow=is_ytd_cashflow if use_processed else False,  # Pass YTD flags
-                    is_ytd_income=is_ytd_income if use_processed else False,
+                    is_ytd_cashflow=is_ytd_cashflow,
+                    is_ytd_income=is_ytd_income,
                 )
-
-                # Thread ADSH through (Phase 10)
                 qdata.adsh = q["adsh"]
                 qdata.period_end_date = str(q["period_end"]) if q["period_end"] else None
                 qdata.form = q["form"]
-
                 quarterly_data_list.append(qdata)
 
-                # Log quarter details for debugging
                 self.logger.debug(
-                    f"📊 [FETCH_QUARTERS] Created QuarterlyData for {symbol} {q['fiscal_year']}-{q['fiscal_period']}: "
-                    f"OCF=${financial_data.get('operating_cash_flow', 0)/1e9:.2f}B, "
-                    f"CapEx=${abs(financial_data.get('capital_expenditures', 0))/1e9:.2f}B, "
-                    f"Quality={quality}%"
+                    "📊 [FETCH_QUARTERS] Created QuarterlyData for %s %s-%s: OCF=$%.2fB, CapEx=$%.2fB, Quality=%s%%",
+                    symbol,
+                    q["fiscal_year"],
+                    q["fiscal_period"],
+                    financial_data.get("operating_cash_flow", 0) / 1e9,
+                    abs(financial_data.get("capital_expenditures", 0)) / 1e9,
+                    quality,
                 )
-
-                # Phase 10: Cache this quarter separately (ADSH-based caching)
                 if self.cache:
                     self.cache.set(CacheType.QUARTERLY_METRICS, quarter_cache_key, qdata)
                     self.logger.debug(
-                        f"Cached quarter {symbol} {q['fiscal_year']}-{q['fiscal_period']} " f"(ADSH: {q['adsh']})"
+                        "Cached quarter %s %s-%s (ADSH: %s)",
+                        symbol,
+                        q["fiscal_year"],
+                        q["fiscal_period"],
+                        q["adsh"],
                     )
 
             log_quarterly_snapshot(self.logger, symbol, quarterly_data_list)
             self.logger.info(
-                f"Successfully fetched {len(quarterly_data_list)} quarters for {symbol} using hybrid strategy: "
-                f"{quarterly_data_list[0].period_label} → {quarterly_data_list[-1].period_label}"
+                "Successfully fetched %s quarters for %s using hybrid strategy: %s → %s",
+                len(quarterly_data_list),
+                symbol,
+                quarterly_data_list[0].period_label,
+                quarterly_data_list[-1].period_label,
             )
-
             return quarterly_data_list
 
         except ValueError:
@@ -1869,176 +1605,16 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             or None if no data found
         """
         try:
-            from sqlalchemy import text
-
             from investigator.infrastructure.database.db import get_db_manager
 
             db_manager = get_db_manager()
-            with db_manager.engine.connect() as conn:
-                # Query for most recent period (prefer FY, then latest Q)
-                result = conn.execute(
-                    text(
-                        """
-                        SELECT *
-                        FROM sec_companyfacts_processed
-                        WHERE symbol = :symbol
-                        ORDER BY
-                            fiscal_year DESC,
-                            CASE fiscal_period
-                                WHEN 'FY' THEN 4
-                                WHEN 'Q4' THEN 3
-                                WHEN 'Q3' THEN 2
-                                WHEN 'Q2' THEN 1
-                                WHEN 'Q1' THEN 0
-                            END DESC
-                        LIMIT 1
-                    """
-                    ),
-                    {"symbol": symbol},
-                ).fetchone()
-
-                if not result:
-                    self.logger.warning(
-                        f"[CLEAN ARCH] No processed data found for {symbol} in sec_companyfacts_processed"
-                    )
-                    return None
-
-                row = dict(result._mapping)
-
-                def safe_float(key: str) -> float:
-                    value = row.get(key)
-                    if value is None:
-                        return 0.0
-                    try:
-                        return float(value)
-                    except (TypeError, ValueError):
-                        return 0.0
-
-                # CRITICAL DATA QUALITY CHECK: Detect corrupt data from failed YTD conversions
-                # Root cause: Missing quarters → Failed YTD conversion → Negative revenue stored
-                # Examples: ORCL Q2 (-$1,085M), ZS Q1 (NULL), META Q2 (-$178M)
-                revenue = safe_float("total_revenue")
-                operating_income = safe_float("operating_income")
-                fiscal_year = row.get("fiscal_year")
-                fiscal_period = row.get("fiscal_period")
-
-                # Check 1: Negative revenue (physically impossible for most companies)
-                if revenue < 0:
-                    self.logger.error(
-                        f"❌ CORRUPT DATA DETECTED: {symbol} {fiscal_year}-{fiscal_period} has NEGATIVE revenue: ${revenue:,.0f}. "
-                        f"This indicates failed YTD conversion. DELETING corrupt record and forcing re-fetch."
-                    )
-                    # Delete corrupt record from database
-                    conn.execute(
-                        text(
-                            """
-                            DELETE FROM sec_companyfacts_processed
-                            WHERE symbol = :symbol
-                              AND fiscal_year = :fiscal_year
-                              AND fiscal_period = :fiscal_period
-                        """
-                        ),
-                        {"symbol": symbol, "fiscal_year": fiscal_year, "fiscal_period": fiscal_period},
-                    )
-                    conn.commit()
-                    self.logger.warning(
-                        f"⚠️  Deleted corrupt record for {symbol} {fiscal_year}-{fiscal_period}. "
-                        f"SEC Agent should re-fetch and reprocess this period in next run."
-                    )
-                    return None  # Force fresh fetch from SEC
-
-                # Check 2: Zero revenue when company should have revenue (likely incomplete data)
-                if revenue == 0 and fiscal_period != "Q1":
-                    self.logger.warning(
-                        f"⚠️  {symbol} {fiscal_year}-{fiscal_period} has ZERO revenue. "
-                        f"May indicate incomplete data or failed YTD conversion."
-                    )
-
-                # Log which period we're using
-                self.logger.info(
-                    f"[CLEAN ARCH] Fetched company data for {symbol} from processed table: "
-                    f"{fiscal_year}-{fiscal_period} (filed: {row.get('filed_date')}) | Revenue: ${revenue:,.0f}"
-                )
-
-                # Map database columns to old extractor format for compatibility
-                financial_metrics = {
-                    # Income Statement
-                    "revenues": safe_float("total_revenue"),
-                    "net_income": safe_float("net_income"),
-                    "gross_profit": safe_float("gross_profit"),
-                    "operating_income": safe_float("operating_income"),
-                    "cost_of_revenue": safe_float("cost_of_revenue"),
-                    # Balance Sheet (NOTE: Field name mappings for compatibility)
-                    "assets": safe_float("total_assets"),  # total_assets → assets
-                    "equity": safe_float("stockholders_equity"),  # stockholders_equity → equity
-                    "assets_current": safe_float("current_assets"),  # current_assets → assets_current
-                    "liabilities_current": safe_float("current_liabilities"),
-                    "liabilities": safe_float("total_liabilities"),  # total_liabilities → liabilities
-                    "total_debt": safe_float("total_debt"),
-                    "long_term_debt": safe_float("long_term_debt"),
-                    "debt_current": safe_float("short_term_debt"),  # short_term_debt → debt_current
-                    "inventory": safe_float("inventory"),
-                    "cash_and_equivalents": safe_float("cash_and_equivalents"),
-                    # Cash Flow
-                    "operating_cash_flow": safe_float("operating_cash_flow"),
-                    "capital_expenditures": safe_float("capital_expenditures"),
-                    "free_cash_flow": safe_float("free_cash_flow"),
-                    "shares_outstanding": safe_float("shares_outstanding"),
-                    # Metadata
-                    "fiscal_year": row.get("fiscal_year"),
-                    "fiscal_period": row.get("fiscal_period"),
-                    "symbol": row.get("symbol"),
-                    "data_date": row.get("filed_date").isoformat() if row.get("filed_date") else None,
-                    "weighted_average_diluted_shares_outstanding": safe_float(
-                        "weighted_average_diluted_shares_outstanding"
-                    ),
-                    "cash_and_equivalents": safe_float("cash_and_equivalents"),
-                }
-
-                for key in PROCESSED_ADDITIONAL_FINANCIAL_KEYS:
-                    financial_metrics[key] = safe_float(key)
-
-                # Derive critical fields if the canonical tags were missing or zeroed in the warehouse.
-                long_term_debt = financial_metrics.get("long_term_debt") or 0.0
-                short_term_debt = financial_metrics.get("debt_current") or 0.0
-                if not financial_metrics.get("total_debt") and (long_term_debt or short_term_debt):
-                    financial_metrics["total_debt"] = long_term_debt + short_term_debt
-
-                if not financial_metrics.get("cash"):
-                    cash_guess = financial_metrics.get("cash_and_equivalents") or safe_float("cash")
-                    financial_metrics["cash"] = cash_guess
-
-                if not financial_metrics.get("shares_outstanding"):
-                    shares_guess = financial_metrics.get("weighted_average_diluted_shares_outstanding") or safe_float(
-                        "shares_outstanding"
-                    )
-                    financial_metrics["shares_outstanding"] = shares_guess
-
-                financial_ratios = {
-                    # Ratios (already calculated in database)
-                    "current_ratio": safe_float("current_ratio"),
-                    "quick_ratio": safe_float("quick_ratio"),
-                    "debt_to_equity": safe_float("debt_to_equity"),
-                    "roe": safe_float("roe"),
-                    "roa": safe_float("roa"),
-                    "gross_margin": safe_float("gross_margin"),
-                    "operating_margin": safe_float("operating_margin"),
-                    "net_margin": safe_float("net_margin"),
-                    # Metadata
-                    "symbol": row.get("symbol"),
-                    "data_date": row.get("filed_date").isoformat() if row.get("filed_date") else None,
-                    "raw_metrics": financial_metrics,  # Include raw metrics for reference
-                }
-
-                for key in PROCESSED_RATIO_KEYS:
-                    financial_ratios[key] = safe_float(key)
-
-                return {
-                    "financial_metrics": financial_metrics,
-                    "financial_ratios": financial_ratios,
-                    "data_quality_score": safe_float("data_quality_score"),
-                    "source": "clean_architecture",  # Mark as clean architecture source
-                }
+            return fetch_latest_company_data_from_processed_table(
+                symbol=symbol,
+                db_manager=db_manager,
+                logger=self.logger,
+                processed_additional_financial_keys=PROCESSED_ADDITIONAL_FINANCIAL_KEYS,
+                processed_ratio_keys=PROCESSED_RATIO_KEYS,
+            )
 
         except Exception as e:
             self.logger.error(f"[CLEAN ARCH] Failed to fetch company data from processed table for {symbol}: {e}")
@@ -2063,232 +1639,19 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             Dictionary with financial_data, ratios, and quality, or None if not found
         """
         try:
-            from sqlalchemy import text
-
             from investigator.infrastructure.database.db import get_db_manager
 
             engine = get_db_manager().engine
-
-            # DEBUG: Log query parameters
-            self.logger.info(
-                f"🔍 [PROCESSED_TABLE] Querying for {symbol} {fiscal_year}-{fiscal_period} ADSH={adsh[:20]}..."
-            )
-
-            query = text(
-                """
-                SELECT *
-                FROM sec_companyfacts_processed
-                WHERE symbol = :symbol
-                  AND fiscal_year = :fiscal_year
-                  AND fiscal_period = :fiscal_period
-                  AND adsh = :adsh
-                LIMIT 1
-            """
-            )
-
-            with engine.connect() as conn:
-                result = conn.execute(
-                    query,
-                    {
-                        "symbol": symbol.upper(),
-                        "fiscal_year": fiscal_year,
-                        "fiscal_period": fiscal_period,
-                        "adsh": adsh,
-                    },
-                ).fetchone()
-
-            if not result:
-                self.logger.warning(
-                    f"❌ [PROCESSED_TABLE] No data found for {symbol} {fiscal_year}-{fiscal_period} ADSH={adsh[:20]}"
-                )
-                return None
-
-            row = dict(result._mapping)
-
-            # Helper to convert Decimal to float (database returns Decimal type)
-            from decimal import Decimal
-
-            def to_float(val):
-                if val is None:
-                    return 0.0
-                if isinstance(val, Decimal):
-                    return float(val)
-                try:
-                    return float(val)
-                except (TypeError, ValueError):
-                    return 0.0
-
-            # CLEAN ARCHITECTURE: Statement-level structure matching GAAP
-            # Organized by financial statement type with YTD tracking
-
-            # Get FiscalPeriodService for centralized YTD detection
             fiscal_period_service = get_fiscal_period_service()
-
-            # Determine if this is YTD data based on statement-specific qtrs values
-            # qtrs=1 means point-in-time, qtrs>=2 means YTD cumulative
-            income_qtrs_val = row.get("income_statement_qtrs")
-            cashflow_qtrs_val = row.get("cash_flow_statement_qtrs")
-            is_ytd_income = fiscal_period_service.is_ytd(income_qtrs_val) if income_qtrs_val else False
-            is_ytd_cashflow = fiscal_period_service.is_ytd(cashflow_qtrs_val) if cashflow_qtrs_val else False
-
-            ocf_val = to_float(row.get("operating_cash_flow"))
-            capex_val = to_float(row.get("capital_expenditures"))
-            raw_fcf = row.get("free_cash_flow")  # preserve original for diagnostics
-            free_cash_flow_val = to_float(row.get("free_cash_flow"))
-
-            # Derive FCF when missing or zero (common gap in historical records)
-            if (raw_fcf is None or abs(free_cash_flow_val) < 1e-6) and (ocf_val is not None and capex_val is not None):
-                derived_fcf = float(ocf_val) - abs(float(capex_val))
-                free_cash_flow_val = derived_fcf
-                if abs(derived_fcf) > 1e-6:
-                    self.logger.debug(
-                        "🔄 [PROCESSED_TABLE] Derived FCF for %s %s-%s via OCF %.2f - |CapEx| %.2f = %.2f",
-                        symbol,
-                        fiscal_year,
-                        fiscal_period,
-                        ocf_val,
-                        capex_val,
-                        derived_fcf,
-                    )
-
-            data = {
-                # Metadata
-                "fiscal_year": fiscal_year,
-                "fiscal_period": fiscal_period,
-                "adsh": adsh,
-                # Income Statement (YTD based on income_statement_qtrs)
-                "income_statement": {
-                    "total_revenue": to_float(row.get("total_revenue")),
-                    "net_income": to_float(row.get("net_income")),
-                    "gross_profit": to_float(row.get("gross_profit")),
-                    "operating_income": to_float(row.get("operating_income")),
-                    "cost_of_revenue": to_float(row.get("cost_of_revenue")),
-                    "research_and_development_expense": to_float(row.get("research_and_development_expense")),
-                    "selling_general_administrative_expense": to_float(
-                        row.get("selling_general_administrative_expense")
-                    ),
-                    "operating_expenses": to_float(row.get("operating_expenses")),
-                    "interest_expense": to_float(row.get("interest_expense")),
-                    "income_tax_expense": to_float(row.get("income_tax_expense")),
-                    "earnings_per_share": to_float(row.get("earnings_per_share")),
-                    "earnings_per_share_diluted": to_float(row.get("earnings_per_share_diluted")),
-                    "preferred_stock_dividends": to_float(row.get("preferred_stock_dividends")),
-                    "common_stock_dividends": to_float(row.get("common_stock_dividends")),
-                    "weighted_average_diluted_shares_outstanding": to_float(
-                        row.get("weighted_average_diluted_shares_outstanding")
-                    ),
-                    "is_ytd": is_ytd_income,
-                },
-                # Cash Flow Statement (YTD based on cash_flow_statement_qtrs)
-                "cash_flow": {
-                    "operating_cash_flow": ocf_val,
-                    "capital_expenditures": capex_val,
-                    "free_cash_flow": free_cash_flow_val,
-                    "dividends_paid": to_float(row.get("dividends_paid")),
-                    "investing_cash_flow": to_float(row.get("investing_cash_flow")),
-                    "financing_cash_flow": to_float(row.get("financing_cash_flow")),
-                    "depreciation_amortization": to_float(row.get("depreciation_amortization")),
-                    "stock_based_compensation": to_float(row.get("stock_based_compensation")),
-                    "preferred_stock_dividends": to_float(row.get("preferred_stock_dividends")),
-                    "common_stock_dividends": to_float(row.get("common_stock_dividends")),
-                    "is_ytd": is_ytd_cashflow,
-                },
-                # Balance Sheet (ALWAYS point-in-time snapshot)
-                "balance_sheet": {
-                    "total_assets": to_float(row.get("total_assets")),
-                    "total_liabilities": to_float(row.get("total_liabilities")),
-                    "stockholders_equity": to_float(row.get("stockholders_equity")),
-                    "current_assets": to_float(row.get("current_assets")),
-                    "current_liabilities": to_float(row.get("current_liabilities")),
-                    "retained_earnings": to_float(row.get("retained_earnings")),
-                    "accounts_payable": to_float(row.get("accounts_payable")),
-                    "accrued_liabilities": to_float(row.get("accrued_liabilities")),
-                    "long_term_debt": to_float(row.get("long_term_debt")),
-                    "short_term_debt": to_float(row.get("short_term_debt")),
-                    "total_debt": to_float(row.get("total_debt")),
-                    "net_debt": to_float(row.get("net_debt")),
-                    "cash_and_equivalents": to_float(row.get("cash_and_equivalents")),
-                    "accounts_receivable": to_float(row.get("accounts_receivable")),
-                    "inventory": to_float(row.get("inventory")),
-                    "property_plant_equipment": to_float(row.get("property_plant_equipment")),
-                    "accumulated_depreciation": to_float(row.get("accumulated_depreciation")),
-                    "property_plant_equipment_net": to_float(row.get("property_plant_equipment_net")),
-                    "goodwill": to_float(row.get("goodwill")),
-                    "intangible_assets": to_float(row.get("intangible_assets")),
-                    "deferred_revenue": to_float(row.get("deferred_revenue")),
-                    "treasury_stock": to_float(row.get("treasury_stock")),
-                    "other_comprehensive_income": to_float(row.get("other_comprehensive_income")),
-                    "book_value": to_float(row.get("book_value")),
-                    "book_value_per_share": to_float(row.get("book_value_per_share")),
-                    "working_capital": to_float(row.get("working_capital")),
-                },
-                "market_metrics": {
-                    "market_cap": to_float(row.get("market_cap")),
-                    "enterprise_value": to_float(row.get("enterprise_value")),
-                    "shares_outstanding": to_float(row.get("shares_outstanding")),
-                },
-                # Financial Ratios (organized by category)
-                "ratios": {
-                    "liquidity": {
-                        "current_ratio": to_float(row.get("current_ratio")),
-                        "quick_ratio": to_float(row.get("quick_ratio")),
-                    },
-                    "leverage": {
-                        "debt_to_equity": to_float(row.get("debt_to_equity")),
-                        "interest_coverage": to_float(row.get("interest_coverage")),
-                    },
-                    "profitability": {
-                        "roa": to_float(row.get("roa")),
-                        "roe": to_float(row.get("roe")),
-                        "gross_margin": to_float(row.get("gross_margin")),
-                        "operating_margin": to_float(row.get("operating_margin")),
-                        "net_margin": to_float(row.get("net_margin")),
-                        # return_on_assets and return_on_equity columns dropped (duplicates of roa/roe)
-                    },
-                    "efficiency": {
-                        "asset_turnover": to_float(row.get("asset_turnover")),
-                    },
-                    "distribution": {
-                        "dividend_payout_ratio": to_float(row.get("dividend_payout_ratio")),
-                        "dividend_yield": to_float(row.get("dividend_yield")),
-                    },
-                    "tax": {
-                        "effective_tax_rate": to_float(row.get("effective_tax_rate")),
-                    },
-                },
-                # Data Quality
-                "data_quality_score": to_float(row.get("data_quality_score")),
-            }
-
-            # 🔍 DEBUG TRACE: Log interest_expense after income_statement extraction from database
-            interest_expense = data["income_statement"].get("interest_expense", 0)
-            income_tax_expense = data["income_statement"].get("income_tax_expense", 0)
-            self.logger.info(
-                f"🔍 [FUNDAMENTAL_FETCH] {symbol} {fiscal_year}-{fiscal_period} income_statement: "
-                f"interest_expense=${interest_expense/1e6:.2f}M, income_tax=${income_tax_expense/1e9:.2f}B"
+            return fetch_processed_quarter_payload(
+                symbol=symbol,
+                fiscal_year=fiscal_year,
+                fiscal_period=fiscal_period,
+                adsh=adsh,
+                engine=engine,
+                fiscal_period_service=fiscal_period_service,
+                logger=self.logger,
             )
-
-            # DEBUG: Log successful retrieval with detailed YTD info
-            revenue = data["income_statement"]["total_revenue"]
-            ocf = data["cash_flow"]["operating_cash_flow"]
-            capex = data["cash_flow"]["capital_expenditures"]
-            fcf = data["cash_flow"]["free_cash_flow"]
-
-            # Show YTD status for each statement type
-            inc_ytd_str = "YTD" if is_ytd_income else "PIT"
-            cf_ytd_str = "YTD" if is_ytd_cashflow else "PIT"
-
-            self.logger.info(
-                f"✅ [PROCESSED_TABLE] {symbol} {fiscal_year}-{fiscal_period}: "
-                f"Income({inc_ytd_str}, qtrs={income_qtrs_val or 'NULL'}), "
-                f"CashFlow({cf_ytd_str}, qtrs={cashflow_qtrs_val or 'NULL'})"
-            )
-            self.logger.info(
-                f"   📊 Raw DB Values: Revenue=${revenue/1e9:.2f}B, "
-                f"OCF=${ocf/1e9:.2f}B, CapEx=${capex/1e9:.2f}B, FCF=${fcf/1e9:.2f}B"
-            )
-
-            return data
 
         except Exception as e:
             self.logger.warning(f"Error fetching from processed table for {symbol}: {e}")
@@ -2353,451 +1716,55 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         return ratios
 
     def _assess_quarter_quality(self, financial_data: Dict) -> Dict:
-        """
-        Assess data quality for a single quarter.
+        """Delegate single-quarter quality checks to DataQualityAssessor."""
+        return self._get_data_quality_assessor().assess_quarter_quality(financial_data)
 
-        Args:
-            financial_data: Financial metrics for the quarter
+    def _get_data_quality_assessor(self):
+        """Lazily resolve data quality assessor to keep agent methods thin and testable."""
+        assessor = getattr(self, "_data_quality_assessor", None)
+        if assessor is None:
+            assessor = get_data_quality_assessor(getattr(self, "logger", None))
+            self._data_quality_assessor = assessor
+        return assessor
 
-        Returns:
-            Dictionary with quality metrics (completeness, consistency)
-        """
-        required_fields = [
-            "revenues",
-            "net_income",
-            "total_assets",
-            "total_liabilities",
-            "stockholders_equity",
-            "operating_cash_flow",
-            "capital_expenditures",
-        ]
+    def _get_trend_analyzer(self):
+        """Lazily resolve trend analyzer to keep agent methods thin and testable."""
+        analyzer = getattr(self, "_trend_analyzer", None)
+        if analyzer is None:
+            analyzer = get_trend_analyzer(getattr(self, "logger", None))
+            self._trend_analyzer = analyzer
+        return analyzer
 
-        # Calculate completeness (% of required fields present and non-zero)
-        present_fields = sum(1 for field in required_fields if financial_data.get(field, 0) != 0)
-        completeness = (present_fields / len(required_fields)) * 100
-
-        # Calculate consistency (basic sanity checks)
-        consistency_score = 100.0
-        issues = []
-
-        # Check: Assets = Liabilities + Equity (within 5% tolerance)
-        assets = financial_data.get("total_assets", 0)
-        liabilities = financial_data.get("total_liabilities", 0)
-        equity = financial_data.get("stockholders_equity", 0)
-
-        if assets > 0:
-            balance = liabilities + equity
-            balance_error = abs(assets - balance) / assets
-            if balance_error > 0.05:  # 5% tolerance
-                consistency_score -= 20
-                issues.append(f"Balance sheet mismatch: {balance_error:.1%}")
-
-        # Check: Revenue > 0 and reasonable relative to assets
-        revenue = financial_data.get("revenues", 0)
-        if revenue <= 0:
-            consistency_score -= 30
-            issues.append("Zero or negative revenue")
-
-        # Check: OCF should be reasonable relative to net income
-        ocf = financial_data.get("operating_cash_flow", 0)
-        net_income = financial_data.get("net_income", 0)
-        if net_income != 0 and ocf != 0:
-            cash_conversion = ocf / net_income
-            if cash_conversion < 0.3 or cash_conversion > 5.0:
-                consistency_score -= 15
-                issues.append(f"Unusual cash conversion: {cash_conversion:.1f}x")
-
-        return {
-            "completeness": completeness,
-            "consistency": max(0, consistency_score),  # Ensure non-negative
-            "issues": issues,
-        }
+    def _get_deterministic_analyzer(self) -> DeterministicAnalyzer:
+        """Lazily resolve per-agent deterministic analyzer for rule-based sub-analyses."""
+        analyzer = getattr(self, "_deterministic_analyzer", None)
+        if analyzer is None:
+            analyzer = DeterministicAnalyzer(
+                agent_id=getattr(self, "agent_id", "fundamental_analysis"),
+                logger=getattr(self, "logger", None),
+            )
+            self._deterministic_analyzer = analyzer
+        return analyzer
 
     def _analyze_revenue_trend(self, quarterly_data: List[QuarterlyData]) -> Dict:
-        """
-        Analyze revenue trend: accelerating, stable, or decelerating.
-
-        Args:
-            quarterly_data: List of QuarterlyData objects (chronologically sorted)
-
-        Returns:
-            Dictionary with:
-                - trend: 'accelerating', 'stable', or 'decelerating'
-                - q_over_q_growth: List of quarter-over-quarter growth rates (%)
-                - y_over_y_growth: List of year-over-year growth rates (%)
-                - average_growth: Average Q/Q growth rate (%)
-                - volatility: Standard deviation of Q/Q growth (%)
-                - consistency_score: 0-100 (higher = more consistent)
-        """
-        if len(quarterly_data) < 2:
-            return {
-                "trend": "insufficient_data",
-                "q_over_q_growth": [],
-                "y_over_y_growth": [],
-                "average_growth": 0.0,
-                "volatility": 0.0,
-                "consistency_score": 0.0,
-            }
-
-        # Extract revenues
-        revenues = [q.financial_data.get("revenues", 0) for q in quarterly_data]
-
-        # Calculate Q/Q growth rates
-        qoq_growth = []
-        for i in range(1, len(revenues)):
-            if revenues[i - 1] > 0:
-                growth = ((float(revenues[i]) - float(revenues[i - 1])) / float(revenues[i - 1])) * 100
-                qoq_growth.append(growth)
-            else:
-                qoq_growth.append(0.0)
-
-        # Calculate Y/Y growth rates (4 quarters lag)
-        yoy_growth = []
-        for i in range(4, len(revenues)):
-            if revenues[i - 4] > 0:
-                growth = ((float(revenues[i]) - float(revenues[i - 4])) / float(revenues[i - 4])) * 100
-                yoy_growth.append(growth)
-            else:
-                yoy_growth.append(0.0)
-
-        # Calculate average growth
-        avg_growth = sum(qoq_growth) / len(qoq_growth) if qoq_growth else 0.0
-
-        # Calculate volatility (standard deviation)
-        if len(qoq_growth) > 1:
-            variance = sum((g - avg_growth) ** 2 for g in qoq_growth) / len(qoq_growth)
-            volatility = variance**0.5
-        else:
-            volatility = 0.0
-
-        # Calculate consistency score (0-100, inverse of volatility)
-        # Low volatility → high consistency
-        # Normalize: volatility of 10% → score of 0, volatility of 0% → score of 100
-        if volatility > 0:
-            consistency_score = max(0, min(100, 100 - (volatility * 5)))
-        else:
-            consistency_score = 100.0
-
-        # Determine trend (accelerating, stable, or decelerating)
-        # Compare early vs late quarters
-        if len(qoq_growth) >= 6:
-            early_avg = sum(qoq_growth[:3]) / 3
-            late_avg = sum(qoq_growth[-3:]) / 3
-
-            # Threshold for acceleration/deceleration: 2 percentage points
-            if late_avg > early_avg + 2.0:
-                trend = "accelerating"
-            elif late_avg < early_avg - 2.0:
-                trend = "decelerating"
-            else:
-                trend = "stable"
-        else:
-            # Not enough data for trend determination
-            trend = "stable"
-
-        return {
-            "trend": trend,
-            "q_over_q_growth": [round(g, 2) for g in qoq_growth],
-            "y_over_y_growth": [round(g, 2) for g in yoy_growth],
-            "average_growth": round(avg_growth, 2),
-            "volatility": round(volatility, 2),
-            "consistency_score": round(consistency_score, 1),
-        }
+        """Delegate revenue trend analysis to dedicated TrendAnalyzer service."""
+        return self._get_trend_analyzer().analyze_revenue_trend(quarterly_data)
 
     def _analyze_margin_trend(self, quarterly_data: List[QuarterlyData]) -> Dict:
-        """
-        Analyze margin trends: expanding, stable, or contracting.
-
-        Args:
-            quarterly_data: List of QuarterlyData objects (chronologically sorted)
-
-        Returns:
-            Dictionary with margin trends and historical values
-        """
-        if len(quarterly_data) < 2:
-            return {
-                "gross_margin_trend": "insufficient_data",
-                "operating_margin_trend": "insufficient_data",
-                "net_margin_trend": "insufficient_data",
-                "gross_margins": [],
-                "operating_margins": [],
-                "net_margins": [],
-            }
-
-        gross_margins = []
-        operating_margins = []
-        net_margins = []
-
-        for q in quarterly_data:
-            revenue = q.financial_data.get("revenues", 0)
-            net_income = q.financial_data.get("net_income", 0)
-
-            # Calculate margins
-            if revenue > 0:
-                # Net margin (we have this directly)
-                net_margin = (float(net_income) / float(revenue)) * 100
-                net_margins.append(net_margin)
-
-                # For gross and operating margins, use ratios if available
-                if q.ratios:
-                    gross_margin = q.ratios.get("profit_margin", net_margin)
-                    operating_margin = q.ratios.get("profit_margin", net_margin)
-                else:
-                    # Fallback to net margin as proxy
-                    gross_margin = net_margin
-                    operating_margin = net_margin
-
-                gross_margins.append(gross_margin)
-                operating_margins.append(operating_margin)
-            else:
-                gross_margins.append(0.0)
-                operating_margins.append(0.0)
-                net_margins.append(0.0)
-
-        # Determine trends (compare early vs late quarters)
-        def determine_margin_trend(margins):
-            if len(margins) < 4:
-                return "stable"
-
-            early_avg = sum(float(m) for m in margins[: len(margins) // 2]) / (len(margins) // 2)
-            late_avg = sum(float(m) for m in margins[len(margins) // 2 :]) / (len(margins) - len(margins) // 2)
-
-            # Threshold: 1 percentage point
-            if late_avg > early_avg + 1.0:
-                return "expanding"
-            elif late_avg < early_avg - 1.0:
-                return "contracting"
-            else:
-                return "stable"
-
-        return {
-            "gross_margin_trend": determine_margin_trend(gross_margins),
-            "operating_margin_trend": determine_margin_trend(operating_margins),
-            "net_margin_trend": determine_margin_trend(net_margins),
-            "gross_margins": [round(m, 2) for m in gross_margins],
-            "operating_margins": [round(m, 2) for m in operating_margins],
-            "net_margins": [round(m, 2) for m in net_margins],
-        }
+        """Delegate margin trend analysis to dedicated TrendAnalyzer service."""
+        return self._get_trend_analyzer().analyze_margin_trend(quarterly_data)
 
     def _analyze_cash_flow_trend(self, quarterly_data: List[QuarterlyData]) -> Dict:
-        """
-        Analyze cash flow quality and trend.
-
-        Args:
-            quarterly_data: List of QuarterlyData objects (chronologically sorted)
-
-        Returns:
-            Dictionary with cash flow metrics and quality score
-        """
-        if len(quarterly_data) < 2:
-            return {
-                "trend": "insufficient_data",
-                "operating_cash_flow": [],
-                "free_cash_flow": [],
-                "cash_conversion_ratio": [],
-                "quality_of_earnings": 0.0,
-            }
-
-        ocf_values = []
-        fcf_values = []
-        cash_conversion = []
-
-        for q in quarterly_data:
-            ocf = q.financial_data.get("operating_cash_flow", 0)
-            capex = q.financial_data.get("capital_expenditures", 0)
-            net_income = q.financial_data.get("net_income", 0)
-
-            ocf_values.append(ocf)
-            fcf = ocf - capex
-            fcf_values.append(fcf)
-
-            # Cash conversion ratio (OCF / Net Income)
-            if net_income > 0:
-                conversion = (ocf / net_income) * 100
-                cash_conversion.append(conversion)
-            else:
-                cash_conversion.append(0.0)
-
-        # Determine trend
-        if len(ocf_values) >= 4:
-            early_avg = sum(ocf_values[: len(ocf_values) // 2]) / (len(ocf_values) // 2)
-            late_avg = sum(ocf_values[len(ocf_values) // 2 :]) / (len(ocf_values) - len(ocf_values) // 2)
-
-            if late_avg > early_avg * 1.1:  # 10% improvement
-                trend = "improving"
-            elif late_avg < early_avg * 0.9:  # 10% decline
-                trend = "deteriorating"
-            else:
-                trend = "stable"
-        else:
-            trend = "stable"
-
-        # Quality of earnings score (0-100)
-        # Based on cash conversion ratio
-        # >100% = excellent (95-100), 80-100% = good (80-95), 50-80% = fair (50-80), <50% = poor (0-50)
-        if cash_conversion:
-            avg_conversion = sum(cash_conversion) / len(cash_conversion)
-            if avg_conversion >= 100:
-                quality_score = min(100, 95 + (avg_conversion - 100) / 20)
-            elif avg_conversion >= 80:
-                quality_score = 80 + (avg_conversion - 80)
-            elif avg_conversion >= 50:
-                quality_score = 50 + (avg_conversion - 50) * 0.6
-            else:
-                quality_score = avg_conversion
-        else:
-            quality_score = 0.0
-
-        return {
-            "trend": trend,
-            "operating_cash_flow": [round(ocf, 0) for ocf in ocf_values],
-            "free_cash_flow": [round(fcf, 0) for fcf in fcf_values],
-            "cash_conversion_ratio": [round(cc, 1) for cc in cash_conversion],
-            "quality_of_earnings": round(quality_score, 1),
-        }
+        """Delegate cash flow trend analysis to dedicated TrendAnalyzer service."""
+        return self._get_trend_analyzer().analyze_cash_flow_trend(quarterly_data)
 
     def _calculate_quarterly_comparisons(self, quarterly_data: List[QuarterlyData]) -> Dict:
-        """
-        Calculate quarter-over-quarter and year-over-year comparisons.
-
-        Args:
-            quarterly_data: List of QuarterlyData objects (chronologically sorted)
-
-        Returns:
-            Dictionary with Q/Q and Y/Y comparisons for key metrics
-        """
-        if len(quarterly_data) < 2:
-            return {
-                "q_over_q": {"revenue": [], "net_income": [], "eps": []},
-                "y_over_y": {"revenue": [], "net_income": [], "eps": []},
-            }
-
-        revenues = [q.financial_data.get("revenues", 0) for q in quarterly_data]
-        net_incomes = [q.financial_data.get("net_income", 0) for q in quarterly_data]
-
-        # Q/Q comparisons
-        qoq_revenue = []
-        qoq_net_income = []
-
-        for i in range(1, len(revenues)):
-            if revenues[i - 1] > 0:
-                qoq_revenue.append(((float(revenues[i]) - float(revenues[i - 1])) / float(revenues[i - 1])) * 100)
-            else:
-                qoq_revenue.append(0.0)
-
-            if net_incomes[i - 1] > 0:
-                qoq_net_income.append(
-                    ((float(net_incomes[i]) - float(net_incomes[i - 1])) / float(net_incomes[i - 1])) * 100
-                )
-            else:
-                qoq_net_income.append(0.0)
-
-        # Y/Y comparisons (4 quarters lag)
-        yoy_revenue = []
-        yoy_net_income = []
-
-        for i in range(4, len(revenues)):
-            if revenues[i - 4] > 0:
-                yoy_revenue.append(((float(revenues[i]) - float(revenues[i - 4])) / float(revenues[i - 4])) * 100)
-            else:
-                yoy_revenue.append(0.0)
-
-            if net_incomes[i - 4] > 0:
-                yoy_net_income.append(
-                    ((float(net_incomes[i]) - float(net_incomes[i - 4])) / float(net_incomes[i - 4])) * 100
-                )
-            else:
-                yoy_net_income.append(0.0)
-
-        return {
-            "q_over_q": {
-                "revenue": [round(g, 2) for g in qoq_revenue],
-                "net_income": [round(g, 2) for g in qoq_net_income],
-                "eps": [],  # EPS not yet calculated
-            },
-            "y_over_y": {
-                "revenue": [round(g, 2) for g in yoy_revenue],
-                "net_income": [round(g, 2) for g in yoy_net_income],
-                "eps": [],  # EPS not yet calculated
-            },
-        }
+        """Delegate quarterly comparisons to dedicated TrendAnalyzer service."""
+        return self._get_trend_analyzer().calculate_quarterly_comparisons(quarterly_data)
 
     def _detect_cyclical_patterns(self, quarterly_data: List[QuarterlyData]) -> Dict:
-        """
-        Detect seasonal/cyclical business patterns.
-
-        Args:
-            quarterly_data: List of QuarterlyData objects (chronologically sorted)
-
-        Returns:
-            Dictionary with cyclical pattern analysis
-        """
-        if len(quarterly_data) < 8:
-            return {
-                "is_cyclical": False,
-                "seasonal_pattern": "insufficient_data",
-                "quarterly_strength": {},
-                "pattern_confidence": 0.0,
-            }
-
-        # Group revenues by quarter (Q1, Q2, Q3, Q4)
-        quarter_revenues = {"Q1": [], "Q2": [], "Q3": [], "Q4": []}
-
-        for q in quarterly_data:
-            period = q.fiscal_period
-            revenue = q.financial_data.get("revenues", 0)
-            if period in quarter_revenues:
-                quarter_revenues[period].append(revenue)
-
-        # Calculate average revenue per quarter
-        quarter_averages = {}
-        for period, revenues in quarter_revenues.items():
-            if revenues:
-                quarter_averages[period] = sum(revenues) / len(revenues)
-            else:
-                quarter_averages[period] = 0
-
-        # Calculate overall average
-        overall_avg = sum(quarter_averages.values()) / len(quarter_averages) if quarter_averages else 0
-
-        # Calculate strength (% above/below average)
-        quarterly_strength = {}
-        for period, avg in quarter_averages.items():
-            if overall_avg > 0:
-                strength = ((avg - overall_avg) / overall_avg) * 100
-                quarterly_strength[period] = round(strength, 1)
-            else:
-                quarterly_strength[period] = 0.0
-
-        # Determine if cyclical (any quarter > 15% different from average)
-        max_deviation = max(abs(s) for s in quarterly_strength.values())
-        is_cyclical = max_deviation > 15.0
-
-        # Identify strongest quarter
-        strongest_quarter = max(quarterly_strength, key=quarterly_strength.get)
-
-        # Pattern confidence (based on consistency across years)
-        # Higher confidence if pattern repeats
-        if len(quarterly_data) >= 8:
-            pattern_confidence = min(100, max_deviation * 3)
-        else:
-            pattern_confidence = max_deviation * 2
-
-        # Determine seasonal pattern
-        if is_cyclical:
-            if quarterly_strength[strongest_quarter] > 15:
-                seasonal_pattern = f"{strongest_quarter}_strong"
-            else:
-                seasonal_pattern = "moderate_cyclical"
-        else:
-            seasonal_pattern = "non_cyclical"
-
-        return {
-            "is_cyclical": is_cyclical,
-            "seasonal_pattern": seasonal_pattern,
-            "quarterly_strength": quarterly_strength,
-            "pattern_confidence": round(pattern_confidence, 1),
-        }
+        """Delegate cyclical pattern detection to dedicated TrendAnalyzer service."""
+        return self._get_trend_analyzer().detect_cyclical_patterns(quarterly_data)
 
     async def _calculate_financial_ratios(self, company_data: Dict) -> Dict:
         """Calculate comprehensive financial ratios"""
@@ -3012,211 +1979,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         return ratios
 
     def _assess_data_quality(self, company_data: Dict, ratios: Dict) -> Dict:
-        """
-        Assess the quality and completeness of financial data.
-        Returns a data quality score (0-100) and detailed assessment.
-
-        FEATURE #1: Data Quality Scoring (migrated from old solution)
-        Similar to old solution's extraction-level quality scoring.
-
-        Also tracks raw extraction quality vs enhanced quality to quantify
-        value of data enrichment (market data integration, ratio calculations).
-
-        ENHANCEMENT: Now uses DataNormalizer for schema harmonization and
-        includes debt metrics in completeness scoring.
-        """
-        financials = company_data.get("financials") or {}
-        market_data = company_data.get("market_data") or {}
-
-        # Step 1: Normalize field names to snake_case for internal consistency
-        # Note: DataNormalizer.assess_completeness() internally converts to camelCase
-        # for checking against CORE_METRICS, so we normalize to snake_case here first
-        normalized_financials = DataNormalizer.normalize_field_names(financials, to_camel_case=False)
-
-        # Step 2: Use DataNormalizer's enhanced completeness assessment (includes debt metrics)
-        completeness_assessment = DataNormalizer.assess_completeness(normalized_financials, include_debt_metrics=True)
-
-        core_populated = completeness_assessment["core_metrics_count"]
-        debt_populated = completeness_assessment["debt_metrics_count"]
-
-        # Log warnings for missing debt metrics (explicit upstream gap tracking)
-        if completeness_assessment["missing_debt"]:
-            symbol = company_data.get("symbol", "UNKNOWN")
-            missing_debt_str = ", ".join(completeness_assessment["missing_debt"])
-            self.logger.warning(
-                f"⚠️  UPSTREAM DATA GAP for {symbol}: Missing debt metrics: {missing_debt_str}. "
-                f"Debt-related ratios may be unreliable."
-            )
-
-        # Market data metrics (check both camelCase and snake_case for compatibility).
-        # NOTE: this dual check keeps legacy prompts (marketCap) and new pipeline fields (market_cap)
-        # in sync, which prevents false "1/2 populated" warnings in data quality logs.
-        has_price = market_data.get("current_price", 0) != 0 or company_data.get("current_price", 0) != 0
-        has_market_cap = (
-            market_data.get("market_cap", 0) != 0
-            or market_data.get("market_cap", 0) != 0
-            or company_data.get("market_cap", 0) != 0
-            or company_data.get("market_cap", 0) != 0
-        )
-        market_populated = (1 if has_price else 0) + (1 if has_market_cap else 0)
-
-        # Calculated ratio metrics (from _calculate_financial_ratios)
-        ratio_metrics = [
-            "pe_ratio",
-            "price_to_book",
-            "current_ratio",
-            "debt_to_equity",
-            "roe",
-            "roa",
-            "gross_margin",
-            "operating_margin",
-        ]
-        ratio_populated = sum(1 for m in ratio_metrics if ratios.get(m, 0) != 0)
-
-        # Calculate completeness scores
-        # Use DataNormalizer's score for core metrics, then add market/ratio components
-        core_completeness = completeness_assessment["score"]  # Already includes debt metrics
-        market_completeness = (market_populated / 2) * 100  # 2 metrics: price + market_cap
-        ratio_completeness = (ratio_populated / len(ratio_metrics)) * 100
-
-        # Overall completeness (weighted average)
-        # Core+Debt: 50%, Market data: 25%, Ratios: 25%
-        completeness_score = core_completeness * 0.50 + market_completeness * 0.25 + ratio_completeness * 0.25
-
-        # Check for data consistency (red flags)
-        consistency_issues = []
-
-        # Check for impossible values (with None-safe comparisons)
-        net_income = financials.get("net_income") or 0
-        total_revenue = financials.get("revenues") or 0
-        if net_income < 0 and total_revenue > 0:
-            if abs(net_income) > total_revenue:
-                consistency_issues.append("Net loss exceeds revenue (possible data error)")
-
-        current_liabilities = financials.get("current_liabilities") or 0
-        total_assets = financials.get("total_assets") or 0
-        if current_liabilities > 0 and total_assets > 0 and current_liabilities > total_assets:
-            consistency_issues.append("Current liabilities exceed total assets (data warning)")
-
-        current_ratio = ratios.get("current_ratio") or 0
-        if current_ratio > 100:  # Impossibly high current ratio
-            consistency_issues.append("Unrealistic current ratio (possible unit error)")
-
-        # Calculate consistency score (100 if no issues, -10 for each issue)
-        consistency_score = max(0, 100 - (len(consistency_issues) * 10))
-
-        # ENHANCEMENT: Explicit warnings for zeroed critical ratios due to upstream gaps
-        symbol = company_data.get("symbol", "UNKNOWN")
-        DataNormalizer.validate_and_warn(ratios, symbol, self.logger)
-
-        # Calculate overall data quality score
-        # Completeness: 70%, Consistency: 30%
-        data_quality_score = (completeness_score * 0.70) + (consistency_score * 0.30)
-
-        # Determine quality grade
-        if data_quality_score >= 90:
-            quality_grade = "Excellent"
-        elif data_quality_score >= 75:
-            quality_grade = "Good"
-        elif data_quality_score >= 60:
-            quality_grade = "Fair"
-        elif data_quality_score >= 40:
-            quality_grade = "Poor"
-        else:
-            quality_grade = "Very Poor"
-
-        # FEATURE #3: Enhanced vs Extraction Quality Comparison
-        # Calculate "extraction quality" (raw financial data only, before enrichment)
-        extraction_completeness = core_completeness  # Only SEC financial data
-        extraction_quality = (extraction_completeness * 0.70) + (consistency_score * 0.30)
-
-        # Calculate enhancement delta
-        quality_improvement = data_quality_score - extraction_quality
-        improvement_sources = []
-
-        if market_populated > 0:
-            improvement_sources.append(f"market data (+{market_populated} metrics)")
-        if ratio_populated > 0:
-            improvement_sources.append(f"calculated ratios (+{ratio_populated} metrics)")
-
-        # Generate enhancement summary
-        if quality_improvement > 0:
-            enhancement_summary = (
-                f"Data enrichment improved quality by {quality_improvement:.1f} points "
-                f"({extraction_quality:.1f}% → {data_quality_score:.1f}%) through: "
-                f"{', '.join(improvement_sources)}"
-            )
-        else:
-            enhancement_summary = "No data enrichment applied (extraction-only data)"
-
-        return {
-            "data_quality_score": round(data_quality_score, 1),
-            "quality_grade": quality_grade,
-            "completeness_score": round(completeness_score, 1),
-            "consistency_score": round(consistency_score, 1),
-            "core_metrics_populated": f"{core_populated}/{completeness_assessment['core_metrics_total']}",
-            "market_metrics_populated": f"{market_populated}/2",
-            "ratio_metrics_populated": f"{ratio_populated}/{len(ratio_metrics)}",
-            "consistency_issues": consistency_issues,
-            "assessment": f"Data quality is {quality_grade.lower()} with {completeness_score:.0f}% completeness",
-            # FEATURE #3: Enhanced vs extraction quality tracking
-            "extraction_quality": round(extraction_quality, 1),
-            "quality_improvement": round(quality_improvement, 1),
-            "improvement_sources": improvement_sources,
-            "enhancement_summary": enhancement_summary,
-        }
+        """Delegate comprehensive data quality scoring to DataQualityAssessor."""
+        return self._get_data_quality_assessor().assess_data_quality(company_data, ratios)
 
     def _calculate_confidence_level(self, data_quality: Dict) -> Dict:
-        """
-        Calculate confidence level based on data quality score.
-
-        FEATURE #2: Confidence Level Adjustment (migrated from old solution concept)
-        Maps data quality score to confidence level for investment decisions.
-
-        Args:
-            data_quality: Data quality assessment from _assess_data_quality()
-
-        Returns:
-            Dict with confidence_level, confidence_score, and rationale
-        """
-        data_quality_score = data_quality.get("data_quality_score", 0)
-        quality_grade = data_quality.get("quality_grade", "Unknown")
-        consistency_issues = data_quality.get("consistency_issues", [])
-
-        # Map data quality score to confidence level
-        if data_quality_score >= 90:
-            confidence_level = "VERY HIGH"
-            confidence_score = 95
-            rationale = "Excellent data quality with complete, consistent financial metrics"
-        elif data_quality_score >= 75:
-            confidence_level = "HIGH"
-            confidence_score = 85
-            rationale = "Good data quality with minor gaps, analysis is reliable"
-        elif data_quality_score >= 60:
-            confidence_level = "MODERATE"
-            confidence_score = 70
-            rationale = "Fair data quality with some gaps, exercise caution in decision-making"
-        elif data_quality_score >= 40:
-            confidence_level = "LOW"
-            confidence_score = 50
-            rationale = "Poor data quality with significant gaps, recommendations should be treated with skepticism"
-        else:
-            confidence_level = "VERY LOW"
-            confidence_score = 30
-            rationale = "Very poor data quality, analysis may be unreliable, seek additional data sources"
-
-        # Adjust confidence down if there are consistency issues
-        if consistency_issues:
-            confidence_score -= 10
-            rationale += f" (adjusted down due to {len(consistency_issues)} data consistency issue(s))"
-
-        return {
-            "confidence_level": confidence_level,
-            "confidence_score": confidence_score,
-            "rationale": rationale,
-            "based_on_data_quality": data_quality_score,
-            "quality_grade": quality_grade,
-        }
+        """Delegate confidence mapping to DataQualityAssessor."""
+        return self._get_data_quality_assessor().calculate_confidence_level(data_quality)
 
     def _sanitize_for_llm(self, company_data: Dict, ratios: Dict, symbol: str) -> tuple:
         """
@@ -3351,22 +2119,7 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
     def _build_deterministic_response(self, label: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Return a structure consistent with _wrap_llm_response for rule-based analyses."""
-        return {
-            "response": payload,
-            "prompt": "",
-            "model_info": {
-                "model": f"deterministic-{label}",
-                "temperature": 0.0,
-                "top_p": 0.0,
-                "format": "json",
-            },
-            "metadata": {
-                "generated_at": datetime.now().isoformat(),
-                "agent_id": self.agent_id,
-                "analysis_type": label,
-                "cache_type": "deterministic_analysis",
-            },
-        }
+        return build_deterministic_response(self.agent_id, label, payload)
 
     def _store_deterministic_analysis(
         self,
@@ -3380,19 +2133,13 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         if not self.cache or not isinstance(payload, dict):
             return
 
-        cache_key: Dict[str, Any] = {"symbol": symbol, "llm_type": label}
-        if period:
-            cache_key["period"] = period
-
-        wrapped = {
-            "response": payload,
-            "metadata": {
-                "cached_at": datetime.now().isoformat(),
-                "agent_id": self.agent_id,
-                "analysis_type": label,
-                "period": period,
-            },
-        }
+        cache_key, wrapped = build_deterministic_cache_record(
+            symbol=symbol,
+            agent_id=self.agent_id,
+            label=label,
+            payload=payload,
+            period=period,
+        )
 
         try:
             self.cache.set(CacheType.LLM_RESPONSE, cache_key, wrapped)
@@ -3400,430 +2147,16 @@ class FundamentalAnalysisAgent(InvestmentAgent):
             self.logger.debug("Failed to store deterministic %s for %s: %s", label, symbol, exc)
 
     async def _analyze_financial_health(self, company_data: Dict, ratios: Dict, symbol: str) -> Dict:
-        """Evaluate liquidity, solvency, and working-capital resilience without LLM calls."""
-        financials = self._require_financials(company_data)
-
-        def assess_liquidity() -> tuple[str, str, float]:
-            current_ratio = ratios.get("current_ratio")
-            quick_ratio = ratios.get("quick_ratio")
-            if current_ratio is None:
-                return (
-                    "Unknown",
-                    "Current ratio unavailable; liquidity requires manual review.",
-                    55.0,
-                )
-            if current_ratio >= 2.0:
-                label, score = "Strong", 95.0
-            elif current_ratio >= 1.2:
-                label, score = "Adequate", 75.0
-            else:
-                label, score = "Weak", 45.0
-            if quick_ratio:
-                commentary = f"Current ratio {current_ratio:.2f}; quick ratio {quick_ratio:.2f}."
-            else:
-                commentary = f"Current ratio {current_ratio:.2f}."
-            return label, commentary, score
-
-        def assess_solvency() -> tuple[str, str, float]:
-            debt_to_equity = ratios.get("debt_to_equity")
-            debt_to_assets = ratios.get("debt_to_assets")
-            total_debt = financials.get("total_debt") or 0
-            if total_debt == 0:
-                return "Debt Free", "Company has no financial leverage.", 95.0
-            if debt_to_equity is None:
-                return "Unknown", "Debt-to-equity unavailable; solvency indeterminate.", 55.0
-            if debt_to_equity <= 1.0:
-                label, score = "Comfortable", 80.0
-            elif debt_to_equity <= 2.0:
-                label, score = "Managed", 65.0
-            else:
-                label, score = "Leveraged", 45.0
-
-            def _fmt_ratio(value: Optional[float]) -> str:
-                if value is None:
-                    return "n/a"
-                try:
-                    return f"{value:.2f}"
-                except (TypeError, ValueError):
-                    return "n/a"
-
-            commentary = f"Debt/Equity {debt_to_equity:.2f}; Debt/Assets {_fmt_ratio(debt_to_assets)}."
-            return label, commentary, score
-
-        def assess_capital_structure(sol_label: str, sol_score: float) -> tuple[str, str, float]:
-            net_debt = (financials.get("total_debt") or 0) - (financials.get("cash") or 0)
-            if net_debt <= 0:
-                return "Net Cash", "Cash reserves exceed total debt.", max(sol_score, 85.0)
-            return sol_label, f"Net debt approximately ${net_debt:,.0f}.", sol_score
-
-        def assess_working_capital() -> tuple[str, str, float]:
-            ocf = financials.get("operating_cash_flow")
-            revenue = financials.get("revenues")
-            if ocf is None or revenue in (None, 0):
-                return "Mixed", "Operating cash-flow data unavailable.", 60.0
-            ocf_margin = ocf / revenue if revenue else 0
-            if ocf_margin >= 0.2:
-                label, score = "Efficient", 85.0
-            elif ocf_margin >= 0.1:
-                label, score = "Stable", 70.0
-            else:
-                label, score = "Tight", 55.0
-            commentary = f"OCF margin {ocf_margin:.1%}."
-            return label, commentary, score
-
-        def assess_debt_serviceability() -> tuple[str, str, float]:
-            interest_coverage = ratios.get("interest_coverage") or company_data.get("interest_coverage")
-            total_debt = financials.get("total_debt") or 0
-            if total_debt == 0:
-                return "Not Applicable", "No debt outstanding.", 90.0
-            if not interest_coverage:
-                return "Unknown", "Interest coverage unavailable.", 55.0
-            if interest_coverage >= 6:
-                return "Comfortable", f"Coverage {interest_coverage:.1f}×.", 85.0
-            if interest_coverage >= 2:
-                return "Adequate", f"Coverage {interest_coverage:.1f}×.", 70.0
-            return "Stressed", f"Coverage {interest_coverage:.1f}×.", 45.0
-
-        def assess_flexibility() -> tuple[str, str, float]:
-            cash = financials.get("cash") or 0
-            total_debt = financials.get("total_debt") or 0
-            if total_debt == 0:
-                return "High", "Balance sheet unlevered with cash cushion.", 90.0
-            liquidity_ratio = (cash + (financials.get("short_term_investments") or 0)) / total_debt
-            if liquidity_ratio >= 0.75:
-                return "High", f"Liquid assets cover {liquidity_ratio:.0%} of debt.", 80.0
-            if liquidity_ratio >= 0.4:
-                return "Moderate", f"Liquid assets cover {liquidity_ratio:.0%} of debt.", 65.0
-            return "Limited", f"Liquid assets cover {liquidity_ratio:.0%} of debt.", 50.0
-
-        liquidity = assess_liquidity()
-        solvency = assess_solvency()
-        capital_structure = assess_capital_structure(solvency[0], solvency[2])
-        working_capital = assess_working_capital()
-        debt_serviceability = assess_debt_serviceability()
-        flexibility = assess_flexibility()
-
-        score_components = [
-            liquidity[2],
-            solvency[2],
-            capital_structure[2],
-            working_capital[2],
-            debt_serviceability[2],
-            flexibility[2],
-        ]
-        overall_health_score = round(sum(score_components) / len(score_components), 1)
-
-        risk_factors: List[Dict[str, str]] = []
-        if liquidity[0] == "Weak":
-            risk_factors.append({"risk": "Tight liquidity", "commentary": liquidity[1]})
-        if solvency[0] == "Leveraged":
-            risk_factors.append({"risk": "High leverage", "commentary": solvency[1]})
-        if debt_serviceability[0] == "Stressed":
-            risk_factors.append({"risk": "Debt service pressure", "commentary": debt_serviceability[1]})
-
-        payload = {
-            "liquidity_position": {"assessment": liquidity[0], "commentary": liquidity[1]},
-            "solvency": {"assessment": solvency[0], "commentary": solvency[1]},
-            "capital_structure_quality": {"assessment": capital_structure[0], "commentary": capital_structure[1]},
-            "working_capital_management": {"assessment": working_capital[0], "commentary": working_capital[1]},
-            "debt_serviceability": {"assessment": debt_serviceability[0], "commentary": debt_serviceability[1]},
-            "financial_flexibility": {"assessment": flexibility[0], "commentary": flexibility[1]},
-            "risk_factors": risk_factors,
-            "overall_health_score": overall_health_score,
-        }
-
-        return self._build_deterministic_response("financial_health", payload)
+        """Delegate deterministic financial-health analysis to specialized analyzer."""
+        return await self._get_deterministic_analyzer().analyze_financial_health(company_data, ratios, symbol)
 
     async def _analyze_growth(self, company_data: Dict, symbol: str) -> Dict:
-        """Deterministic growth analysis leveraging computed trend data."""
-        trend = company_data.get("trend_analysis") or {}
-        revenue_trend = trend.get("revenue") or {}
-        margin_trend = trend.get("margins") or {}
-
-        def _summarize_series(series: List[float]) -> Dict[str, Optional[float]]:
-            if not series:
-                return {"avg": None, "latest": None, "quantiles": {}}
-            window = series[-min(len(series), 6) :]
-            summary = {"avg": statistics.mean(window) if window else None, "latest": window[-1] if window else None}
-            quantiles = {}
-            if len(window) >= 4:
-                try:
-                    q1, q2, q3 = statistics.quantiles(window, n=4, method="inclusive")
-                    quantiles = {"p25": q1, "p50": q2, "p75": q3}
-                except statistics.StatisticsError:
-                    quantiles = {}
-            summary["quantiles"] = quantiles
-            return summary
-
-        yoy_summary = _summarize_series(revenue_trend.get("y_over_y_growth") or [])
-        qoq_summary = _summarize_series(revenue_trend.get("q_over_q_growth") or [])
-        comparisons = {
-            "avg_yoy_growth": yoy_summary["avg"],
-            "latest_qoq_growth": qoq_summary["latest"],
-            "yoy_quantiles": yoy_summary["quantiles"],
-            "qoq_quantiles": qoq_summary["quantiles"],
-        }
-
-        def classify_growth(value: Optional[float]) -> tuple[str, float]:
-            if value is None:
-                return "Unknown", 60.0
-            if value >= 8.0:
-                return "High", 90.0
-            if value >= 3.0:
-                return "Moderate", 75.0
-            if value >= 0.0:
-                return "Stable", 65.0
-            return "Contracting", 45.0
-
-        yoy_growth = comparisons.get("avg_yoy_growth")
-        qoq_growth = comparisons.get("latest_qoq_growth")
-        yoy_label, yoy_score = classify_growth(yoy_growth)
-        qoq_label, qoq_score = classify_growth(qoq_growth)
-
-        consistency_score = revenue_trend.get("consistency_score")
-        if consistency_score is None:
-            consistency_label, consistency_pts = "Unknown", 60.0
-        elif consistency_score >= 80:
-            consistency_label, consistency_pts = "Low Volatility", 85.0
-        elif consistency_score >= 60:
-            consistency_label, consistency_pts = "Manageable", 70.0
-        else:
-            consistency_label, consistency_pts = "Choppy", 55.0
-
-        margin_direction = margin_trend.get("net_margin_trend") or "stable"
-        margin_map = {
-            "expanding": ("Improving", 85.0),
-            "stable": ("Stable", 70.0),
-            "contracting": ("Weak", 55.0),
-        }
-        earnings_label, earnings_score = margin_map.get(margin_direction, ("Stable", 70.0))
-
-        market_share_trend = revenue_trend.get("trend", "stable")
-        market_map = {
-            "accelerating": ("Gaining", 85.0),
-            "stable": ("Holding", 70.0),
-            "decelerating": ("Losing", 55.0),
-        }
-        market_label, market_score = market_map.get(market_share_trend, ("Holding", 70.0))
-
-        growth_drivers: List[str] = []
-        growth_risks: List[str] = []
-        if yoy_growth and yoy_growth >= 5:
-            growth_drivers.append("Product demand momentum")
-        if margin_direction == "expanding":
-            growth_drivers.append("Operational leverage")
-        if trend.get("cyclical", {}).get("is_cyclical"):
-            growth_risks.append("Seasonality swings")
-        if yoy_growth is not None and yoy_growth < 0:
-            growth_risks.append("Negative revenue comp")
-        if not growth_drivers:
-            growth_drivers.append("Core franchise stability")
-        if not growth_risks:
-            growth_risks.append("Execution risk")
-
-        score_components = [yoy_score, qoq_score, consistency_pts, earnings_score, market_score]
-        growth_score = round(sum(score_components) / len(score_components), 1)
-
-        payload = {
-            "revenue_growth_sustainability": {
-                "assessment": yoy_label,
-                "commentary": (
-                    f"Average Y/Y growth {yoy_growth:.1f}%" if yoy_growth is not None else "Insufficient data"
-                ),
-            },
-            "earnings_growth_quality": {
-                "assessment": earnings_label,
-                "commentary": f"Margin trend {margin_direction.upper()}.",
-            },
-            "growth_consistency_and_volatility": {
-                "assessment": consistency_label,
-                "commentary": (
-                    f"Consistency score {consistency_score:.0f}/100"
-                    if consistency_score is not None
-                    else "Consistency data unavailable."
-                ),
-            },
-            "market_share_trends": {
-                "assessment": market_label,
-                "commentary": f"Revenue trend classified as {market_share_trend}.",
-            },
-            "growth_drivers_and_catalysts": growth_drivers,
-            "future_growth_potential": {
-                "assessment": "High" if yoy_label in {"High", "Moderate"} else "Balanced",
-                "commentary": (
-                    "Pipeline supported by demand indicators."
-                    if yoy_label in {"High", "Moderate"}
-                    else "Requires catalysts to re-accelerate."
-                ),
-            },
-            "growth_risks_and_headwinds": growth_risks,
-            "distribution_snapshot": {
-                "yoy_percentiles": comparisons.get("yoy_quantiles"),
-                "qoq_percentiles": comparisons.get("qoq_quantiles"),
-            },
-            "growth_score": growth_score,
-        }
-
-        return self._build_deterministic_response("growth_analysis", payload)
+        """Delegate deterministic growth analysis to specialized analyzer."""
+        return await self._get_deterministic_analyzer().analyze_growth(company_data, symbol)
 
     async def _analyze_profitability(self, company_data: Dict, ratios: Dict, symbol: str) -> Dict:
-        """Deterministic profitability assessment using core ratios."""
-        trend = company_data.get("trend_analysis") or {}
-        margin_trend = trend.get("margins", {})
-
-        def pct(value: Optional[float]) -> str:
-            if value is None:
-                return "n/a"
-            return f"{value*100:.1f}%" if value <= 1 else f"{value:.1f}%"
-
-        gross_margin = ratios.get("gross_margin")
-        operating_margin = ratios.get("operating_margin")
-        net_margin = ratios.get("net_margin")
-        roe = ratios.get("roe")
-        roa = ratios.get("roa")
-        asset_turnover = ratios.get("asset_turnover")
-
-        def classify_margin(value: Optional[float]) -> tuple[str, float]:
-            if value is None:
-                return "Unknown", 60.0
-            if value >= 0.25:
-                return "Wide", 90.0
-            if value >= 0.15:
-                return "Healthy", 75.0
-            if value >= 0.05:
-                return "Thin", 60.0
-            return "Negative", 45.0
-
-        gross_label, gross_score = classify_margin(gross_margin)
-        op_label, op_score = classify_margin(operating_margin)
-        net_label, net_score = classify_margin(net_margin)
-
-        gross_history = margin_trend.get("gross_margins") or []
-        op_history = margin_trend.get("operating_margins") or []
-        net_history = margin_trend.get("net_margins") or []
-
-        def classify_returns(value: Optional[float]) -> tuple[str, float]:
-            if value is None:
-                return "Unknown", 60.0
-            if value >= 0.18:
-                return "High", 90.0
-            if value >= 0.10:
-                return "Solid", 75.0
-            if value >= 0.05:
-                return "Moderate", 60.0
-            return "Low", 45.0
-
-        roe_label, roe_score = classify_returns(roe)
-        roa_label, roa_score = classify_returns(roa)
-
-        margin_direction = margin_trend.get("net_margin_trend", "stable")
-        direction_comment = {
-            "expanding": "Margins trending higher.",
-            "contracting": "Margins compressing.",
-            "stable": "Margins steady year over year.",
-        }.get(margin_direction, "Margin trend unavailable.")
-
-        pricing_power_label = gross_label if gross_label != "Unknown" else op_label
-        pricing_comment = f"Gross margin {pct(gross_margin)}; operating margin {pct(operating_margin)}."
-
-        operating_leverage = None
-        if gross_margin is not None and operating_margin is not None:
-            operating_leverage = gross_margin - operating_margin
-        if operating_leverage is None:
-            leverage_label, leverage_score = "Unknown", 60.0
-            leverage_comment = "Insufficient data to assess operating leverage."
-        elif operating_leverage <= 0.05:
-            leverage_label, leverage_score = "Low", 60.0
-            leverage_comment = "Limited drop from gross to operating margin."
-        elif operating_leverage <= 0.15:
-            leverage_label, leverage_score = "Balanced", 75.0
-            leverage_comment = "Moderate fixed-cost absorption."
-        else:
-            leverage_label, leverage_score = "High", 85.0
-            leverage_comment = "High fixed-cost base amplifies swings."
-
-        cost_structure_spread = None
-        if gross_margin is not None and operating_margin is not None:
-            cost_structure_spread = gross_margin - operating_margin
-        if cost_structure_spread is None:
-            cost_label, cost_score = "Unknown", 60.0
-            cost_comment = "Unable to derive cost structure spread."
-        elif cost_structure_spread <= 0.10:
-            cost_label, cost_score = "Lean", 85.0
-            cost_comment = "Operating expenses tightly managed."
-        elif cost_structure_spread <= 0.20:
-            cost_label, cost_score = "Balanced", 70.0
-            cost_comment = "Cost structure consistent with peers."
-        else:
-            cost_label, cost_score = "Heavy", 55.0
-            cost_comment = "Operating expenses absorb large share of gross profit."
-
-        profitability_drivers: List[str] = []
-        if gross_history:
-            try:
-                profitability_drivers.append(f"Median gross margin {statistics.median(gross_history):.1f}%")
-            except statistics.StatisticsError:
-                pass
-        if net_history:
-            try:
-                median_net = statistics.median(net_history)
-                if median_net > 15:
-                    profitability_drivers.append("Consistent double-digit net margins")
-            except statistics.StatisticsError:
-                pass
-        if gross_label in {"Wide", "Healthy"}:
-            profitability_drivers.append("Premium margin profile")
-        if roe_label in {"High", "Solid"}:
-            profitability_drivers.append("Efficient capital deployment")
-        if not profitability_drivers:
-            profitability_drivers.append("Scaling opportunities")
-
-        profitability_score = round(
-            sum(
-                [
-                    gross_score,
-                    op_score,
-                    net_score,
-                    roe_score,
-                    roa_score,
-                    leverage_score,
-                    cost_score,
-                ]
-            )
-            / 7,
-            1,
-        )
-
-        payload = {
-            "margin_trends_and_sustainability": {
-                "assessment": margin_direction.capitalize(),
-                "commentary": direction_comment,
-            },
-            "return_on_capital_efficiency": {
-                "assessment": roe_label,
-                "commentary": f"ROE {pct(roe)}; ROA {pct(roa)}.",
-            },
-            "competitive_advantages_moat": {
-                "assessment": gross_label,
-                "commentary": f"Gross margin {pct(gross_margin)} suggests {gross_label.lower()} moat.",
-            },
-            "pricing_power_indicators": {
-                "assessment": pricing_power_label,
-                "commentary": pricing_comment,
-            },
-            "cost_structure_analysis": {
-                "assessment": cost_label,
-                "commentary": cost_comment,
-            },
-            "operating_leverage": {
-                "assessment": leverage_label,
-                "commentary": leverage_comment,
-            },
-            "profitability_drivers": profitability_drivers,
-            "profitability_score": profitability_score,
-        }
-
-        return self._build_deterministic_response("profitability_analysis", payload)
+        """Delegate deterministic profitability analysis to specialized analyzer."""
+        return await self._get_deterministic_analyzer().analyze_profitability(company_data, ratios, symbol)
 
     def _hydrate_cost_of_capital_inputs(
         self,
@@ -4206,880 +2539,138 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         # Log DCF result immediately
         log_individual_model_result(self.logger, symbol, "DCF", dcf_professional)
 
-        # === P/E MULTIPLE MODEL ===
-        ttm_eps = ratios.get("eps") or ratios.get("eps_basic") or ratios.get("eps_diluted")
-        sector_median_pe = (
-            company_data.get("sector_metrics", {}).get("median_pe")
-            or company_data.get("sector_data", {}).get("median_pe")
-            or self._lookup_sector_multiple(company_profile.sector, "pe")
-        )
-        growth_adjusted_pe = None
-        peg_ratio = ratios.get("peg_ratio") or ratios.get("peg")
-        if peg_ratio and peg_ratio > 0:
-            growth_adjusted_pe = sector_median_pe * (1 + min(peg_ratio, 3)) if sector_median_pe else None
-
-        pe_model = PEMultipleModel(
+        relative_models = calculate_relative_valuation_models(
+            symbol=symbol,
             company_profile=company_profile,
-            ttm_eps=ttm_eps,
-            current_price=market_data.get("price")
-            or market_data.get("close")
-            or market_data.get("current_price")
-            or ratios.get("current_price"),
-            sector_median_pe=sector_median_pe,
-            growth_adjusted_pe=growth_adjusted_pe,
-            earnings_quality_score=company_profile.earnings_quality_score,
+            company_data=company_data,
+            ratios=ratios,
+            financials=financials,
+            market_data=market_data,
+            config=self.config,
+            sector_specific_result=valuation_results.get("sector_specific"),
+            lookup_sector_multiple=self._lookup_sector_multiple,
+            calculate_enterprise_value=self._calculate_enterprise_value,
+            logger=self.logger,
         )
-
-        pe_result = pe_model.calculate()
-        normalized_pe = normalize_model_output(pe_result)
+        normalized_pe = relative_models["pe"]
+        normalized_ev_ebitda = relative_models["ev_ebitda"]
+        normalized_ps = relative_models["ps"]
+        normalized_pb = relative_models["pb"]
         valuation_results["pe"] = normalized_pe
-
-        # Log P/E result immediately
-        log_individual_model_result(self.logger, symbol, "P/E", normalized_pe)
-
-        # === EV/EBITDA MODEL ===
-        ttm_ebitda = financials.get("ebitda") or ratios.get("ebitda") or financials.get("operating_income")
-        enterprise_value = self._calculate_enterprise_value(market_data, financials)
-        sector_ev_ebitda = (
-            company_data.get("sector_metrics", {}).get("median_ev_ebitda")
-            or company_data.get("sector_data", {}).get("median_ev_ebitda")
-            or self._lookup_sector_multiple(company_profile.sector, "ev_ebitda")
-        )
-
-        leverage_adjusted_multiple = None
-        if sector_ev_ebitda and company_profile.net_debt_to_ebitda is not None:
-            leverage_delta = max(company_profile.net_debt_to_ebitda - 2.0, 0.0)
-            leverage_adjusted_multiple = sector_ev_ebitda * clamp(1.0 - 0.06 * leverage_delta, 0.6, 1.1)
-
-        ev_ebitda_model = EVEBITDAModel(
-            company_profile=company_profile,
-            ttm_ebitda=ttm_ebitda,
-            enterprise_value=enterprise_value,
-            sector_median_ev_ebitda=sector_ev_ebitda,
-            leverage_adjusted_multiple=leverage_adjusted_multiple,
-            interest_coverage=ratios.get("interest_coverage") or ratios.get("interest_coverage_ratio"),
-        )
-
-        ev_ebitda_result = ev_ebitda_model.calculate()
-        normalized_ev_ebitda = normalize_model_output(ev_ebitda_result)
         valuation_results["ev_ebitda"] = normalized_ev_ebitda
-
-        # Log EV/EBITDA result immediately
-        log_individual_model_result(self.logger, symbol, "EV/EBITDA", normalized_ev_ebitda)
-
-        # === P/S MULTIPLE MODEL ===
-        revenue_per_share = None
-
-        # Calculate revenue per share
-        if ratios.get("revenue_per_share"):
-            revenue_per_share = ratios.get("revenue_per_share")
-        elif financials.get("revenues") and company_profile.shares_outstanding:
-            try:
-                revenue_per_share = float(financials.get("revenues")) / float(company_profile.shares_outstanding)
-            except (TypeError, ValueError, ZeroDivisionError) as e:
-                revenue_per_share = None
-                self.logger.debug(f"{symbol} - Failed to calculate revenue_per_share: {e}")
-        else:
-            revenue_per_share = None
-
-        # Get sector P/S multiple (priority: sector_metrics > sector_data > lookup)
-        sector_ps_from_metrics = company_data.get("sector_metrics", {}).get("median_ps")
-        sector_ps_from_data = company_data.get("sector_data", {}).get("median_ps")
-        sector_ps_from_lookup = self._lookup_sector_multiple(company_profile.sector, "ps")
-
-        sector_ps = sector_ps_from_metrics or sector_ps_from_data or sector_ps_from_lookup
-
-        valuation_settings = getattr(self.config, "valuation", None)
-        liquidity_floor = 5_000_000
-        if isinstance(valuation_settings, dict):
-            liquidity_floor = valuation_settings.get("liquidity_floor_usd", liquidity_floor)
-        elif valuation_settings is not None:
-            liquidity_floor = getattr(valuation_settings, "liquidity_floor_usd", liquidity_floor)
-
-        current_price = (
-            market_data.get("price")
-            or market_data.get("close")
-            or market_data.get("current_price")
-            or ratios.get("current_price")
-        )
-
-        ps_model = PSMultipleModel(
-            company_profile=company_profile,
-            revenue_per_share=revenue_per_share,
-            current_price=current_price,
-            sector_median_ps=sector_ps,
-            liquidity_floor_usd=liquidity_floor,
-        )
-
-        ps_result = ps_model.calculate()
-        normalized_ps = normalize_model_output(ps_result)
         valuation_results["ps"] = normalized_ps
-
-        # Log P/S result immediately
-        log_individual_model_result(self.logger, symbol, "P/S", normalized_ps)
-
-        # === P/B MULTIPLE MODEL ===
-        sector_pb = (
-            company_data.get("sector_metrics", {}).get("median_pb")
-            or company_data.get("sector_data", {}).get("median_pb")
-            or self._lookup_sector_multiple(company_profile.sector, "pb")
-        )
-
-        pb_model = PBMultipleModel(
-            company_profile=company_profile,
-            book_value_per_share=company_profile.book_value_per_share,
-            tangible_book_value_per_share=ratios.get("tangible_book_value_per_share"),
-            current_price=market_data.get("price")
-            or market_data.get("close")
-            or market_data.get("current_price")
-            or ratios.get("current_price"),
-            sector_median_pb=sector_pb,
-        )
-
-        pb_result = pb_model.calculate()
-        normalized_pb = normalize_model_output(pb_result)
         valuation_results["pb"] = normalized_pb
 
-        # === INSURANCE VALUATION OVERRIDE ===
-        # For insurance companies, override generic P/B with sector-specific P/BV valuation
-        # This ensures the insurance-specific fair value (based on ROE-adjusted target P/BV)
-        # is used instead of the generic book value calculation
-        sector_specific = valuation_results.get("sector_specific")
-        if sector_specific and "P/BV" in sector_specific.get("method", ""):
-            # Convert insurance ValuationResult to orchestrator-compatible format
-            confidence_map = {"high": 0.9, "medium": 0.7, "low": 0.5}
-            insurance_confidence = confidence_map.get(sector_specific.get("confidence", "medium"), 0.7)
-
-            # Override normalized_pb with insurance-specific values
-            normalized_pb = {
-                "model": "pb",
-                "fair_value_per_share": sector_specific.get("fair_value"),
-                "applicable": True,
-                "confidence_score": insurance_confidence,
-                "method": sector_specific.get("method"),
-                "details": sector_specific.get("details", {}),
-                "warnings": sector_specific.get("warnings", []),
-                # Preserve upside calculation
-                "upside_percent": sector_specific.get("upside_percent"),
-                "current_price": sector_specific.get("current_price"),
-            }
-            valuation_results["pb"] = normalized_pb
-
-            self.logger.info(
-                f"🏦 {symbol} - INSURANCE OVERRIDE: Using P/BV insurance valuation for P/B model "
-                f"(FV=${sector_specific.get('fair_value', 0):.2f}, confidence={sector_specific.get('confidence')})"
-            )
+        # Log relative-model results immediately
+        log_individual_model_result(self.logger, symbol, "P/E", normalized_pe)
+        log_individual_model_result(self.logger, symbol, "EV/EBITDA", normalized_ev_ebitda)
+        log_individual_model_result(self.logger, symbol, "P/S", normalized_ps)
 
         # Log P/B result immediately
         log_individual_model_result(self.logger, symbol, "P/B", normalized_pb)
 
-        # === GORDON GROWTH MODEL (dividend stocks only) ===
-        # Determine if stock pays SIGNIFICANT dividends (payout ratio ≥ 20%)
-        # Growth stocks may pay token dividends (0.5%), but GGM requires meaningful dividend policy
-        common_divs = abs(financials.get("dividends_paid", 0) or 0)
-        preferred_divs = abs(financials.get("preferred_stock_dividends", 0) or 0)
-        dividends_paid = common_divs + preferred_divs
-
-        # Data quality note: preferred_stock_dividends has only 27% coverage across Russell 1000
-        if preferred_divs > 0:
-            self.logger.debug(
-                f"{symbol} - Preferred stock dividends found: ${preferred_divs:,.0f} " f"(27%% coverage - rare field)"
-            )
-
-        net_income = financials.get("net_income", 0) or 0
-
-        # Calculate payout ratio to determine if GGM is appropriate
-        payout_ratio = (dividends_paid / net_income * 100) if net_income > 0 else 0
-        is_significant_dividend_stock = dividends_paid > 0 and payout_ratio >= 20.0
-
-        if is_significant_dividend_stock:
-            # Calculate cost of equity using CAPM for GGM
-            cost_of_equity = self._calculate_cost_of_equity(symbol)
-            self.logger.info(f"{symbol} - GGM cost_of_equity passed: {cost_of_equity*100:.2f}%")
-
-            # Calculate GGM valuation
-            ggm_result = await self._calculate_ggm(symbol, cost_of_equity, quarterly_data, company_profile)
-            valuation_results["ggm"] = ggm_result  # Gordon Growth Model
-
-            self.logger.info(
-                f"{symbol} - GGM applicable: payout ratio {payout_ratio:.1f}% "
-                f"(≥20% threshold for meaningful dividend policy)"
-            )
-
-            # Log GGM result immediately
-            log_individual_model_result(self.logger, symbol, "GGM", ggm_result)
-        else:
-            # Not a significant dividend payer
-            if dividends_paid > 0 and payout_ratio < 20.0:
-                reason = f"Low payout ratio ({payout_ratio:.1f}%) - token dividend, not meaningful dividend policy (need ≥20%)"
-            elif dividends_paid == 0:
-                reason = "No dividends paid - GGM requires dividend-paying stock"
-            else:
-                reason = "Negative net income - cannot calculate meaningful payout ratio"
-
-            valuation_results["ggm"] = {
-                "applicable": False,
-                "reason": reason,
-                "fair_value_per_share": 0,
-                "payout_ratio": payout_ratio,
-            }
-
-            ggm_result = valuation_results["ggm"]
-
-            self.logger.info(f"{symbol} - GGM not applicable: {reason}")
-
-            # Log GGM not applicable
-            log_individual_model_result(self.logger, symbol, "GGM", ggm_result)
-
-        # === DAMODARAN 3-STAGE DCF (Milestone 7.1) ===
-        # Uses 3-stage growth projection with Monte Carlo sensitivity analysis
-        try:
-            damodaran_model = DamodaranDCFModel(company_profile)
-            damodaran_result = damodaran_model.calculate(
-                current_fcf=financials.get("free_cash_flow") or financials.get("fcf"),
-                revenue_growth=company_profile.revenue_growth_yoy,
-                fcf_margin=ratios.get("fcf_margin") or ratios.get("free_cash_flow_margin"),
-                current_revenue=financials.get("revenues")
-                or financials.get("revenue")
-                or financials.get("total_revenue"),
-                shares_outstanding=company_profile.shares_outstanding,
-            )
-            normalized_damodaran = normalize_model_output(damodaran_result)
-            valuation_results["damodaran_dcf"] = normalized_damodaran
-            log_individual_model_result(self.logger, symbol, "Damodaran DCF", normalized_damodaran)
-        except Exception as e:
-            self.logger.warning(f"{symbol} - Damodaran DCF failed: {e}")
-            valuation_results["damodaran_dcf"] = {"applicable": False, "reason": str(e), "model": "damodaran_dcf"}
-
-        # === RULE OF 40 VALUATION (Milestone 7.2) ===
-        # Applies to growth companies, especially SaaS
-        is_saas_company = company_profile.industry and any(
-            kw in company_profile.industry.lower() for kw in ["software", "saas", "cloud", "internet"]
-        )
-        is_growth_company = company_profile.revenue_growth_yoy and company_profile.revenue_growth_yoy > 0.10
-
-        if is_saas_company or is_growth_company:
-            try:
-                rule_of_40_model = RuleOf40Valuation(company_profile)
-                rule_of_40_result = rule_of_40_model.calculate(
-                    revenue_growth=company_profile.revenue_growth_yoy,
-                    fcf_margin=ratios.get("fcf_margin") or ratios.get("free_cash_flow_margin"),
-                    current_revenue=financials.get("revenues")
-                    or financials.get("revenue")
-                    or financials.get("total_revenue"),
-                    current_price=market_data.get("price")
-                    or market_data.get("close")
-                    or market_data.get("current_price"),
-                    shares_outstanding=company_profile.shares_outstanding,
-                )
-                normalized_rule_of_40 = normalize_model_output(rule_of_40_result)
-                valuation_results["rule_of_40"] = normalized_rule_of_40
-                log_individual_model_result(self.logger, symbol, "Rule of 40", normalized_rule_of_40)
-            except Exception as e:
-                self.logger.warning(f"{symbol} - Rule of 40 failed: {e}")
-                valuation_results["rule_of_40"] = {"applicable": False, "reason": str(e), "model": "rule_of_40"}
-        else:
-            valuation_results["rule_of_40"] = {
-                "applicable": False,
-                "reason": "Not a growth/SaaS company (requires >10% revenue growth or SaaS industry)",
-                "model": "rule_of_40",
-            }
-
-        # === SAAS VALUATION MODEL (Milestone 7.3) ===
-        # Applies specifically to SaaS companies with recurring revenue metrics
-        if is_saas_company:
-            try:
-                saas_model = SaaSValuationModel(company_profile)
-                saas_result = saas_model.calculate(
-                    revenue_growth=company_profile.revenue_growth_yoy,
-                    current_revenue=financials.get("revenues")
-                    or financials.get("revenue")
-                    or financials.get("total_revenue"),
-                    current_price=market_data.get("price")
-                    or market_data.get("close")
-                    or market_data.get("current_price"),
-                    shares_outstanding=company_profile.shares_outstanding,
-                    gross_margin=ratios.get("gross_margin") or ratios.get("gross_profit_margin"),
-                    # SaaS-specific metrics (may not be available for all companies)
-                    nrr=ratios.get("net_revenue_retention") or ratios.get("nrr"),
-                    ltv_cac=ratios.get("ltv_cac") or ratios.get("ltv_cac_ratio"),
-                    fcf_margin=ratios.get("fcf_margin") or ratios.get("free_cash_flow_margin"),
-                )
-                normalized_saas = normalize_model_output(saas_result)
-                valuation_results["saas"] = normalized_saas
-                log_individual_model_result(self.logger, symbol, "SaaS", normalized_saas)
-            except Exception as e:
-                self.logger.warning(f"{symbol} - SaaS valuation failed: {e}")
-                valuation_results["saas"] = {"applicable": False, "reason": str(e), "model": "saas"}
-        else:
-            valuation_results["saas"] = {
-                "applicable": False,
-                "reason": "Not a SaaS company (requires software/cloud/internet industry)",
-                "model": "saas",
-            }
-
-        # === MULTI-MODEL BLENDING ===
-        try:
-            models_for_blending: List[Dict[str, Any]] = []
-            if isinstance(dcf_professional, dict):
-                models_for_blending.append(dcf_professional)
-            if isinstance(valuation_results.get("ggm"), dict):
-                models_for_blending.append(valuation_results["ggm"])
-            if isinstance(normalized_pe, dict):
-                models_for_blending.append(normalized_pe)
-            if isinstance(normalized_ev_ebitda, dict):
-                models_for_blending.append(normalized_ev_ebitda)
-            if isinstance(normalized_ps, dict):
-                models_for_blending.append(normalized_ps)
-            if isinstance(normalized_pb, dict):
-                models_for_blending.append(normalized_pb)
-            # Note: Insurance P/BV valuation is already integrated into normalized_pb above
-            # Only add other sector-specific valuations (bank ROE, REIT FFO) as separate models
-            sector_spec = valuation_results.get("sector_specific")
-            if isinstance(sector_spec, dict) and "P/BV" not in sector_spec.get("method", ""):
-                models_for_blending.append(sector_spec)
-                self.logger.info(
-                    f"✅ [SECTOR_VALUATION] {symbol} - Added sector-specific valuation to blending: {sector_spec.get('method')}"
-                )
-
-            # Add new valuation models (Milestone 7)
-            if isinstance(valuation_results.get("damodaran_dcf"), dict) and valuation_results["damodaran_dcf"].get(
-                "applicable"
-            ):
-                models_for_blending.append(valuation_results["damodaran_dcf"])
-                self.logger.info(f"✅ {symbol} - Added Damodaran DCF to blending")
-            if isinstance(valuation_results.get("rule_of_40"), dict) and valuation_results["rule_of_40"].get(
-                "applicable"
-            ):
-                models_for_blending.append(valuation_results["rule_of_40"])
-                self.logger.info(f"✅ {symbol} - Added Rule of 40 to blending")
-            if isinstance(valuation_results.get("saas"), dict) and valuation_results["saas"].get("applicable"):
-                models_for_blending.append(valuation_results["saas"])
-                self.logger.info(f"✅ {symbol} - Added SaaS valuation to blending")
-
-            self.logger.debug(f"{symbol} - Models for blending: {[m.get('model') for m in models_for_blending]}")
-
-            allowed_models = self._select_models_for_company(company_profile)
-            if allowed_models is not None:
-                # CRITICAL: For insurance companies, always include 'pb' regardless of archetype
-                # Insurance companies are valued primarily on book value (P/BV)
-                is_insurance = company_profile.industry and "insur" in company_profile.industry.lower()
-                if is_insurance and "pb" not in allowed_models:
-                    allowed_models = list(allowed_models) + ["pb"]
-                    self.logger.info(f"🏦 {symbol} - Added 'pb' to allowed_models for insurance company")
-
-                models_for_blending = [model for model in models_for_blending if model.get("model") in allowed_models]
-                self.logger.debug(
-                    f"{symbol} - Filtered models (allowed={allowed_models}): {[m.get('model') for m in models_for_blending]}"
-                )
-
-            # CRITICAL FIX: Ensure market_cap and related fields are in financials dict for dynamic weighting
-            # Dynamic weighting service expects these in financials, but they're calculated in ratios
-            # Copy them to financials to ensure dynamic weighting has all required data
-            if ratios:
-                if "market_cap" in ratios and "market_cap" not in financials:
-                    financials["market_cap"] = ratios["market_cap"]
-                    self.logger.debug(
-                        f"{symbol} - Copied market_cap from ratios to financials: ${ratios['market_cap']:,.0f}"
-                    )
-                if "shares_outstanding" in ratios and "shares_outstanding" not in financials:
-                    financials["shares_outstanding"] = ratios["shares_outstanding"]
-                if "current_price" in ratios and "current_price" not in financials:
-                    financials["current_price"] = ratios["current_price"]
-
-            # CRITICAL FIX: Ensure revenue key exists in financials for P/S model applicability
-            # Model applicability checker requires exactly "revenue" key (not "revenues" or "total_revenue")
-            # This prevents P/S from being incorrectly filtered out with "Negative/zero revenue: $0"
-            if "revenue" not in financials or financials.get("revenue", 0) == 0:
-                # Try common revenue key variants
-                ttm_metrics = company_data.get("ttm_metrics", {})
-                revenue_value = (
-                    financials.get("revenues")
-                    or financials.get("total_revenue")
-                    or ttm_metrics.get("revenues")
-                    or ttm_metrics.get("total_revenue")
-                    or ttm_metrics.get("revenue")
-                    or 0
-                )
-                if revenue_value and revenue_value > 0:
-                    financials["revenue"] = revenue_value
-                    self.logger.info(f"{symbol} - Added missing 'revenue' key to financials: ${revenue_value:,.0f}")
-
-            # CRITICAL FIX: Add FCF quarters count for DCF applicability check
-            # ModelApplicabilityRules requires this field to determine if DCF is applicable
-            fcf_quarters_count = 0
-            if hasattr(company_profile, "quarterly_metrics") and company_profile.quarterly_metrics:
-                for quarter in company_profile.quarterly_metrics:
-                    if isinstance(quarter, dict):
-                        cash_flow = quarter.get("cash_flow", {})
-                        if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
-                            fcf_quarters_count += 1
-                    else:
-                        if hasattr(quarter, "cash_flow"):
-                            cash_flow = getattr(quarter, "cash_flow", {})
-                            if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
-                                fcf_quarters_count += 1
-
-            financials["fcf_quarters_count"] = fcf_quarters_count
-
-            # Add TTM free cash flow if available
-            if hasattr(company_profile, "free_cash_flow") and company_profile.free_cash_flow:
-                financials["free_cash_flow"] = company_profile.free_cash_flow
-            elif hasattr(company_profile, "ttm_metrics") and isinstance(company_profile.ttm_metrics, dict):
-                financials["free_cash_flow"] = company_profile.ttm_metrics.get("free_cash_flow", 0)
-
-            # CRITICAL FIX: Add dividends_paid for GGM applicability check
-            # ModelApplicabilityRules._check_ggm_applicability requires this field
-            if hasattr(company_profile, "dividends_paid") and company_profile.dividends_paid:
-                financials["dividends_paid"] = company_profile.dividends_paid
-            elif "dividends_paid" not in financials or financials.get("dividends_paid", 0) == 0:
-                # Fallback to extracting from financials dict itself
-                financials["dividends_paid"] = abs(financials.get("dividends_paid", 0) or 0)
-
-            # CRITICAL FIX: Add ebitda for EV/EBITDA applicability check
-            if hasattr(company_profile, "ebitda") and company_profile.ebitda:
-                financials["ebitda"] = company_profile.ebitda
-            elif "ebitda" not in financials or financials.get("ebitda", 0) == 0:
-                # Fallback: Try to get from ttm_metrics or calculate from operating_income
-                ttm_metrics = company_data.get("ttm_metrics", {})
-                ebitda_value = (
-                    ttm_metrics.get("ebitda")
-                    or ttm_metrics.get("operating_income")
-                    or financials.get("operating_income")
-                    or 0
-                )
-                if ebitda_value:
-                    financials["ebitda"] = ebitda_value
-
-            # CRITICAL FIX: Add payout_ratio for GGM applicability check
-            if hasattr(company_profile, "dividend_payout_ratio") and company_profile.dividend_payout_ratio:
-                financials["payout_ratio"] = company_profile.dividend_payout_ratio
-            elif ratios and ratios.get("payout_ratio"):
-                financials["payout_ratio"] = ratios["payout_ratio"]
-            elif ratios and ratios.get("dividend_payout_ratio"):
-                financials["payout_ratio"] = ratios["dividend_payout_ratio"]
-
-            # CRITICAL FIX: Add net_income for P/E and GGM applicability
-            if hasattr(company_profile, "net_income") and company_profile.net_income:
-                financials["net_income"] = company_profile.net_income
-            elif "net_income" not in financials or financials.get("net_income", 0) == 0:
-                ttm_metrics = company_data.get("ttm_metrics", {})
-                net_income_value = ttm_metrics.get("net_income") or 0
-                if net_income_value:
-                    financials["net_income"] = net_income_value
-
-            # CRITICAL FIX: Add stockholders_equity for P/B applicability
-            if "stockholders_equity" not in financials and "book_value" not in financials:
-                book_value = (
-                    financials.get("stockholders_equity")
-                    or financials.get("total_stockholders_equity")
-                    or company_data.get("ttm_metrics", {}).get("stockholders_equity")
-                    or 0
-                )
-                if book_value:
-                    financials["stockholders_equity"] = book_value
-
-            # CRITICAL FIX: If fcf_quarters_count is 0 but we have FCF value, infer quarters
-            # If TTM FCF exists, it implies we have at least 4 quarters of data
-            if fcf_quarters_count == 0 and financials.get("free_cash_flow", 0) > 0:
-                fcf_quarters_count = 4  # TTM implies 4 quarters
-                financials["fcf_quarters_count"] = fcf_quarters_count
-                self.logger.info(f"{symbol} - Inferred fcf_quarters_count=4 from TTM FCF value")
-
-            self.logger.info(
-                f"{symbol} - Applicability fields added: fcf_quarters={fcf_quarters_count}, "
-                f"fcf=${financials.get('free_cash_flow', 0)/1e9:.2f}B, "
-                f"ebitda=${financials.get('ebitda', 0)/1e9:.2f}B, "
-                f"dividends_paid=${financials.get('dividends_paid', 0)/1e9:.2f}B, "
-                f"payout_ratio={financials.get('payout_ratio', 0):.1f}%, "
-                f"net_income=${financials.get('net_income', 0)/1e9:.2f}B, "
-                f"book_value=${financials.get('stockholders_equity', financials.get('book_value', 0))/1e9:.2f}B"
-            )
-
-            # Get fallback weights and tier classification (pass financials and ratios directly)
-            fallback_weights_result = self._resolve_fallback_weights(
-                company_profile, models_for_blending, financials, ratios
-            )
-            if isinstance(fallback_weights_result, tuple):
-                fallback_weights, tier_classification = fallback_weights_result
-            else:
-                # Fallback case: old return type (just weights dict)
-                fallback_weights = fallback_weights_result
-                tier_classification = None
-
-            multi_model_summary = self.multi_model_orchestrator.combine(
-                company_profile,
-                models_for_blending,
-                fallback_weights=fallback_weights,
-                tier_classification=tier_classification,
-            )
-            valuation_results["multi_model"] = multi_model_summary
-
-            # Update individual model weights from orchestrator result
-            try:
-                weight_lookup = {
-                    model.get("model"): model.get("weight")
-                    for model in multi_model_summary.get("models", [])
-                    if isinstance(model, dict)
-                }
-                if isinstance(dcf_professional, dict) and "dcf" in weight_lookup:
-                    dcf_professional["weight"] = weight_lookup["dcf"]
-                ggm_entry = valuation_results.get("ggm")
-                if isinstance(ggm_entry, dict) and "ggm" in weight_lookup:
-                    ggm_entry["weight"] = weight_lookup["ggm"]
-                if isinstance(normalized_pe, dict) and "pe" in weight_lookup:
-                    normalized_pe["weight"] = weight_lookup["pe"]
-                if isinstance(normalized_ev_ebitda, dict) and "ev_ebitda" in weight_lookup:
-                    normalized_ev_ebitda["weight"] = weight_lookup["ev_ebitda"]
-                if isinstance(normalized_ps, dict) and "ps" in weight_lookup:
-                    normalized_ps["weight"] = weight_lookup["ps"]
-                if isinstance(normalized_pb, dict) and "pb" in weight_lookup:
-                    normalized_pb["weight"] = weight_lookup["pb"]
-            except Exception as exc2:  # pragma: no cover - defensive
-                self.logger.warning(f"{symbol} - Weight lookup failed: {exc2}")
-                pass
-        except Exception as exc:  # pragma: no cover - defensive
-            import traceback
-
-            self.logger.error(f"{symbol} - Multi-model blending failed: {exc}")
-            self.logger.debug(f"{symbol} - Traceback: {traceback.format_exc()}")
-
-        # Synthesize fair value estimate
-        multi_model_summary = valuation_results.get("multi_model", {})
-        blended_fair_value = multi_model_summary.get("blended_fair_value")
-        overall_confidence = multi_model_summary.get("overall_confidence")
-        model_agreement_score = multi_model_summary.get("model_agreement_score")
-        divergence_flag = multi_model_summary.get("divergence_flag")
-        applicable_models = multi_model_summary.get("applicable_models")
-        notes = multi_model_summary.get("notes", [])
-
-        log_valuation_snapshot(self.logger, symbol, valuation_results)
-
-        # Format and log comprehensive valuation summary table
-        try:
-            # Get current price from company_data
-            current_price = company_data.get("current_price", 0)
-
-            # Collect all model data for table
-            all_models_data = []
-
-            # DCF
-            if isinstance(dcf_professional, dict):
-                all_models_data.append(
-                    {
-                        "name": "DCF",
-                        "fair_value": dcf_professional.get("fair_value_per_share", 0),
-                        "confidence": dcf_professional.get("confidence_score", 0) * 100,  # Convert to percentage
-                        "weight": dcf_professional.get("weight", 0),
-                        "applicable": dcf_professional.get("applicable", True),
-                    }
-                )
-
-            # GGM
-            ggm_entry = valuation_results.get("ggm", {})
-            if isinstance(ggm_entry, dict):
-                all_models_data.append(
-                    {
-                        "name": "GGM",
-                        "fair_value": ggm_entry.get("fair_value_per_share", 0),
-                        "confidence": ggm_entry.get("confidence_score", 0) * 100,
-                        "weight": ggm_entry.get("weight", 0),
-                        "applicable": ggm_entry.get("applicable", False),
-                    }
-                )
-
-            # P/E
-            if isinstance(normalized_pe, dict):
-                all_models_data.append(
-                    {
-                        "name": "P/E",
-                        "fair_value": normalized_pe.get("fair_value_per_share", 0),
-                        "confidence": normalized_pe.get("confidence_score", 0) * 100,
-                        "weight": normalized_pe.get("weight", 0),
-                        "applicable": normalized_pe.get("applicable", True),
-                    }
-                )
-
-            # EV/EBITDA
-            if isinstance(normalized_ev_ebitda, dict):
-                all_models_data.append(
-                    {
-                        "name": "EV/EBITDA",
-                        "fair_value": normalized_ev_ebitda.get("fair_value_per_share", 0),
-                        "confidence": normalized_ev_ebitda.get("confidence_score", 0) * 100,
-                        "weight": normalized_ev_ebitda.get("weight", 0),
-                        "applicable": normalized_ev_ebitda.get("applicable", True),
-                    }
-                )
-
-            # P/S
-            if isinstance(normalized_ps, dict):
-                all_models_data.append(
-                    {
-                        "name": "P/S",
-                        "fair_value": normalized_ps.get("fair_value_per_share", 0),
-                        "confidence": normalized_ps.get("confidence_score", 0) * 100,
-                        "weight": normalized_ps.get("weight", 0),
-                        "applicable": normalized_ps.get("applicable", True),
-                    }
-                )
-
-            # P/B
-            if isinstance(normalized_pb, dict):
-                all_models_data.append(
-                    {
-                        "name": "P/B",
-                        "fair_value": normalized_pb.get("fair_value_per_share", 0),
-                        "confidence": normalized_pb.get("confidence_score", 0) * 100,
-                        "weight": normalized_pb.get("weight", 0),
-                        "applicable": normalized_pb.get("applicable", True),
-                    }
-                )
-
-            # Get tier classification
-            tier_display = tier_classification if tier_classification else "N/A"
-
-            # Format and log the comprehensive valuation summary table
-            valuation_table = ValuationTableFormatter.format_valuation_summary_table(
-                symbol=symbol,
-                all_models=all_models_data,
-                dynamic_weights={m["name"].lower(): m["weight"] for m in all_models_data},
-                blended_fair_value=blended_fair_value if blended_fair_value else 0,
-                current_price=current_price,
-                tier=tier_display,
-                notes=multi_model_summary.get("notes"),
-            )
-            self.logger.info(valuation_table)
-
-        except Exception as e:
-            self.logger.warning(f"{symbol} - Failed to format valuation summary table: {e}")
-
-        # Log blended fair value explicitly for visibility
-        if blended_fair_value and blended_fair_value > 0:
-            # Handle None values for agreement score and confidence
-            agreement_str = f"{model_agreement_score:.2f}" if model_agreement_score is not None else "N/A"
-            confidence_str = f"{overall_confidence:.1%}" if overall_confidence is not None else "N/A"
-            log_msg = (
-                f"✅ {symbol} - Multi-Model Blended Fair Value: ${blended_fair_value:.2f} | "
-                f"Confidence: {confidence_str} | "
-                f"Agreement: {agreement_str} | "
-                f"Applicable Models: {applicable_models}"
-            )
-            self.logger.info(log_msg)
-
-            if divergence_flag and model_agreement_score is not None:
-                self.logger.warning(
-                    f"⚠️  {symbol} - Model divergence detected! "
-                    f"Agreement score {model_agreement_score:.2f} indicates significant spread between model outputs."
-                )
-        else:
-            self.logger.warning(
-                f"⚠️  {symbol} - No blended fair value calculated (applicable models: {applicable_models})"
-            )
-
-        # Helper functions now imported from safe_formatters module
-        def _fmt_float(value: Any, decimals: int = 1) -> str:
-            """Safe float formatting with specified decimal places."""
-            return format_number(value, decimals=decimals, thousands_separator=False)
-
-        models_detail_lines: List[str] = []
-        for model in multi_model_summary.get("models", []):
-            if not isinstance(model, dict):
-                continue
-            model_name = model.get("methodology") or model.get("model")
-            if model.get("applicable"):
-                line = (
-                    f"- {model_name}: Fair Value {_fmt_currency(model.get('fair_value_per_share'))}, "
-                    f"Weight {round(model.get('weight', 0.0), 3):.3f}, "
-                    f"Confidence {round(model.get('confidence_score', 0.0), 3):.3f}"
-                )
-                assumptions = model.get("assumptions") or {}
-                metadata = model.get("metadata") or {}
-                extra_bits: List[str] = []
-                if model.get("model") == "dcf":
-                    if "wacc" in assumptions:
-                        extra_bits.append(f"WACC {_fmt_pct(assumptions.get('wacc'))}")
-                    if metadata.get("rule_of_40"):
-                        r40 = metadata["rule_of_40"]
-                        score = round_for_prompt(r40.get("score", 0), 1)
-                        if score is not None:
-                            extra_bits.append(f"Rule of 40 {score:.1f} ({r40.get('classification', '').upper()})")
-                if model.get("model") == "ggm":
-                    if "growth_rate" in assumptions:
-                        extra_bits.append(f"Growth {_fmt_pct(assumptions.get('growth_rate'))}")
-                    if "discount_rate" in assumptions:
-                        extra_bits.append(f"Cost of equity {_fmt_pct(assumptions.get('discount_rate'))}")
-                if model.get("model") == "pe":
-                    if assumptions.get("target_pe"):
-                        extra_bits.append(f"Target P/E {_fmt_float(assumptions.get('target_pe'), 2)}")
-                    if assumptions.get("sector_median_pe"):
-                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_pe'), 2)}")
-                if model.get("model") == "ev_ebitda":
-                    if assumptions.get("target_ev_ebitda"):
-                        extra_bits.append(f"Target EV/EBITDA {_fmt_float(assumptions.get('target_ev_ebitda'), 2)}")
-                    if assumptions.get("sector_median_ev_ebitda"):
-                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_ev_ebitda'), 2)}")
-                if model.get("model") == "ps":
-                    if assumptions.get("target_ps"):
-                        extra_bits.append(f"Target P/S {_fmt_float(assumptions.get('target_ps'), 2)}")
-                    if assumptions.get("sector_median_ps"):
-                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_ps'), 2)}")
-                if model.get("model") == "pb":
-                    if assumptions.get("target_pb"):
-                        extra_bits.append(f"Target P/B {_fmt_float(assumptions.get('target_pb'), 2)}")
-                    if assumptions.get("sector_median_pb"):
-                        extra_bits.append(f"Sector Median {_fmt_float(assumptions.get('sector_median_pb'), 2)}")
-                if extra_bits:
-                    line += " | " + ", ".join(extra_bits)
-            else:
-                line = f"- {model_name}: Not applicable ({model.get('reason', 'no reason provided')})"
-            models_detail_lines.append(line)
-
-        if not models_detail_lines:
-            models_detail_lines.append("- No valuation models produced outputs.")
-
-        notes_section = "\n".join(f"- {note}" for note in notes) if notes else "- None"
-
-        archetype_labels = ", ".join(company_profile.archetype_labels()) or "Unclassified"
-
-        models_detail_section = "\n".join(models_detail_lines)
-
-        prompt = f"""
-        Synthesize a fair value estimate using the multi-model valuation summary below. Anchor your assessment on the
-        blended output and explain any material disagreements across models.
-
-        DATA QUALITY ASSESSMENT:
-        - Overall Quality: {data_quality.get('quality_grade', 'Unknown')} ({_safe_fmt_pct(data_quality.get('data_quality_score', 0))})
-        - {data_quality.get('assessment', 'Data quality information not available')}
-        - Core Metrics: {data_quality.get('core_metrics_populated', 'N/A')} populated
-        - Market Data: {data_quality.get('market_metrics_populated', 'N/A')} populated
-        - Consistency Issues: {', '.join(data_quality.get('consistency_issues', [])) or 'None detected'}
-        {trend_context}
-
-        COMPANY PROFILE SNAPSHOT:
-        - Sector: {company_profile.sector}
-        - Industry: {company_profile.industry or 'N/A'}
-        - Archetypes: {archetype_labels}
-        - Data Flags: {', '.join(company_profile_payload.get('data_quality_flags', [])) or 'None'}
-
-        MARKET CONTEXT:
-        - Current Price: {_fmt_currency(market_data.get('price'))}
-        - Market Cap: ${_fmt_int_comma(market_data.get('market_cap', 0))}
-        - Dividend Payout Ratio: {_safe_fmt_pct(payout_ratio)}
-
-        === MULTI-MODEL VALUATION SUMMARY ===
-        - Blended Fair Value: {_fmt_currency(blended_fair_value)}
-        - Overall Confidence: {_fmt_float(overall_confidence or 0, 3)}
-        - Model Agreement Score: {_fmt_float(model_agreement_score or 0, 3)} (lower implies divergence)
-        - Divergence Flag: {divergence_flag}
-        - Applicable Models: {applicable_models}
-        - Notes:\n{notes_section}
-
-        === INDIVIDUAL MODEL DETAIL ===
-        {models_detail_section}
-
-        VALUATION SYNTHESIS INSTRUCTIONS:
-        1. Produce a blended fair value estimate (state the number) and the implied upside/downside vs. current price.
-        2. Explain how each model influences the final number, especially when weights differ.
-        3. Comment on confidence and whether divergence or data-quality flags warrant caution.
-        4. Highlight key drivers/assumptions (growth, margins, discount rates) that matter most.
-        5. Outline valuation risks or scenarios that could shift the blend materially.
-        6. Recommend a valuation stance (Undervalued / Fairly Valued / Overvalued) and suggest a margin of safety target.
-
-        Before generating the JSON, think step-by-step about the analysis. Put your thinking process inside <think> and </think> tags.
-
-        Return a JSON object that captures these points and follows the schema below (values are illustrative):
-        {{
-          "fair_value_estimate": 150.00,
-          "implied_upside_downside": 0.15,
-          "model_influence_explanation": "The DCF model has the highest weight (50%) and is the primary driver of the fair value estimate. The P/E and P/S models are used as secondary inputs.",
-          "confidence_and_caution": "Confidence is high due to good data quality and model agreement. No divergence flags were raised.",
-          "key_drivers_and_assumptions": "The key drivers are the assumed 5% terminal growth rate and the 10% WACC.",
-          "valuation_risks": "A significant increase in interest rates or a slowdown in revenue growth could negatively impact the valuation.",
-          "valuation_stance": "Undervalued",
-          "margin_of_safety_target": 0.20
-        }}
-        """
-
-        # Check if deterministic valuation synthesis is enabled (saves tokens, faster)
-        if self.use_deterministic and self.deterministic_valuation_synthesis:
-            self.logger.debug(f"{symbol} - Using deterministic valuation synthesis (LLM bypass)")
-
-            # Use deterministic synthesis instead of LLM
-            response_data = synthesize_valuation(
-                symbol=symbol,
-                current_price=market_data.get("current_price", market_data.get("price", 0)),
-                valuation_results=valuation_results,
-                multi_model_summary=multi_model_summary,
-                data_quality=data_quality,
-                company_profile=company_profile_payload,
-                notes=notes,
-            )
-
-            # Add valuation methods and current price
-            response_data["valuation_methods"] = valuation_results
-            response_data["current_price"] = market_data.get("current_price", market_data.get("price", 0))
-            response_data["company_profile"] = company_profile_payload
-
-            return self._build_deterministic_response("valuation_synthesis", response_data)
-
-        # === LLM Path (fallback when deterministic is disabled) ===
-        # Save prompt to cache for auditing
-        prompt_name = "_perform_valuation_synthesis_prompt"
-        self._debug_log_prompt(prompt_name, prompt)
-
-        response = await self.ollama.generate(
-            model=self.models["valuation"],
-            prompt=prompt,
-            system="Synthesize valuation analysis and provide fair value estimate.",
-            format="json",
-            period=company_data.get("fiscal_period"),  # Period-based caching
-            prompt_name=prompt_name,
-        )
-
-        self._debug_log_response(prompt_name, response)
-
-        # DUAL CACHING: Cache LLM response separately
-        await self._cache_llm_response(
-            response=response,
-            model=self.models["valuation"],
+        payout_ratio = await calculate_valuation_extensions(
             symbol=symbol,
-            llm_type="fundamental_valuation",
-            prompt=prompt,
-            temperature=0.3,
-            top_p=0.9,
-            format="json",
-            period=company_data.get("fiscal_period"),  # Period-based caching
+            valuation_results=valuation_results,
+            financials=financials,
+            ratios=ratios,
+            market_data=market_data,
+            company_profile=company_profile,
+            quarterly_data=quarterly_data,
+            calculate_cost_of_equity=self._calculate_cost_of_equity,
+            calculate_ggm=self._calculate_ggm,
+            normalize_model_output=normalize_model_output,
+            log_model_result=log_individual_model_result,
+            logger=self.logger,
         )
 
-        # Extract response data and add valuation details
-        if isinstance(response, dict) and "response" in response:
-            response_data = response["response"]
-        else:
-            response_data = response
+        # === MULTI-MODEL BLENDING + SUMMARY LOGGING ===
+        multi_model_summary, tier_classification = run_multi_model_blending(
+            symbol=symbol,
+            valuation_results=valuation_results,
+            company_profile=company_profile,
+            company_data=company_data,
+            ratios=ratios,
+            financials=financials,
+            dcf_professional=dcf_professional,
+            normalized_pe=normalized_pe,
+            normalized_ev_ebitda=normalized_ev_ebitda,
+            normalized_ps=normalized_ps,
+            normalized_pb=normalized_pb,
+            select_models_for_company=self._select_models_for_company,
+            resolve_fallback_weights=self._resolve_fallback_weights,
+            multi_model_orchestrator=self.multi_model_orchestrator,
+            logger=self.logger,
+        )
+        summary_metrics = log_multi_model_summary(
+            symbol=symbol,
+            valuation_results=valuation_results,
+            company_data=company_data,
+            tier_classification=tier_classification,
+            dcf_professional=dcf_professional,
+            normalized_pe=normalized_pe,
+            normalized_ev_ebitda=normalized_ev_ebitda,
+            normalized_ps=normalized_ps,
+            normalized_pb=normalized_pb,
+            log_valuation_snapshot=log_valuation_snapshot,
+            format_valuation_summary_table=ValuationTableFormatter.format_valuation_summary_table,
+            logger=self.logger,
+        )
+        blended_fair_value = summary_metrics["blended_fair_value"]
+        overall_confidence = summary_metrics["overall_confidence"]
+        model_agreement_score = summary_metrics["model_agreement_score"]
+        divergence_flag = summary_metrics["divergence_flag"]
+        applicable_models = summary_metrics["applicable_models"]
+        notes = summary_metrics["notes"]
 
-        # Parse response if it's a string
-        if isinstance(response_data, str):
+        models_detail_lines = build_models_detail_lines(
+            multi_model_summary.get("models", []),
+            format_currency=_fmt_currency,
+            format_percentage=_fmt_pct,
+        )
+        archetype_labels = ", ".join(company_profile.archetype_labels()) or "Unclassified"
+        prompt = build_valuation_synthesis_prompt(
+            data_quality=data_quality,
+            trend_context=trend_context,
+            sector=company_profile.sector,
+            industry=company_profile.industry,
+            archetype_labels=archetype_labels,
+            data_quality_flags=company_profile_payload.get("data_quality_flags", []),
+            current_price=market_data.get("price"),
+            market_cap=market_data.get("market_cap", 0),
+            payout_ratio=payout_ratio,
+            blended_fair_value=blended_fair_value,
+            overall_confidence=overall_confidence,
+            model_agreement_score=model_agreement_score,
+            divergence_flag=divergence_flag,
+            applicable_models=applicable_models,
+            notes=notes,
+            models_detail_lines=models_detail_lines,
+            format_currency=_fmt_currency,
+            format_int_with_commas=_fmt_int_comma,
+            format_percentage=_safe_fmt_pct,
+        )
 
-            try:
-                response_data = json.loads(response_data.strip())
-            except:
-                response_data = {}
-
-        # Add valuation methods and current price
-        if isinstance(response_data, dict):
-            response_data["valuation_methods"] = valuation_results
-            response_data["current_price"] = market_data.get("current_price", market_data.get("price", 0))
-            response_data["company_profile"] = company_profile_payload
-
-        return self._wrap_llm_response(
-            response=response_data,
-            model=self.models["valuation"],
+        return await dispatch_valuation_synthesis(
+            symbol=symbol,
             prompt=prompt,
-            temperature=0.3,
-            top_p=0.9,
-            format="json",
-            period=company_data.get("fiscal_period"),  # Period-based caching
+            company_data=company_data,
+            market_data=market_data,
+            valuation_results=valuation_results,
+            multi_model_summary=multi_model_summary,
+            data_quality=data_quality,
+            company_profile_payload=company_profile_payload,
+            notes=notes,
+            use_deterministic=self.use_deterministic,
+            deterministic_valuation_synthesis=self.deterministic_valuation_synthesis,
+            build_deterministic_response=self._build_deterministic_response,
+            debug_log_prompt=self._debug_log_prompt,
+            debug_log_response=self._debug_log_response,
+            ollama_client=self.ollama,
+            valuation_model=self.models["valuation"],
+            cache_llm_response=self._cache_llm_response,
+            wrap_llm_response=self._wrap_llm_response,
+            logger=self.logger,
         )
 
     async def _analyze_competitive_position(self, company_data: Dict, symbol: str) -> Dict:
@@ -5286,326 +2877,17 @@ class FundamentalAnalysisAgent(InvestmentAgent):
         models_for_blending: List[Dict[str, Any]],
         financials: Optional[Dict[str, Any]] = None,
         ratios: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, float]]:
-        """
-        Determine dynamic model weights using tier-based classification.
-
-        UPDATED: Uses DynamicModelWeightingService for config-driven dynamic weighting.
-
-        Flow:
-        1. Use provided financials and ratios dicts directly (already computed)
-        2. Call dynamic_weighting_service.determine_weights()
-        3. Returns weights as percentages (e.g., {"dcf": 50, "pe": 30, ...})
-        4. MultiModelValuationOrchestrator.combine() expects percentages (not decimals)
-
-        Args:
-            company_profile: CompanyProfile with metrics
-            models_for_blending: List of model results (for context)
-            financials: Financial metrics dict (net_income, revenue, etc.)
-            ratios: Financial ratios dict (payout_ratio, rule_of_40_score, etc.)
-
-        Returns:
-            Tuple of (weights_dict, tier_classification) or just weights_dict for backward compat
-        """
-        try:
-            # Extract symbol
-            symbol = company_profile.symbol if hasattr(company_profile, "symbol") else "UNKNOWN"
-
-            # Use provided financials and ratios if available, otherwise reconstruct from company_profile
-            if financials is None:
-                # Backward compatibility: reconstruct from company_profile
-                self.logger.debug(f"{symbol} - No financials provided, reconstructing from company_profile")
-                financials = {
-                    "net_income": getattr(company_profile, "net_income", 0),
-                    "revenue": getattr(company_profile, "revenue", 0),
-                    "dividends_paid": getattr(company_profile, "dividends_paid", 0),
-                    "ebitda": getattr(company_profile, "ebitda", 0),
-                    "book_value": getattr(company_profile, "book_value", 0),
-                    "market_cap": 0,  # Will be extracted from model results below
-                    "current_price": 0,  # Will be extracted from model results below
-                }
-
-            # CRITICAL FIX: Add fields required for model applicability checks
-            # These fields were missing, causing DCF, EV/EBITDA, and P/B to be incorrectly filtered out
-
-            # Count quarters with FCF data for DCF applicability
-            fcf_quarters_count = 0
-            if hasattr(company_profile, "quarterly_metrics") and company_profile.quarterly_metrics:
-                for quarter in company_profile.quarterly_metrics:
-                    # Check if this quarter has FCF data
-                    if isinstance(quarter, dict):
-                        cash_flow = quarter.get("cash_flow", {})
-                        if isinstance(cash_flow, dict):
-                            fcf = cash_flow.get("free_cash_flow")
-                            if fcf is not None:
-                                fcf_quarters_count += 1
-                    else:
-                        # Handle object access pattern
-                        if hasattr(quarter, "cash_flow"):
-                            cash_flow = getattr(quarter, "cash_flow", {})
-                            if isinstance(cash_flow, dict):
-                                fcf = cash_flow.get("free_cash_flow")
-                                if fcf is not None:
-                                    fcf_quarters_count += 1
-
-            financials["fcf_quarters_count"] = fcf_quarters_count
-
-            # Add TTM free cash flow for DCF calculation
-            if hasattr(company_profile, "free_cash_flow"):
-                financials["free_cash_flow"] = getattr(company_profile, "free_cash_flow", 0)
-            elif hasattr(company_profile, "ttm_metrics") and isinstance(company_profile.ttm_metrics, dict):
-                financials["free_cash_flow"] = company_profile.ttm_metrics.get("free_cash_flow", 0)
-            else:
-                financials["free_cash_flow"] = 0
-
-            # CRITICAL FIX: Add dividends_paid for GGM applicability
-            if hasattr(company_profile, "dividends_paid") and company_profile.dividends_paid:
-                financials["dividends_paid"] = company_profile.dividends_paid
-
-            # CRITICAL FIX: Add ebitda for EV/EBITDA applicability
-            if hasattr(company_profile, "ebitda") and company_profile.ebitda:
-                financials["ebitda"] = company_profile.ebitda
-
-            # CRITICAL FIX: Infer fcf_quarters_count from TTM FCF if not detected from quarterly data
-            if fcf_quarters_count == 0 and financials.get("free_cash_flow", 0) > 0:
-                fcf_quarters_count = 4  # TTM implies 4 quarters
-                financials["fcf_quarters_count"] = fcf_quarters_count
-                self.logger.info(f"{symbol} - Inferred fcf_quarters_count=4 from TTM FCF value")
-
-            self.logger.info(
-                f"{symbol} - Applicability fields: fcf_quarters={fcf_quarters_count}, "
-                f"fcf=${financials.get('free_cash_flow', 0)/1e9:.2f}B, "
-                f"ebitda=${financials.get('ebitda', 0)/1e9:.2f}B, "
-                f"dividends_paid=${financials.get('dividends_paid', 0)/1e9:.2f}B, "
-                f"book_value=${financials.get('book_value', 0)/1e9:.2f}B"
-            )
-
-            if ratios is None:
-                # Backward compatibility: reconstruct from company_profile
-                self.logger.debug(f"{symbol} - No ratios provided, reconstructing from company_profile")
-                ratios = {
-                    "payout_ratio": getattr(company_profile, "dividend_payout_ratio", 0),
-                    "rule_of_40_score": getattr(company_profile, "rule_of_40_score", 0),
-                    "revenue_growth_pct": getattr(company_profile, "revenue_growth_yoy", 0),
-                    "fcf_margin_pct": (
-                        getattr(company_profile, "fcf_margin", 0) * 100
-                        if getattr(company_profile, "fcf_margin", None)
-                        else 0
-                    ),
-                    "ttm_eps": 0,  # Will be extracted from model results below
-                }
-
-            # Extract enhanced weighting data from model results
-            # This data is in the model assumptions/metadata, not company_profile
-            self.logger.debug(
-                f"{symbol} - DEBUG: models_for_blending type: {type(models_for_blending)}, length: {len(models_for_blending) if models_for_blending else 0}"
-            )
-
-            for idx, model_result in enumerate(models_for_blending):
-                if model_result is None:
-                    continue
-
-                # Debug logging to understand structure
-                self.logger.debug(f"{symbol} - DEBUG: model_result[{idx}] type: {type(model_result)}")
-                if isinstance(model_result, dict):
-                    self.logger.debug(f"{symbol} - DEBUG: model_result[{idx}] keys: {list(model_result.keys())}")
-                    if "model_name" in model_result:
-                        self.logger.debug(
-                            f"{symbol} - DEBUG: model_result[{idx}] model_name: {model_result.get('model_name')}"
-                        )
-                else:
-                    self.logger.debug(
-                        f"{symbol} - DEBUG: model_result[{idx}] attributes: {[a for a in dir(model_result) if not a.startswith('_')][:10]}"
-                    )
-                    if hasattr(model_result, "model_name"):
-                        self.logger.debug(
-                            f"{symbol} - DEBUG: model_result[{idx}] model_name: {getattr(model_result, 'model_name', None)}"
-                        )
-
-                # Handle both dict and object access patterns
-                # NOTE: model results use 'model' key, not 'model_name'
-                model_name = (
-                    model_result.get("model")
-                    if isinstance(model_result, dict)
-                    else getattr(model_result, "model", None)
-                )
-
-                # Extract from P/E model (has current_price and ttm_eps)
-                if model_name == "pe":
-                    if isinstance(model_result, dict):
-                        assumptions = model_result.get("assumptions", {})
-                        metadata = model_result.get("metadata", {})
-                    else:
-                        assumptions = getattr(model_result, "assumptions", {})
-                        metadata = getattr(model_result, "metadata", {})
-
-                    current_price = metadata.get("current_price")
-                    if current_price is not None:
-                        financials["current_price"] = current_price
-
-                    ttm_eps = assumptions.get("ttm_eps")
-                    if ttm_eps is not None:
-                        ratios["ttm_eps"] = ttm_eps
-
-                # Extract from any model that has market_cap
-                if isinstance(model_result, dict):
-                    assumptions = model_result.get("assumptions", {})
-                    metadata = model_result.get("metadata", {})
-                else:
-                    assumptions = (
-                        getattr(model_result, "assumptions", {}) if hasattr(model_result, "assumptions") else {}
-                    )
-                    metadata = getattr(model_result, "metadata", {}) if hasattr(model_result, "metadata") else {}
-
-                market_cap_from_assumptions = assumptions.get("market_cap", 0) if isinstance(assumptions, dict) else 0
-                if market_cap_from_assumptions > 0:
-                    financials["market_cap"] = market_cap_from_assumptions
-
-                market_cap_from_metadata = metadata.get("market_cap", 0) if isinstance(metadata, dict) else 0
-                if market_cap_from_metadata > 0:
-                    financials["market_cap"] = market_cap_from_metadata
-
-            # Calculate market_cap from current_price and shares if not found
-            if financials["market_cap"] == 0 and financials["current_price"] > 0:
-                # Try to get shares_outstanding from model results
-                for model_result in models_for_blending:
-                    if model_result is None:
-                        continue
-
-                    if isinstance(model_result, dict):
-                        assumptions = model_result.get("assumptions", {})
-                    else:
-                        assumptions = getattr(model_result, "assumptions", {})
-
-                    shares = assumptions.get("shares_outstanding", 0) if isinstance(assumptions, dict) else 0
-                    if shares > 0:
-                        financials["market_cap"] = financials["current_price"] * shares
-                        break
-
-            # Extract data quality (if available)
-            data_quality = getattr(company_profile, "data_quality", None)
-
-            # CRITICAL FIX: Add FCF quarters count for DCF applicability check
-            # Count quarters with FCF data - required for ModelApplicabilityRules
-            fcf_quarters_count = 0
-            if hasattr(company_profile, "quarterly_metrics") and company_profile.quarterly_metrics:
-                for quarter in company_profile.quarterly_metrics:
-                    # Check if this quarter has FCF data
-                    if isinstance(quarter, dict):
-                        cash_flow = quarter.get("cash_flow", {})
-                        if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
-                            fcf_quarters_count += 1
-                    else:
-                        # Handle object access pattern
-                        if hasattr(quarter, "cash_flow"):
-                            cash_flow = getattr(quarter, "cash_flow", {})
-                            if isinstance(cash_flow, dict) and cash_flow.get("free_cash_flow") is not None:
-                                fcf_quarters_count += 1
-
-            # Add to financials dict for applicability check
-            financials["fcf_quarters_count"] = fcf_quarters_count
-
-            # Add TTM free cash flow if available
-            if hasattr(company_profile, "free_cash_flow") and company_profile.free_cash_flow:
-                financials["free_cash_flow"] = company_profile.free_cash_flow
-            elif hasattr(company_profile, "ttm_metrics") and isinstance(company_profile.ttm_metrics, dict):
-                financials["free_cash_flow"] = company_profile.ttm_metrics.get("free_cash_flow", 0)
-
-            # CRITICAL FIX: Add dividends_paid for GGM applicability
-            if hasattr(company_profile, "dividends_paid") and company_profile.dividends_paid:
-                financials["dividends_paid"] = company_profile.dividends_paid
-
-            # CRITICAL FIX: Add ebitda for EV/EBITDA applicability
-            if hasattr(company_profile, "ebitda") and company_profile.ebitda:
-                financials["ebitda"] = company_profile.ebitda
-
-            # CRITICAL FIX: Infer fcf_quarters_count from TTM FCF if not detected from quarterly data
-            if fcf_quarters_count == 0 and financials.get("free_cash_flow", 0) > 0:
-                fcf_quarters_count = 4  # TTM implies 4 quarters
-                financials["fcf_quarters_count"] = fcf_quarters_count
-                self.logger.info(f"{symbol} - Inferred fcf_quarters_count=4 from TTM FCF value")
-
-            self.logger.info(
-                f"{symbol} - Applicability fields added: fcf_quarters={fcf_quarters_count}, "
-                f"fcf=${financials.get('free_cash_flow', 0)/1e9:.2f}B, "
-                f"ebitda=${financials.get('ebitda', 0)/1e9:.2f}B, "
-                f"dividends_paid=${financials.get('dividends_paid', 0)/1e9:.2f}B, "
-                f"book_value=${financials.get('book_value', 0)/1e9:.2f}B"
-            )
-
-            # Call dynamic weighting service (returns 3-tuple: weights, tier_classification, audit_trail)
-            # TODO: Build MarketContext from technical/market context agent results
-            # For now, pass market_context=None (weights use tier-based defaults only)
-            weights, tier_classification, audit_trail = self.dynamic_weighting_service.determine_weights(
-                symbol=symbol,
-                financials=financials,
-                ratios=ratios,
-                data_quality=data_quality,
-                market_context=None,  # Future: extract from agent results
-            )
-
-            # Log audit trail summary if available
-            if audit_trail:
-                audit_trail.log_summary()
-
-            self.logger.info(
-                f"{symbol} - Dynamic weights determined (tier={tier_classification}): "
-                f"{', '.join([f'{model.upper()}={weight}%' for model, weight in weights.items() if weight > 0])}"
-            )
-
-            return weights, tier_classification
-
-        except Exception as e:
-            self.logger.warning(f"Dynamic weighting failed: {e}. Falling back to static weights.")
-
-            # Fallback to old static logic if dynamic weighting fails
-            valuation_settings = getattr(self.config, "valuation", None)
-            if isinstance(valuation_settings, dict):
-                fallback_cfg = valuation_settings.get("model_fallback", {})
-            else:
-                fallback_cfg = getattr(valuation_settings, "model_fallback", {}) if valuation_settings else {}
-
-            if not isinstance(fallback_cfg, dict) or not fallback_cfg:
-                return None, "fallback_error"  # Return tuple with error tier
-
-            def _normalize_key(key: Optional[str]) -> Optional[str]:
-                return key.lower() if key else None
-
-            primary_key = _normalize_key(
-                company_profile.primary_archetype.name if company_profile.primary_archetype else None
-            )
-            fallback_node = None
-            if primary_key and primary_key in fallback_cfg:
-                fallback_node = fallback_cfg[primary_key]
-            elif primary_key and primary_key.capitalize() in fallback_cfg:
-                fallback_node = fallback_cfg[primary_key.capitalize()]
-            else:
-                fallback_node = fallback_cfg.get("default")
-
-            fallback_tier = "static_fallback"
-            if not fallback_node:
-                return None, "no_fallback_node"
-
-            weights = (
-                fallback_node.get("weights")
-                if isinstance(fallback_node, dict)
-                else getattr(fallback_node, "weights", None)
-            )
-            if not isinstance(weights, dict):
-                return None, "invalid_fallback_weights"
-
-            available_models = {model.get("model") for model in models_for_blending if model.get("model")}
-            resolved = {
-                model_key: float(weight)
-                for model_key, weight in weights.items()
-                if model_key in available_models and weight is not None
-            }
-
-            # Convert decimals to percentages if needed
-            if resolved and all(v <= 1.0 for v in resolved.values()):
-                resolved = {k: v * 100 for k, v in resolved.items()}
-
-            return (resolved, fallback_tier) if resolved else (None, "no_resolved_weights")
+    ) -> Tuple[Optional[Dict[str, float]], str]:
+        """Delegate dynamic/static fallback weighting logic to shared helper."""
+        return resolve_fallback_weights(
+            company_profile=company_profile,
+            models_for_blending=models_for_blending,
+            financials=financials,
+            ratios=ratios,
+            dynamic_weighting_service=self.dynamic_weighting_service,
+            config=self.config,
+            logger=self.logger,
+        )
 
     def _load_model_selection_rules(self) -> Dict[str, Any]:
         rules_path = Path("config/model_selection.yaml")
@@ -6170,171 +3452,12 @@ class FundamentalAnalysisAgent(InvestmentAgent):
 
     def _get_historical_trend(self, financials: Dict) -> Dict:
         """Get historical financial trends"""
-        # This would extract multi-year historical data
-        # Placeholder for demonstration
-        return {
-            "revenue_trend": [100, 110, 121, 133],  # Millions
-            "earnings_trend": [10, 12, 15, 18],
-            "years": [2021, 2022, 2023, 2024],
-        }
+        return _get_historical_trend_helper(financials)
 
     def _summarize_company_data(self, company_data: Dict) -> Dict:
         """Create summary of company data for report"""
-        financials = company_data.get("financials") or {}
-        market_data = company_data.get("market_data", {})
-
-        # Try multiple locations for market_cap (stored at top level after calculation)
-        market_cap = (
-            company_data.get("market_cap", 0)
-            or market_data.get("market_cap", 0)
-            or market_data.get("market_cap", 0)
-            or 0
-        )
-
-        return {
-            "symbol": company_data["symbol"],
-            "market_cap": market_cap,
-            "price": market_data.get("price", 0) or company_data.get("current_price", 0),
-            "revenue": financials.get("revenues") or 0,
-            "net_income": financials.get("net_income") or 0,
-            "total_assets": financials.get("total_assets") or 0,
-            "total_equity": financials.get("stockholders_equity") or 0,
-        }
+        return _summarize_company_data_helper(company_data)
 
     def _extract_latest_financials(self, quarterly_data: List) -> Dict:
         """Extract latest financial statement from quarterly data (supports both Dict and QuarterlyData objects)"""
-        from data.models import QuarterlyData
-
-        if not quarterly_data or len(quarterly_data) == 0:
-            return {}
-
-        # Get the most recent quarter
-        latest_quarter = quarterly_data[0] if isinstance(quarterly_data, list) else quarterly_data
-
-        # Handle QuarterlyData objects (dataclass with financial_data attribute)
-        if isinstance(latest_quarter, QuarterlyData):
-            financial_data = latest_quarter.financial_data
-
-            # Helper to safely get values from nested dictionaries
-            def safe_get(statement_dict, key, default=0):
-                if statement_dict and isinstance(statement_dict, dict):
-                    return statement_dict.get(key, default)
-                return default
-
-            # Extract from income_statement, balance_sheet, cash_flow_statement
-            income_stmt = financial_data.income_statement if hasattr(financial_data, "income_statement") else {}
-            balance_sheet = financial_data.balance_sheet if hasattr(financial_data, "balance_sheet") else {}
-            cash_flow = financial_data.cash_flow_statement if hasattr(financial_data, "cash_flow_statement") else {}
-            quarterly = financial_data.quarterly_data if hasattr(financial_data, "quarterly_data") else {}
-
-            # Extract depreciation_amortization from cash_flow for EBITDA calculation
-            operating_income = safe_get(income_stmt, "operating_income") or safe_get(quarterly, "operating_income")
-            depreciation_amortization = safe_get(cash_flow, "depreciation_amortization") or safe_get(
-                quarterly, "depreciation_amortization"
-            )
-
-            # Calculate EBITDA on-the-fly: Operating Income + D&A
-            ebitda = 0
-            if operating_income and depreciation_amortization:
-                ebitda = operating_income + depreciation_amortization
-            elif operating_income:
-                # If D&A not available, EBITDA = operating_income (conservative)
-                ebitda = operating_income
-
-            return {
-                "revenues": safe_get(income_stmt, "revenue")
-                or safe_get(income_stmt, "revenues")
-                or safe_get(quarterly, "revenue"),
-                "net_income": safe_get(income_stmt, "net_income")
-                or safe_get(income_stmt, "earnings")
-                or safe_get(quarterly, "net_income"),
-                "total_assets": safe_get(balance_sheet, "total_assets") or safe_get(quarterly, "total_assets"),
-                "total_liabilities": safe_get(balance_sheet, "total_liabilities")
-                or safe_get(quarterly, "total_liabilities"),
-                "stockholders_equity": safe_get(balance_sheet, "stockholders_equity")
-                or safe_get(balance_sheet, "shareholderEquity")
-                or safe_get(quarterly, "stockholders_equity"),
-                "total_debt": safe_get(balance_sheet, "total_debt")
-                or safe_get(balance_sheet, "long_term_debt")
-                or safe_get(quarterly, "total_debt"),
-                "cash": safe_get(balance_sheet, "cash")
-                or safe_get(balance_sheet, "cash_and_equivalents")
-                or safe_get(quarterly, "cash"),
-                "current_assets": safe_get(balance_sheet, "current_assets") or safe_get(quarterly, "current_assets"),
-                "current_liabilities": safe_get(balance_sheet, "current_liabilities")
-                or safe_get(quarterly, "current_liabilities"),
-                "gross_profit": safe_get(income_stmt, "gross_profit") or safe_get(quarterly, "gross_profit"),
-                "operating_income": operating_income,
-                "depreciation_amortization": depreciation_amortization,  # NEW: Extract D&A
-                "ebitda": ebitda,  # NEW: Calculate EBITDA on-the-fly
-                "operating_cash_flow": safe_get(cash_flow, "operating_cash_flow")
-                or safe_get(quarterly, "operating_cash_flow"),
-                "capital_expenditures": safe_get(cash_flow, "capital_expenditures")
-                or safe_get(quarterly, "capital_expenditures"),
-                "free_cash_flow": safe_get(cash_flow, "free_cash_flow") or safe_get(quarterly, "free_cash_flow"),
-                "inventory": safe_get(balance_sheet, "inventory") or safe_get(quarterly, "inventory"),
-                "cost_of_revenue": safe_get(income_stmt, "cost_of_revenue") or safe_get(quarterly, "cost_of_revenue"),
-                "dividends": safe_get(cash_flow, "dividends") or safe_get(quarterly, "dividends"),
-                "shares_outstanding": safe_get(balance_sheet, "shares_outstanding")
-                or safe_get(quarterly, "shares_outstanding"),
-            }
-
-        # Handle legacy Dict format (for backwards compatibility)
-        elif isinstance(latest_quarter, dict):
-            # Extract from nested structure if present (dict format from sec_companyfacts_processed)
-            income_stmt = latest_quarter.get("income_statement", {})
-            cash_flow = latest_quarter.get("cash_flow", {})
-            balance_sheet = latest_quarter.get("balance_sheet", {})
-
-            # Calculate EBITDA on-the-fly from dict format
-            operating_income = latest_quarter.get("operating_income", 0) or income_stmt.get("operating_income", 0)
-            depreciation_amortization = latest_quarter.get("depreciation_amortization", 0) or cash_flow.get(
-                "depreciation_amortization", 0
-            )
-
-            # Calculate EBITDA
-            ebitda = 0
-            if operating_income and depreciation_amortization:
-                ebitda = operating_income + depreciation_amortization
-            elif operating_income:
-                ebitda = operating_income
-
-            return {
-                "revenues": latest_quarter.get("revenue", 0)
-                or latest_quarter.get("revenues", 0)
-                or income_stmt.get("total_revenue", 0),
-                "net_income": latest_quarter.get("net_income", 0)
-                or latest_quarter.get("earnings", 0)
-                or income_stmt.get("net_income", 0),
-                "total_assets": latest_quarter.get("total_assets", 0) or balance_sheet.get("total_assets", 0),
-                "total_liabilities": latest_quarter.get("total_liabilities", 0)
-                or balance_sheet.get("total_liabilities", 0),
-                "stockholders_equity": latest_quarter.get("stockholders_equity", 0)
-                or latest_quarter.get("shareholderEquity", 0)
-                or balance_sheet.get("stockholders_equity", 0),
-                "total_debt": latest_quarter.get("total_debt", 0)
-                or latest_quarter.get("long_term_debt", 0)
-                or balance_sheet.get("total_debt", 0),
-                "cash": latest_quarter.get("cash", 0)
-                or latest_quarter.get("cash_and_equivalents", 0)
-                or balance_sheet.get("cash_and_equivalents", 0),
-                "current_assets": latest_quarter.get("current_assets", 0) or balance_sheet.get("current_assets", 0),
-                "current_liabilities": latest_quarter.get("current_liabilities", 0)
-                or balance_sheet.get("current_liabilities", 0),
-                "gross_profit": latest_quarter.get("gross_profit", 0) or income_stmt.get("gross_profit", 0),
-                "operating_income": operating_income,
-                "depreciation_amortization": depreciation_amortization,  # NEW: Extract D&A
-                "ebitda": ebitda,  # NEW: Calculate EBITDA on-the-fly
-                "operating_cash_flow": latest_quarter.get("operating_cash_flow", 0)
-                or cash_flow.get("operating_cash_flow", 0),
-                "capital_expenditures": latest_quarter.get("capital_expenditures", 0)
-                or cash_flow.get("capital_expenditures", 0),
-                "free_cash_flow": latest_quarter.get("free_cash_flow", 0) or cash_flow.get("free_cash_flow", 0),
-                "inventory": latest_quarter.get("inventory", 0) or balance_sheet.get("inventory", 0),
-                "cost_of_revenue": latest_quarter.get("cost_of_revenue", 0) or income_stmt.get("cost_of_revenue", 0),
-                "dividends": latest_quarter.get("dividends", 0) or cash_flow.get("dividends_paid", 0),
-                "shares_outstanding": latest_quarter.get("shares_outstanding", 0)
-                or balance_sheet.get("shares_outstanding", 0),
-            }
-
-        return {}
+        return _extract_latest_financials_helper(quarterly_data)

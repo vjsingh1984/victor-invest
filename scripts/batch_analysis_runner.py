@@ -44,6 +44,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import create_engine, text
 
+# Shared symbol repository for consistent ticker fetching
+from investigator.infrastructure.database.symbol_repository import SymbolRepository
+
 # Victor-Invest imports - uses BaseYAMLWorkflowProvider pattern
 from victor_invest.workflows import (
     AnalysisMode,
@@ -197,21 +200,12 @@ class BatchAnalysisRunner:
         self.error_file = Path("logs/batch_error_symbols.txt")
         self.results_file = self.output_dir / "batch_analysis_results.jsonl"
 
-        # Database connections with proper pool config
-        self.stock_engine = create_engine(
-            "postgresql://stockuser:${STOCK_DB_PASSWORD}@${STOCK_DB_HOST}:5432/stock",
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True,
-            pool_recycle=3600,
-        )
-        self.sec_engine = create_engine(
-            "postgresql://investigator:${SEC_DB_PASSWORD}@${SEC_DB_HOST}:5432/sec_database",
-            pool_size=5,
-            max_overflow=10,
-            pool_pre_ping=True,
-            pool_recycle=3600,
-        )
+        # Shared symbol repository for consistent ticker fetching
+        self.symbol_repo = SymbolRepository()
+
+        # Keep engine references for methods that need direct DB access
+        self.stock_engine = self.symbol_repo.stock_engine
+        self.sec_engine = self.symbol_repo.sec_engine
 
         # RL Outcome Tracker for recording predictions
         self.outcome_tracker = None
@@ -292,106 +286,24 @@ class BatchAnalysisRunner:
         return [str(w) for w in validation_warnings]
 
     def get_domestic_filers(self) -> Set[str]:
-        """
-        Get symbols that file 10-K/10-Q (domestic filers).
-        Excludes foreign private issuers who file 20-F/6-K.
-        """
-        with self.sec_engine.connect() as conn:
-            # Check for symbols with quarterly data (Q1, Q2, Q3, Q4)
-            result = conn.execute(
-                text(
-                    """
-                    SELECT DISTINCT symbol
-                    FROM sec_companyfacts_processed
-                    WHERE fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
-                """
-                )
-            )
-            domestic = {row[0] for row in result.fetchall()}
-            logger.info(f"Found {len(domestic)} domestic filers with quarterly data")
-            return domestic
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_domestic_filers()
 
     def get_russell1000_symbols(self) -> List[str]:
-        """Get Russell 1000 symbols from stock database."""
-        with self.stock_engine.connect() as conn:
-            result = conn.execute(
-                text(
-                    """
-                    SELECT ticker
-                    FROM symbol
-                    WHERE russell1000 = TRUE
-                      AND islisted = TRUE
-                      AND isstock = TRUE
-                      AND (isetf IS NULL OR isetf = FALSE)
-                    ORDER BY mktcap DESC NULLS LAST
-                """
-                )
-            )
-            symbols = [row[0] for row in result.fetchall()]
-            logger.info(f"Found {len(symbols)} Russell 1000 symbols")
-            return symbols
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_russell1000_symbols()
+
+    def get_all_symbols(self, us_only: bool = True, order_by: str = "stockid") -> List[str]:
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_all_symbols(us_only=us_only, order_by=order_by)
 
     def get_top_n_symbols(self, n: int, us_only: bool = True) -> List[str]:
-        """Get top N stocks by market cap (excludes ETFs/ETNs)."""
-        with self.stock_engine.connect() as conn:
-            if us_only:
-                result = conn.execute(
-                    text(
-                        """
-                        SELECT ticker
-                        FROM symbol
-                        WHERE islisted = TRUE
-                          AND isstock = TRUE
-                          AND (isetf IS NULL OR isetf = FALSE)
-                          AND mktcap IS NOT NULL
-                          AND mktcap > 0
-                          AND cik IS NOT NULL
-                        ORDER BY mktcap DESC
-                        LIMIT :n
-                    """
-                    ),
-                    {"n": n},
-                )
-            else:
-                result = conn.execute(
-                    text(
-                        """
-                        SELECT ticker
-                        FROM symbol
-                        WHERE islisted = TRUE
-                          AND isstock = TRUE
-                          AND (isetf IS NULL OR isetf = FALSE)
-                          AND mktcap IS NOT NULL
-                          AND mktcap > 0
-                        ORDER BY mktcap DESC
-                        LIMIT :n
-                    """
-                    ),
-                    {"n": n},
-                )
-            symbols = [row[0] for row in result.fetchall()]
-            logger.info(f"Found {len(symbols)} top symbols by market cap")
-            return symbols
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_top_n_symbols(n, us_only=us_only)
 
     def get_sp500_symbols(self) -> List[str]:
-        """Get S&P 500 symbols (stocks only)."""
-        with self.stock_engine.connect() as conn:
-            result = conn.execute(
-                text(
-                    """
-                    SELECT ticker
-                    FROM symbol
-                    WHERE sp500 = TRUE
-                      AND islisted = TRUE
-                      AND isstock = TRUE
-                      AND (isetf IS NULL OR isetf = FALSE)
-                    ORDER BY mktcap DESC NULLS LAST
-                """
-                )
-            )
-            symbols = [row[0] for row in result.fetchall()]
-            logger.info(f"Found {len(symbols)} S&P 500 symbols")
-            return symbols
+        """Delegate to shared SymbolRepository."""
+        return self.symbol_repo.get_sp500_symbols()
 
     def get_already_processed_symbols(self) -> Set[str]:
         """Get symbols that already have SEC processed data."""
@@ -838,47 +750,71 @@ class BatchAnalysisRunner:
         symbols: List[str],
         skip_processed: bool = True,
         resume_from: Optional[str] = None,
+        skip_domestic_filter: bool = False,
     ):
         """Run batch analysis for all symbols."""
+        print(f"  Starting batch run with {len(symbols)} symbols...", flush=True)
         start_time = datetime.now()
 
         # Filter out already processed symbols
         if skip_processed:
+            print("  Checking for already processed symbols...", flush=True)
             already_processed = self.get_already_processed_symbols()
             file_processed = self.load_processed_from_file()
             all_processed = already_processed | file_processed
 
             original_count = len(symbols)
             symbols = [s for s in symbols if s not in all_processed]
+            print(
+                f"  Filtered: {original_count} -> {len(symbols)} symbols "
+                f"(skipping {len(all_processed)} already processed)", flush=True
+            )
             logger.info(
                 f"Filtered from {original_count} to {len(symbols)} symbols "
                 f"(skipping {len(all_processed)} already processed)"
             )
 
         # Filter out foreign filers (20-F/6-K) - they lack quarterly data for proper valuation
-        domestic_filers = self.get_domestic_filers()
-        foreign_count = len([s for s in symbols if s not in domestic_filers])
-        if foreign_count > 0:
-            symbols = [s for s in symbols if s in domestic_filers]
-            logger.info(
-                f"Filtered out {foreign_count} foreign filers (20-F/6-K) - " f"{len(symbols)} domestic filers remaining"
-            )
+        if not skip_domestic_filter:
+            print("  Checking for domestic filers...", flush=True)
+            domestic_filers = self.get_domestic_filers()
+            foreign_count = len([s for s in symbols if s not in domestic_filers])
+            if foreign_count > 0:
+                symbols = [s for s in symbols if s in domestic_filers]
+                print(f"  Filtered out {foreign_count} foreign filers -> {len(symbols)} remaining", flush=True)
+                logger.info(
+                    f"Filtered out {foreign_count} foreign filers (20-F/6-K) - " f"{len(symbols)} domestic filers remaining"
+                )
+        else:
+            print("  Skipping domestic filer filter (--skip-domestic-filter)", flush=True)
 
         # Resume from specific symbol
         if resume_from:
             try:
                 idx = symbols.index(resume_from)
                 symbols = symbols[idx:]
+                print(f"  Resuming from {resume_from}, {len(symbols)} remaining", flush=True)
                 logger.info(f"Resuming from {resume_from}, {len(symbols)} symbols remaining")
             except ValueError:
                 logger.warning(f"Resume symbol {resume_from} not found in list")
 
         if not symbols:
+            print("  No symbols to process after filtering!", flush=True)
             logger.info("No symbols to process!")
             return
 
         total_symbols = len(symbols)
         total_batches = (total_symbols + self.batch_size - 1) // self.batch_size
+
+        print("=" * 60, flush=True)
+        print("VICTOR-INVEST BATCH ANALYSIS RUNNER", flush=True)
+        print("=" * 60, flush=True)
+        print(f"  Total symbols: {total_symbols}", flush=True)
+        print(f"  Batch size: {self.batch_size}", flush=True)
+        print(f"  Total batches: {total_batches}", flush=True)
+        print(f"  Analysis mode: {self.mode.value}", flush=True)
+        print(f"  RL Policy: Using dual policy (technical + fundamental)", flush=True)
+        print("=" * 60, flush=True)
 
         logger.info("=" * 60)
         logger.info("VICTOR-INVEST BATCH ANALYSIS RUNNER")
@@ -900,6 +836,7 @@ class BatchAnalysisRunner:
             batch_end = min(batch_start + self.batch_size, total_symbols)
             batch_symbols = symbols[batch_start:batch_end]
 
+            print(f"\nBATCH {batch_num + 1}/{total_batches}: {', '.join(batch_symbols)}", flush=True)
             logger.info(f"\n{'='*40}")
             logger.info(f"BATCH {batch_num + 1}/{total_batches} " f"({batch_start + 1}-{batch_end} of {total_symbols})")
             logger.info(f"Symbols: {', '.join(batch_symbols)}")
@@ -916,9 +853,12 @@ class BatchAnalysisRunner:
                 if result.success:
                     self.save_processed_symbol(result.symbol)
                     success_count += 1
+                    upside_str = f"{result.upside_pct:+.1f}%" if result.upside_pct else "N/A"
+                    print(f"  ✓ {result.symbol}: {upside_str} ({result.duration_seconds:.1f}s)", flush=True)
                 else:
                     self.save_error_symbol(result.symbol, result.error or "unknown")
                     error_count += 1
+                    print(f"  ✗ {result.symbol}: {result.error[:50] if result.error else 'unknown'}", flush=True)
 
             # Progress update
             elapsed = (datetime.now() - start_time).total_seconds()
@@ -927,6 +867,10 @@ class BatchAnalysisRunner:
             remaining = total_symbols - processed
             eta_minutes = remaining / rate if rate > 0 else 0
 
+            print(
+                f"  Progress: {processed}/{total_symbols} ({processed/total_symbols*100:.1f}%) | "
+                f"Success: {success_count} | Errors: {error_count} | ETA: {eta_minutes:.0f}m", flush=True
+            )
             logger.info(
                 f"\nProgress: {processed}/{total_symbols} ({processed/total_symbols*100:.1f}%) | "
                 f"Success: {success_count} | Errors: {error_count} | "
@@ -1013,6 +957,7 @@ def main():
     source_group = parser.add_mutually_exclusive_group(required=True)
     source_group.add_argument("--russell1000", action="store_true", help="Process Russell 1000 stocks")
     source_group.add_argument("--sp500", action="store_true", help="Process S&P 500 stocks")
+    source_group.add_argument("--all", action="store_true", help="Process ALL stocks from symbol table")
     source_group.add_argument("--top", type=int, metavar="N", help="Process top N stocks by market cap")
     source_group.add_argument("--file", type=str, metavar="FILE", help="Process symbols from file (one per line)")
     source_group.add_argument("--symbols", type=str, nargs="+", help="Process specific symbols")
@@ -1034,40 +979,71 @@ def main():
         action="store_true",
         help="Include foreign stocks without SEC filings (default: US only with CIK)",
     )
+    parser.add_argument(
+        "--skip-domestic-filter",
+        action="store_true",
+        help="Skip the domestic filer filter (process all stocks even without SEC quarterly data)",
+    )
+    parser.add_argument(
+        "--order-by",
+        choices=["stockid", "mktcap", "ticker"],
+        default="stockid",
+        help="Sort order: stockid (ascending), mktcap (descending), ticker (alphabetical). Default: stockid",
+    )
 
     args = parser.parse_args()
 
-    runner = BatchAnalysisRunner(
-        batch_size=args.batch_size,
-        delay_between_batches=args.delay,
-        mode=args.mode,
-        output_dir=args.output,
-    )
+    print(f"Starting batch analysis runner...", flush=True)
+    print(f"  Mode: {args.mode}, Batch size: {args.batch_size}, Delay: {args.delay}s", flush=True)
+
+    try:
+        runner = BatchAnalysisRunner(
+            batch_size=args.batch_size,
+            delay_between_batches=args.delay,
+            mode=args.mode,
+            output_dir=args.output,
+        )
+        print("  Runner initialized successfully", flush=True)
+    except Exception as e:
+        print(f"ERROR initializing runner: {e}", flush=True)
+        raise
 
     # Get symbols based on source
     us_only = not args.include_foreign
     if args.russell1000:
+        print("  Fetching Russell 1000 symbols...", flush=True)
         symbols = runner.get_russell1000_symbols()
+        print(f"  Found {len(symbols)} symbols", flush=True)
     elif args.sp500:
+        print("  Fetching S&P 500 symbols...", flush=True)
         symbols = runner.get_sp500_symbols()
+        print(f"  Found {len(symbols)} symbols", flush=True)
+    elif getattr(args, 'all', False):
+        print(f"  Fetching ALL stocks from symbol table (order: {args.order_by})...", flush=True)
+        symbols = runner.get_all_symbols(us_only=us_only, order_by=args.order_by)
+        print(f"  Found {len(symbols)} symbols", flush=True)
     elif args.top:
+        print(f"  Fetching top {args.top} stocks by market cap...", flush=True)
         symbols = runner.get_top_n_symbols(args.top, us_only=us_only)
+        print(f"  Found {len(symbols)} symbols", flush=True)
         if us_only:
             logger.info("Filtering to US stocks with SEC CIK only (use --include-foreign for all)")
     elif args.file:
         with open(args.file) as f:
             symbols = [line.strip() for line in f if line.strip()]
-        logger.info(f"Loaded {len(symbols)} symbols from {args.file}")
+        print(f"  Loaded {len(symbols)} symbols from {args.file}", flush=True)
     elif args.symbols:
         symbols = args.symbols
-        logger.info(f"Processing {len(symbols)} specified symbols")
+        print(f"  Processing {len(symbols)} specified symbols", flush=True)
 
     # Run the batch analysis
+    skip_domestic = getattr(args, 'skip_domestic_filter', False)
     asyncio.run(
         runner.run(
             symbols=symbols,
             skip_processed=not args.no_skip,
             resume_from=args.resume_from,
+            skip_domestic_filter=skip_domestic,
         )
     )
 

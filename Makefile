@@ -1,4 +1,4 @@
-.PHONY: help install dev-install test test-cov lint format type-check clean run analyze status cache-clean
+.PHONY: help install dev-install test test-cov lint format type-check clean run analyze status cache-clean benchmark-workflows
 
 .DEFAULT_GOAL := help
 
@@ -60,22 +60,25 @@ clean-all: clean ## Clean everything including data caches
 	@echo "$(GREEN)All caches and artifacts cleared$(RESET)"
 
 analyze: ## Run analysis on a symbol (usage: make analyze SYMBOL=AAPL)
-	python3 cli_orchestrator.py analyze $(SYMBOL) -m standard
+	python3 -m victor_invest.cli analyze $(SYMBOL) --mode standard
 
 analyze-force: ## Run analysis with force refresh (usage: make analyze-force SYMBOL=AAPL)
-	python3 cli_orchestrator.py analyze $(SYMBOL) -m standard --force-refresh
+	python3 -m victor_invest.cli analyze $(SYMBOL) --mode standard --force-refresh
 
 batch: ## Run batch analysis (usage: make batch SYMBOLS="AAPL MSFT GOOGL")
-	python3 cli_orchestrator.py batch $(SYMBOLS) --mode standard
+	python3 -m victor_invest.cli batch $(SYMBOLS) --mode standard
 
 status: ## Check system status
-	python3 cli_orchestrator.py status
+	python3 -m victor_invest.cli status
 
 cache-inspect: ## Inspect cache for symbol (usage: make cache-inspect SYMBOL=AAPL)
-	python3 cli_orchestrator.py inspect-cache --symbol $(SYMBOL) --verbose
+	python3 -m victor_invest.cli inspect-cache --symbol $(SYMBOL) --verbose
 
 cache-clean: ## Clean cache for symbol (usage: make cache-clean SYMBOL=AAPL)
-	python3 cli_orchestrator.py clean-cache --symbol $(SYMBOL)
+	python3 -m victor_invest.cli clean-cache --symbol $(SYMBOL)
+
+benchmark-workflows: ## Benchmark quick/standard/comprehensive latency budgets (usage: make benchmark-workflows SYMBOL=AAPL)
+	python3 scripts/benchmark_victor_workflows.py --symbol $(if $(SYMBOL),$(SYMBOL),AAPL) --output-json artifacts/benchmarks/workflow_benchmark_$(if $(SYMBOL),$(SYMBOL),AAPL).json
 
 run-dev: ## Run development server (if API exists)
 	uvicorn investigator.api.main:app --reload --port 8000

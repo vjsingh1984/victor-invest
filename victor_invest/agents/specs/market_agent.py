@@ -18,7 +18,7 @@ Defines the agent responsible for analyzing sector dynamics
 and macro factors.
 """
 
-from victor.agents.spec import (
+from victor.agent.specs.models import (
     AgentCapabilities,
     AgentConstraints,
     AgentSpec,

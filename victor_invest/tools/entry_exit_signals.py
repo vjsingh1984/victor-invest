@@ -93,7 +93,7 @@ class EntryExitSignalTool(BaseTool):
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Optional[Dict[str, Any]] = None,
         action: str = "generate_signals",
         symbol: str = "",
         current_price: float = 0.0,
@@ -177,13 +177,13 @@ class EntryExitSignalTool(BaseTool):
                     llm_analysis=llm_analysis,
                 )
             else:
-                return ToolResult.error_result(
+                return ToolResult.create_failure(
                     f"Unknown action: {action}. Valid actions: generate_signals, "
                     "get_entry_signals, get_exit_signals, get_entry_zone, integrate_signals"
                 )
         except Exception as e:
             logger.error(f"Error in EntryExitSignalTool: {e}")
-            return ToolResult.error_result(str(e))
+            return ToolResult.create_failure(str(e))
 
     async def _generate_all_signals(
         self,
@@ -243,8 +243,7 @@ class EntryExitSignalTool(BaseTool):
         exit_signals_data = [self._exit_signal_to_dict(s) for s in exit_signals[:5]]
         entry_zone_data = self._entry_zone_to_dict(entry_zone) if entry_zone else None
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "symbol": symbol,
                 "current_price": current_price,
                 "fair_value": fair_value,
@@ -288,8 +287,7 @@ class EntryExitSignalTool(BaseTool):
             support_resistance=sr,
         )
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "entry_signals": [self._signal_to_dict(s) for s in entry_signals[:5]],
                 "total_count": len(entry_signals),
             }
@@ -303,7 +301,7 @@ class EntryExitSignalTool(BaseTool):
     ) -> ToolResult:
         """Get exit signals only."""
         if not self._engine:
-            return ToolResult.success_result(data={"exit_signals": [], "total_count": 0})
+            return ToolResult.create_success(output={"exit_signals": [], "total_count": 0})
 
         df = self._to_dataframe(price_data, current_price)
 
@@ -313,8 +311,7 @@ class EntryExitSignalTool(BaseTool):
             position_info=None,
         )
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "exit_signals": [self._exit_signal_to_dict(s) for s in exit_signals[:5]],
                 "total_count": len(exit_signals),
             }
@@ -334,8 +331,7 @@ class EntryExitSignalTool(BaseTool):
             # Fallback calculation
             lower = current_price * 0.97
             upper = current_price * 1.02
-            return ToolResult.success_result(
-                data={
+            return ToolResult.create_success(output={
                     "lower_bound": round(lower, 2),
                     "upper_bound": round(upper, 2),
                     "ideal_entry": round(current_price * 0.98, 2),
@@ -355,7 +351,7 @@ class EntryExitSignalTool(BaseTool):
             atr=effective_atr,
         )
 
-        return ToolResult.success_result(data=self._entry_zone_to_dict(entry_zone) if entry_zone else {})
+        return ToolResult.create_success(output=self._entry_zone_to_dict(entry_zone) if entry_zone else {})
 
     async def _integrate_signals(
         self,
@@ -366,11 +362,11 @@ class EntryExitSignalTool(BaseTool):
     ) -> ToolResult:
         """Integrate programmatic and LLM signals."""
         if not self._integrator:
-            return ToolResult.error_result("Signal integrator not available")
+            return ToolResult.create_failure("Signal integrator not available")
 
         df = self._to_dataframe(price_data, 0)
         if df.empty:
-            return ToolResult.error_result("Price data required for signal integration")
+            return ToolResult.create_failure("Price data required for signal integration")
 
         integrated = self._integrator.integrate_signals(
             price_data=df,
@@ -383,7 +379,7 @@ class EntryExitSignalTool(BaseTool):
         report_data["signal_agreement_score"] = integrated.signal_agreement_score
         report_data["confidence_boost"] = integrated.confidence_boost
 
-        return ToolResult.success_result(data=report_data)
+        return ToolResult.create_success(output=report_data)
 
     def _to_dataframe(self, price_data: Optional[Dict], current_price: float) -> pd.DataFrame:
         """Convert price data to DataFrame."""
@@ -477,8 +473,7 @@ class EntryExitSignalTool(BaseTool):
                 }
             )
 
-        return ToolResult.success_result(
-            data={
+        return ToolResult.create_success(output={
                 "entry_signals": entry_signals,
                 "exit_signals": [],
                 "optimal_entry_zone": {
@@ -495,7 +490,7 @@ class EntryExitSignalTool(BaseTool):
                 "total_entry_signals": len(entry_signals),
                 "total_exit_signals": 0,
             },
-            warnings=["Using fallback signal generation - full engine not available"],
+            metadata={"warnings": ["Using fallback signal generation - full engine not available"]},
         )
 
     def get_schema(self) -> Dict[str, Any]:
