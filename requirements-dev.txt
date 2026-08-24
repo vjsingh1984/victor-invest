@@ -35,7 +35,7 @@ py-spy>=0.4.2
 locust>=2.46.3
 
 # Pre-commit hooks
-pre-commit>=4.6.1
+pre-commit>=4.6.2
 
 # Type stubs
 types-requests>=2.33.0.20260712
