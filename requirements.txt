@@ -102,5 +102,5 @@ cerberus>=1.3.8
 # Logging
 structlog>=23.2.0
 loguru>=0.7.0
-pydantic-settings>=2.0.0
+pydantic-settings>=2.15.0
 certifi>=2023.0.0  # SSL certificate bundle for HTTPS requests
